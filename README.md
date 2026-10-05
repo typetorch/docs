@@ -88,9 +88,10 @@ flowchart LR
 ## Conventions in these docs
 
 - Commands work in PowerShell 5.1 and bash unless a block says otherwise.
-- `bun run typetorch <command>` runs the CLI: from npm (`@typetorch/cli` in your dev dependencies) or from its
-  checkout next to your game (see [fresh setup](getting-started/fresh-setup.md#2-get-the-code)). Without either,
-  `npx @typetorch/cli <command>` does the same.
+- `bun run typetorch <command>` runs the CLI: `@typetorch/cli` from npm, in the game's dev dependencies with the
+  script `"typetorch": "typetorch"` (the template has both; see
+  [fresh setup](getting-started/fresh-setup.md#2-get-the-code)). Without it, `npx @typetorch/cli <command>` does the
+  same.
 - Ids in examples are fake: universe `1234567890`, place `9876543210`, group `1234567`, user `111111111`.
 
 ## License

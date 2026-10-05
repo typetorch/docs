@@ -12,7 +12,7 @@ owner** (or a member whose group role may create assets and publish places). The
 
 | Tool | Why | Install |
 |---|---|---|
-| [Bun](https://bun.sh) 1.3+ | package manager and the CLI's runtime | PowerShell: `powershell -c "irm bun.sh/install.ps1 \| iex"`; bash: `curl -fsSL https://bun.sh/install \| bash` |
+| [Bun](https://bun.sh) 1.3+ | package manager; runs the builds | PowerShell: `powershell -c "irm bun.sh/install.ps1 \| iex"`; bash: `curl -fsSL https://bun.sh/install \| bash` |
 | [git](https://git-scm.com) | every build is identified by its commit | your OS package manager |
 | [Rokit](https://github.com/rojo-rbx/rokit) | pins Rojo and Lune per project | the Rokit releases page, then `rokit self-install` |
 | Roblox Studio | creating the experience, settings, testing | [create.roblox.com](https://create.roblox.com) |
@@ -32,98 +32,23 @@ Each prints a version (Bun 1.3 or newer).
 
 ## 2. Get the code
 
-The packages are on npm (`@typetorch/framework`, `transformer`, `kernel`, `cli`, `dev-server`). Two ways to get them:
-
-- **From npm:** clone only the template and switch three entries (see [From npm](#from-npm) below).
-- **Local checkouts** (what the template does today): packed copies of checkouts next to your game. Use this to try
-  framework or kernel changes that aren't released yet.
-
-### Local checkouts
-
-The checkouts sit **next to** your game:
-
-```text
-games/                 any folder
-  my-game/             your game (a copy of the template)
-  framework/           https://github.com/typetorch/framework
-  kernel/              https://github.com/typetorch/kernel
-  transformer/         https://github.com/typetorch/transformer
-  cli/                 https://github.com/typetorch/cli
-  dev-server/          https://github.com/typetorch/dev-server   (optional, for remote-claude)
-```
-
-From the `games` folder:
-
-```sh
-git clone https://github.com/typetorch/template my-game
-git clone https://github.com/typetorch/framework
-git clone https://github.com/typetorch/kernel
-git clone https://github.com/typetorch/transformer
-git clone https://github.com/typetorch/cli
-cd my-game
-git remote remove origin
-```
-
-Install the dependencies:
-
-```sh
-cd ../framework
-bun install
-cd ../transformer
-bun install
-cd ../cli
-bun install
-cd ../my-game
-bun scripts/packages.ts
-bun install
-rokit install
-```
-
-`bun scripts/packages.ts` builds `../framework` and `../transformer`, packs them and `../kernel` into
-`.typetorch/packages/`, and copies them into `node_modules`. Run it again (`bun run packages`) whenever you pull new
-framework, transformer or kernel commits.
-
-Add a script so you can run the CLI from the game folder. In `package.json`, under `"scripts"`:
-
-```json
-"typetorch": "bun ../cli/src/index.ts"
-```
-
-From now on, `bun run typetorch <command>` runs the CLI. (The CLI checkout also has `bin/typetorch` and
-`bin/typetorch.cmd`: put `cli/bin` on your PATH to type `typetorch <command>` anywhere.)
-
-### From npm
+Clone the template and install:
 
 ```sh
 git clone https://github.com/typetorch/template my-game
 cd my-game
 git remote remove origin
-```
-
-In `package.json`, change the three local `file:` entries to npm versions and delete the `postinstall` and `packages`
-scripts (they only copy local tarballs):
-
-```json
-"@typetorch/framework": "^0.2.0",
-"@typetorch/kernel": "^0.3.1",
-```
-
-and under `devDependencies`, `"@typetorch/transformer": "^0.2.0"`. Then:
-
-```sh
-bun add -d @typetorch/cli
 bun install
 rokit install
 ```
 
-Add `"typetorch": "typetorch"` under `"scripts"`, so `bun run typetorch <command>` works as in the rest of these docs.
-Without installing, `npx @typetorch/cli <command>` runs the same CLI. The CLI runs on Node 20+ or Bun; builds still
-need Bun.
-
-### Both ways
-
-Run the compiler through `bun run build` (or `bunx rbxtsc`). In a Bun project on Windows, `npx rbxtsc` runs an
-unrelated placeholder package.
+- `bun install` gets every TypeTorch package from npm: `@typetorch/framework` and `@typetorch/kernel`, and as dev
+  dependencies `@typetorch/transformer`, `@typetorch/cli` and `@typetorch/dev-server`. It also installs roblox-ts.
+- `rokit install` installs Rojo and Lune at the versions pinned in `rokit.toml`.
+- `bun run typetorch <command>` runs the CLI (the template's `"typetorch": "typetorch"` script). Without installing,
+  `npx @typetorch/cli <command>` runs the same CLI. The CLI runs on Node 20+ or Bun; builds still need Bun.
+- Run the compiler through `bun run build` (or `bunx rbxtsc`). In a Bun project on Windows, `npx rbxtsc` runs an
+  unrelated placeholder package.
 
 **Check:**
 
@@ -135,8 +60,47 @@ bun run typetorch build
 
 - `rojo --version` prints `7.7.0-rc.1` inside `my-game`.
 - `bun run build` compiles with no errors.
-- `bun run typetorch build` ends with a `built <id> (branch ..., channel ...)` line and
-  `.typetorch/payload.rbxm ... modules`.
+- `bun run typetorch build` ends with a `built <id> (branch ..., channel ...)` line,
+  `.typetorch/payload.rbxm ... modules`, and `sources  template <commit>, framework v0.2.0, kernel v0.3.1` (the npm
+  versions you installed).
+
+### Unreleased framework or kernel changes (optional)
+
+Skip this unless you need a framework, kernel or transformer change that isn't on npm yet. Clone those repos **next
+to** your game:
+
+```text
+games/            any folder
+  my-game/        your game
+  framework/      https://github.com/typetorch/framework
+  kernel/         https://github.com/typetorch/kernel
+  transformer/    https://github.com/typetorch/transformer
+```
+
+From the `games` folder:
+
+```sh
+git clone https://github.com/typetorch/framework
+git clone https://github.com/typetorch/kernel
+git clone https://github.com/typetorch/transformer
+cd framework
+bun install
+cd ../transformer
+bun install
+cd ../my-game
+bun run packages
+bun run build
+```
+
+- `bun run packages` builds `../framework` and `../transformer`, packs all three into `.typetorch/packages/`, and
+  extracts them over `node_modules/@typetorch`: a local override of the npm versions. Run it again after you pull or
+  change a checkout.
+- The override stays on across `bun install` until `bun run packages --off`, which deletes it and reinstalls the npm
+  versions.
+- With the override, `typetorch build` stamps the checkouts' commits as the payload's sources
+  (`framework <commit>, kernel <commit>`) instead of the npm versions.
+- On Windows with git's `core.autocrlf` on, `--off` can rewrite `bun.lock` with other line endings, so the next build
+  id ends in `-dirty`. `git checkout -- bun.lock` makes the tree clean again.
 
 ## 3. Create the group and the experience (owner)
 
@@ -202,13 +166,13 @@ Remove the template's `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey`:
 | `revoked` | optional: user ids that lose dev access |
 | `devBadgeId` | optional badge id; its holders are devs |
 | `approval` | `all` (default): every deploy waits for your y/N; `prod`: only prod-channel deploys do; `none` |
-| `kernel` | the kernel folder for `kernel deploy` (the packed copy in `node_modules`, or `../kernel`) |
+| `kernel` | the kernel folder for `kernel deploy` (`node_modules/@typetorch/kernel`, or a kernel checkout) |
 | `signingPublicKeys`, `revokedKeys`, `fallbackPublicKey`, `keyAssetId` | written by `typetorch keys` (step 7). Don't edit by hand |
 
 Commit it:
 
 ```sh
-git add typetorch.json package.json
+git add typetorch.json
 git commit -m "My game"
 ```
 
@@ -314,9 +278,12 @@ bun run typetorch kernel deploy --replace-place --yes
 **Check:** join the game from the Roblox app. Open the Developer Console (F9) > **Server**. You should see:
 
 ```text
-[TypeTorch] kernel 0.3.1@<commit> (API 1) on a public server, branch prod, signed deploys only (keys: key asset)
+[TypeTorch] kernel 0.3.1 (API 1) on a public server, branch prod, signed deploys only (keys: key asset)
 [TypeTorch] branch prod: nothing loaded (no verified, bootstrap or usable stored head); waiting for a signed deploy
 ```
+
+(A kernel from the [local override](#unreleased-framework-or-kernel-changes-optional) shows its commit:
+`kernel 0.3.1@<commit>`.)
 
 Type `/tt status` in chat: it answers (you are the owner, so you are a dev).
 

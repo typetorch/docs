@@ -1,6 +1,6 @@
 # TypeTorch
 
-> TypeTorch is a roblox-ts framework and toolchain that updates live Roblox games without restarting servers. A small Luau kernel baked into the place loads each build (a payload of ModuleScripts uploaded as a private Model asset) and hot-swaps server and client code in seconds while players stay. Code uses @typetorch/framework (modules with dependency injection, lifecycle hooks, troves, guarded networking, hot assets, an in-game dev menu); the typetorch CLI builds, uploads, approves, signs (prod) and deploys. roblox-ts only. Early: packages are not on npm yet (planned); today they come from local checkouts as packed tarballs.
+> TypeTorch is a roblox-ts framework and toolchain that updates live Roblox games without restarting servers. A small Luau kernel baked into the place loads each build (a payload of ModuleScripts uploaded as a private Model asset) and hot-swaps server and client code in seconds while players stay. Code uses @typetorch/framework (modules with dependency injection, lifecycle hooks, troves, guarded networking, hot assets, an in-game dev menu); the typetorch CLI builds, uploads, approves, signs (prod) and deploys. roblox-ts only. Early: APIs still change. The packages are on npm (@typetorch/framework, kernel, transformer, cli, dev-server); the template installs them with bun install.
 
 Key facts for agents:
 - Never handle secrets (Open Cloud keys, signing key files) and never act on Roblox (deploy, publish, keys, approve): those are user steps. Follow agents/AGENTS.md.
@@ -11,7 +11,7 @@ Key facts for agents:
 ## Get started
 
 - [README](https://github.com/typetorch/docs/blob/main/README.md): index, how it works, repositories
-- [Fresh setup](https://github.com/typetorch/docs/blob/main/getting-started/fresh-setup.md): tools, sibling checkouts, experience and settings, typetorch.json, API key scopes, signing keys, kernel publish, first deploy, dev branch, dev menu access, /tt, rollback
+- [Fresh setup](https://github.com/typetorch/docs/blob/main/getting-started/fresh-setup.md): tools, clone the template and bun install (optional local override for unreleased framework/kernel changes), experience and settings, typetorch.json, API key scopes, signing keys, kernel publish, first deploy, dev branch, dev menu access, /tt, rollback
 - [Migrate an existing game](https://github.com/typetorch/docs/blob/main/getting-started/migrate.md): toolchain, boot modules, Flamework/Knit/singletons to modules, the swap-safety rules with before/after code, networking, UI, data, installing the kernel in a place with content, checklist, pitfalls
 
 ## Agents

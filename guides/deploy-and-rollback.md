@@ -32,8 +32,10 @@ the last build), `--no-registry`, `--force` (a dev-channel or dirty build to a p
   payload's hash. A build from uncommitted changes is `<commit7>-dirty-<hash6>`. Same bytes, same id.
 - **Deployment number:** `#seq`, one counter for the whole game. It's the handle to paste when something goes wrong.
 - The asset is named `tt-<branch>-<artifact id>`. If Roblox's text filter censors the name to `####`, the CLI renames
-  it `TypeTorch payload`. The notes (your `--message`, the commits since the last deploy, framework and kernel commits)
-  live in the payload's `Notes` attribute, and the dev menu shows them.
+  it `TypeTorch payload`. The notes (your `--message`, the commits since the last deploy, and framework and kernel
+  changes: a new npm version, or the new commits when you build with the
+  [local override](../getting-started/fresh-setup.md#unreleased-framework-or-kernel-changes-optional)) live in the
+  payload's `Notes` attribute, and the dev menu shows them.
 
 ## Approval and proposals
 

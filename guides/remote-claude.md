@@ -12,8 +12,9 @@ Claude can act on your running server ("jump me", "give me 100 coins") or change
 - [Claude Code](https://claude.com/claude-code) installed and logged in with your Claude.ai account (`claude auth login`).
 - `cloudflared` (installed with winget on Windows when missing; macOS: `brew install cloudflared`). The tunnel is an
   account-free Cloudflare Quick Tunnel.
-- The [dev-server](https://github.com/typetorch/dev-server): Node 20+ or Bun 1.3+. Either a checkout next to your game
-  (`bun install` in it), `@typetorch/dev-server` in the game's dev dependencies, or npx (see below).
+- The [dev-server](https://github.com/typetorch/dev-server): Node 20+ or Bun 1.3+. The template has
+  `@typetorch/dev-server` in its dev dependencies, so `bun install` gets it. Without it: npx (see below), or a checkout
+  next to your game (`bun install` in it).
 - An Open Cloud key with `universe-messaging-service:publish`, as `TYPETORCH_API_KEY` (or `OPENCLOUD_API_KEY`,
   `ROBLOX_API_KEY`). The dev-server tells game servers where the session is with it. It finds the key the same way the
   CLI does: the environment, then the env file (`--env-file`, else `TYPETORCH_ENV_FILE`), then `.env` files in the game
@@ -36,16 +37,17 @@ On a dev-channel git branch of your game:
 
 ```sh
 git switch dev
-typetorch remote-claude --users 111111111
+bun run typetorch remote-claude --users 111111111
 ```
 
 `typetorch remote-claude` runs the dev-server with the same arguments. It finds it in `TYPETORCH_DEV_SERVER`, the game's
-`node_modules`, next to the CLI, or a sibling `../dev-server` checkout. Other ways to start it:
+`node_modules` (where the template's `bun install` puts it), next to the CLI, or a sibling `../dev-server` checkout.
+Other ways to start it:
 
 ```sh
-bun ../dev-server/src/index.ts remote-claude --users 111111111           # a checkout
 npx @typetorch/dev-server remote-claude --users 111111111                # from npm
 npx -p @typetorch/cli -p @typetorch/dev-server typetorch remote-claude --users 111111111
+bun ../dev-server/src/index.ts remote-claude --users 111111111           # a checkout
 ```
 
 It prints a pairing code (and copies it to your clipboard):

@@ -24,8 +24,9 @@ copy in the same server. Whatever a module made or connected must go away with i
 
 ## Before you start
 
-- Read [Fresh setup](fresh-setup.md) steps 1 and 2: tools and the sibling checkouts (`../framework`, `../kernel`,
-  `../transformer`, `../cli`, and `../template` as the reference). When in doubt, copy what the template does.
+- Install the tools from [Fresh setup](fresh-setup.md) step 1 (Bun, git, Rokit).
+- Keep a copy of the [template](https://github.com/typetorch/template) next to your game as the reference
+  (`git clone https://github.com/typetorch/template ../template`). When in doubt, copy what the template does.
 - Work on a branch: `git switch -c typetorch-migration`. Commit after every step that builds.
 - Keep a list of what you change and what's left (`MIGRATION_NOTES.md`).
 - Don't change DataStore names or the shape of saved data during the migration.
@@ -54,11 +55,11 @@ contents for each.
 
 1. **Bun** as the package manager (delete other lockfiles after `bun install`).
 2. **`rokit.toml`**: `rojo = "rojo-rbx/rojo@7.7.0-rc.1"` and `lune = "lune-org/lune@0.10.5"`, then `rokit install`.
-3. **`package.json`**: the template's dependencies (`@typetorch/framework` and `@typetorch/kernel`, and the dev
-   dependency `@typetorch/transformer`, all as local tarballs; `@rbxts/t`, `@rbxts/trove`, `rbxts-transform-debug`
-   2.2.0, roblox-ts 3, TypeScript 5.5.3), its scripts (`build`, `watch`, `studio`, `packages`, `postinstall`), and
-   `"typetorch": "bun ../cli/src/index.ts"`. Copy `scripts/packages.ts` and `scripts/build-info.ts` from the template.
-   Then `bun scripts/packages.ts` and `bun install`.
+3. **`package.json`**: the template's dependencies (`@typetorch/framework`, `@typetorch/kernel`, `@rbxts/t`,
+   `@rbxts/trove`, `rbxts-transform-debug` 2.2.0), dev dependencies (`@typetorch/transformer`, `@typetorch/cli`,
+   `@typetorch/dev-server`, roblox-ts 3, TypeScript 5.5.3), `overrides`, and its scripts `build`, `watch`, `studio`
+   and `"typetorch": "typetorch"`. All `@typetorch/*` packages come from npm. Copy `scripts/build-info.ts` from the
+   template (`build` and `watch` run it), then `bun install`.
 4. **`tsconfig.json`**: `include` only `src`; `"typeRoots": ["node_modules/@rbxts", "node_modules/@typetorch"]`;
    `"types": ["types", "compiler-types"]`; `plugins`: `rbxts-transform-debug` first, then
    `{ "transform": "@typetorch/transformer" }`.
@@ -70,9 +71,9 @@ contents for each.
    `.tsconfig.typetorch.json`, `.env`, `.env.*`.
 8. **`typetorch.json`**: see [fresh setup step 5](fresh-setup.md#5-typetorchjson).
 
-**From npm instead** (no sibling checkouts, no `scripts/packages.ts`): `bun add @typetorch/framework
-@typetorch/kernel` and `bun add -d @typetorch/transformer @typetorch/cli`, then the script
-`"typetorch": "typetorch"`. See [fresh setup, From npm](fresh-setup.md#from-npm).
+You don't need `scripts/packages.ts` or the template's `packages` and `postinstall` scripts. They are only for
+building with framework or kernel changes that aren't on npm yet; to use that, copy the script and both entries too
+([fresh setup: unreleased changes](fresh-setup.md#unreleased-framework-or-kernel-changes-optional)).
 
 **Check:** `bun run build` compiles. A Flamework game doesn't yet: every `@flamework/core` import fails with "You can
 only use npm scopes that are listed in your typeRoots". That's expected; section 4 fixes it.
@@ -638,8 +639,8 @@ is **planned**. Until then, install the kernel in Studio:
    dev menu's **Migrate** on servers that still run the old kernel).
 7. Do the same copy again for every later kernel update.
 
-**Check:** the F9 server log shows `[TypeTorch] kernel 0.3.1@... on a public server, branch prod, signed deploys only
-(keys: key asset)`.
+**Check:** the F9 server log shows `[TypeTorch] kernel 0.3.1 (API 1) on a public server, branch prod, signed deploys
+only (keys: key asset)`.
 
 ### What stays in the place
 
@@ -707,7 +708,7 @@ service that uses tags.
 | Pitfall | What happens | Fix |
 |---|---|---|
 | A `*.server.ts` left in `src/server` | `typetorch build`: "the payload may hold only Folders and ModuleScripts" | move its work into a module, delete it |
-| `scripts/*.ts` compiled by rbxtsc | `Cannot find name 'console'` in `scripts/packages.ts` | `"include": ["./src/**/*.ts"]` in tsconfig |
+| `scripts/*.ts` compiled by rbxtsc | `Cannot find name 'console'` in `scripts/build-info.ts` | `"include": ["./src/**/*.ts"]` in tsconfig |
 | Join reward in `onPlayerAdded` | everyone gets it again on every deploy | guard with a persisted set (rule 3) |
 | `Players.PlayerRemoving` logic in a `playerTrove` cleanup | it also runs on every swap | connect `PlayerRemoving` through the trove for real leaves |
 | A charm atom or a class instance in `persist` | the old generation's code stays alive | persist the plain value |

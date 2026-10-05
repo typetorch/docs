@@ -14,23 +14,34 @@ Run `rokit install` in the game folder. `kernel deploy` runs Lune inside the ker
 pins Lune too.
 
 **Bun fails with `EPERM` installing `file:../framework`.**
-Bun on Windows can't install a `file:` folder dependency. TypeTorch packages come from packed tarballs:
-`bun scripts/packages.ts`, then `bun install`.
+Bun on Windows can't install a `file:` folder dependency. Use the npm versions (the template's `package.json`), or,
+for unreleased changes in a checkout, the template's local override: `bun run packages`
+([fresh setup](../getting-started/fresh-setup.md#unreleased-framework-or-kernel-changes-optional)).
 
-**The framework in `node_modules` is stale after you pulled.**
-Bun caches tarballs by path. Run `bun run packages` (rebuilds the framework and the transformer, repacks them and the
-kernel, and copies them into `node_modules`).
+**`bun install` fails with `Module not found "scripts/packages.ts"`.**
+`package.json` has the template's `postinstall` script but not the script it runs. Copy `scripts/packages.ts` from the
+template, or delete the `postinstall` and `packages` scripts (you only need them for the local override).
+
+**The framework in `node_modules` is stale after you pulled a checkout.**
+With the local override, `bun install` re-extracts the old tarballs. Run `bun run packages` again (it rebuilds the
+framework and the transformer, repacks them and the kernel, and extracts them into `node_modules`). To go back to the
+npm versions: `bun run packages --off`.
+
+**The build id ends in `-dirty` right after `bun run packages --off`.**
+On Windows with git's `core.autocrlf` on, the reinstall can rewrite `bun.lock` with other line endings.
+`git checkout -- bun.lock`.
 
 **`TS2688: Cannot find type definition file for 'kernel'`** (or similar).
 `tsconfig.json` needs `"types": ["types", "compiler-types"]`; otherwise the `@typetorch` type root pulls in the kernel
 package, which has no typings.
 
-**`Cannot find name 'console'` in `scripts/packages.ts`.**
+**`Cannot find name 'console'` in `scripts/build-info.ts`** (or another file under `scripts/`).
 rbxtsc compiles your scripts folder. Add `"include": ["./src/**/*.ts"]` to `tsconfig.json`.
 
 **`createNetwork: guards were not generated (is @typetorch/transformer in the tsconfig plugins?)`**
 The transformer isn't running. `tsconfig.json` `plugins`: `rbxts-transform-debug` first, then
-`{ "transform": "@typetorch/transformer" }`; and `@typetorch/transformer` must be installed (`bun run packages`).
+`{ "transform": "@typetorch/transformer" }`; and `@typetorch/transformer` must be in the devDependencies and installed
+(`bun install`).
 
 **`You can only use npm scopes that are listed in your typeRoots` on an `@flamework/core` import.**
 TypeTorch no longer uses Flamework. Import `Service`, `Controller`, the lifecycle interfaces, `Modding`, `Reflect` and

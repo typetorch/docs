@@ -18,6 +18,10 @@ approving. You finish with a numbered "What you need to do" list that tells them
 > clean `typetorch build` (dev and prod channel; only Folders and ModuleScripts; guards and DI ids generated, no
 > Flamework left in the output), and its `studio.project.json` built. The code samples in the guides it links (player
 > data, characters, hot-asset tools, UI) compiled in that project. Nothing that needs keys was run.
+>
+> **npm setup checked on 2026-10-05** with template `756e78c` (every `@typetorch/*` package from npm: framework 0.2.0,
+> kernel 0.3.1, transformer 0.2.0, cli 0.6.0, dev-server 0.2.0): a fresh clone built with `bun install`,
+> `bun run build` and `bun run typetorch build`, and so did a copy without `scripts/packages.ts` and its two scripts.
 
 ## Rules (read first, apply always)
 
@@ -30,8 +34,8 @@ approving. You finish with a numbered "What you need to do" list that tells them
    `deployments`, `branch ls`, `config push`, `kernel deploy` (also not `--dry-run`), `keys ...`, `assets sync|status`,
    `doctor` (it probes the key and publishes a test message). Don't start `remote-claude`. These go in the final list.
 3. **Never push.** Local commits on a new branch are fine. Don't rewrite history, don't force anything.
-4. **Don't edit the TypeTorch checkouts** (`../framework`, `../kernel`, `../transformer`, `../cli`, `../template`).
-   Copy from them.
+4. **Don't edit TypeTorch itself:** `node_modules/@typetorch/*`, the reference `../template`, or any other TypeTorch
+   checkout. Copy from them.
 5. **Don't weaken security to make something work:** no new RemoteEvents, `loadstring`, `_G` hooks, disabled guards,
    or settings changes.
 6. **Don't change player data formats, DataStore names or keys.** Follow [Player data](../guides/player-data.md) and
@@ -39,9 +43,9 @@ approving. You finish with a numbered "What you need to do" list that tells them
 7. **Keep ids honest.** Never invent a universe, place, group or user id. Use the user's, or the placeholder `1`, and
    say so in the final list.
 8. **Only promise what exists today.** On npm since 2026-10-05: `@typetorch/framework`, `transformer`, `kernel`, `cli`
-   and `dev-server` (`npx @typetorch/cli`). Planned: `typetorch init`, kernel deploys that patch only the kernel (today `--replace-place` wipes the
-   place), content packs, the typed asset map from files, CI/GitHub Action, `typetorch test`, `/tt grant`/`revoke`, a
-   kernel `onClose` hook.
+   and `dev-server`; the template installs all five with `bun install` (`npx @typetorch/cli` works too). Planned:
+   `typetorch init`, kernel deploys that patch only the kernel (today `--replace-place` wipes the place), content packs,
+   the typed asset map from files, CI/GitHub Action, `typetorch test`, `/tt grant`/`revoke`, a kernel `onClose` hook.
 
 ## Step 1: Detect
 
@@ -98,64 +102,42 @@ Log every step in `MIGRATION_NOTES.md` as you go: what changed, the build result
 Work on a new branch: `git switch -c typetorch-migration`, from a clean tree (commit or stash the user's changes
 first; ask if unsure).
 
-### 3.1 Sibling checkouts
+### 3.1 The template as reference
 
-The template uses packed copies of local checkouts **next to** the game repo (the npm way is the last bullet of this
-section):
+Every TypeTorch package comes from npm; the only checkout you need is the template, **next to** the game repo, to
+copy files from:
 
 ```text
 <workspace>/
   my-game/       the user's game (this repo)
-  framework/     https://github.com/typetorch/framework
-  kernel/        https://github.com/typetorch/kernel
-  transformer/   https://github.com/typetorch/transformer
-  cli/           https://github.com/typetorch/cli
-  template/      https://github.com/typetorch/template    (the reference: copy its files)
-  dev-server/    https://github.com/typetorch/dev-server  (optional, remote-claude)
+  template/      https://github.com/typetorch/template    (the reference: copy its files, never edit it)
 ```
 
-If one is missing, clone it from the game folder (ask first if your environment needs approval for downloads):
+If it is missing, clone it from the game folder (ask first if your environment needs approval for downloads):
 
 ```sh
-git clone https://github.com/typetorch/framework ../framework
-git clone https://github.com/typetorch/kernel ../kernel
-git clone https://github.com/typetorch/transformer ../transformer
-git clone https://github.com/typetorch/cli ../cli
 git clone https://github.com/typetorch/template ../template
 ```
-
-Then (same in PowerShell and bash):
-
-```sh
-cd ../framework
-bun install
-cd ../transformer
-bun install
-cd ../cli
-bun install
-cd ../my-game
-```
-
-If the checkouts live elsewhere, edit the `source:` paths at the top of the game's copy of `scripts/packages.ts` and
-the path in the `typetorch` script (3.3).
 
 **The template decides the toolchain.** Its `package.json`, `tsconfig.json`, `default.project.json` and
 `studio.project.json` always match the framework of the same date. Copy from them; don't type versions from memory.
 
-- **Today:** no Flamework. The framework's compiler plugin is `@typetorch/transformer` (a devDependency, packed from
-  `../transformer` like the framework and the kernel); `Modding`, `Reflect` and `t` come from `@typetorch/framework`.
-- If the template you find still depends on `@flamework/core` and `rbxts-transformer-flamework` (an older checkout),
-  `git pull` the sibling checkouts first.
-- **From npm** (released 2026-10-05; the template itself still uses `file:` entries): `bun add @typetorch/framework
-  @typetorch/kernel` and `bun add -d @typetorch/transformer @typetorch/cli` (or the npm equivalents), drop the
-  `postinstall` and `packages` scripts, skip the sibling checkouts, and add the script `"typetorch": "typetorch"` (or run
-  `npx @typetorch/cli <command>`). Verified 2026-10-05: a template copy built this way compiles and `typetorch build`
-  packs it.
+- **Today:** no Flamework. `@typetorch/framework` and `@typetorch/kernel` are dependencies; `@typetorch/transformer`
+  (the compiler plugin), `@typetorch/cli` and `@typetorch/dev-server` are devDependencies, all from npm. `Modding`,
+  `Reflect` and `t` come from `@typetorch/framework`.
+- If the template you find still depends on `@flamework/core`, `rbxts-transformer-flamework` or
+  `file:.typetorch/packages/*.tgz` entries (an older checkout), `git pull` it first.
+- The template's `scripts/packages.ts` (`bun run packages`, and the `packages` and `postinstall` scripts) is an
+  optional local override for framework, kernel or transformer changes that aren't on npm yet. Don't copy it unless
+  the user asks for that; see
+  [fresh setup: unreleased changes](../getting-started/fresh-setup.md#unreleased-framework-or-kernel-changes-optional).
 
 ### 3.2 Tools
 
 - **Bun 1.3+** is the package manager. If the project uses npm, pnpm or yarn, run `bun install`, then delete the old
   lockfile. Mixing package managers breaks `rbxtsc`.
+- The CLI and the dev-server need no separate install: they are devDependencies (3.3). Run the CLI with
+  `bun run typetorch <command>`.
 - **Rokit:** `rokit.toml` as in the template (keep the project's other tools; replace an old Rojo pin):
 
   ```toml
@@ -175,34 +157,33 @@ own packages):
 "build": "bun scripts/build-info.ts && rbxtsc",
 "watch": "bun scripts/build-info.ts && rbxtsc -w",
 "studio": "rojo serve studio.project.json",
-"packages": "bun scripts/packages.ts",
-"postinstall": "bun scripts/packages.ts --sync",
-"typetorch": "bun ../cli/src/index.ts"
+"typetorch": "typetorch"
 ```
 
 - `build` must end with `rbxtsc` (the CLI appends `-p` for prod builds).
-- Today the template's dependencies include `@typetorch/framework` and `@typetorch/kernel`, and the devDependency
-  `@typetorch/transformer`, all as `file:.typetorch/packages/*.tgz`; `@rbxts/t` (generated guards import it),
-  `@rbxts/trove`, `rbxts-transform-debug` `2.2.0` exactly, roblox-ts 3, TypeScript `5.5.3` (also in `overrides`).
+- Today the template's dependencies include `@typetorch/framework` and `@typetorch/kernel`, and its devDependencies
+  `@typetorch/transformer`, `@typetorch/cli` and `@typetorch/dev-server`, all npm versions (`^x.y.z`); also
+  `@rbxts/t` (generated guards import it), `@rbxts/trove`, `rbxts-transform-debug` `2.2.0` exactly, roblox-ts 3,
+  TypeScript `5.5.3` (also in `overrides`).
+- Leave out the template's `packages` and `postinstall` scripts (the optional local override, 3.1). A `postinstall`
+  without `scripts/packages.ts` makes `bun install` fail.
 - Remove packages the migration replaces (Knit, `@rbxts/net`, all `@flamework/*`, `rbxts-transformer-flamework`) once
   no code imports them (Step 4.2).
 
-Copy the scripts and the Studio project, then install, in this order:
+Copy the build script and the Studio project, then install:
 
 ```sh
 mkdir -p scripts
-cp ../template/scripts/packages.ts scripts/packages.ts
 cp ../template/scripts/build-info.ts scripts/build-info.ts
 cp ../template/studio.project.json studio.project.json
-bun scripts/packages.ts
 bun install
 ```
 
 PowerShell: `New-Item -ItemType Directory -Force scripts` and `Copy-Item <from> <to>` instead of `mkdir -p` and `cp`.
 
 **Check:** `node_modules/@typetorch/framework/out/init.luau`, `node_modules/@typetorch/kernel/place.project.json` and
-`node_modules/@typetorch/transformer/out/index.js` exist, and `bun scripts/packages.ts` printed `packed from <commit>`
-for each.
+`node_modules/@typetorch/transformer/out/index.js` exist, and `bun run typetorch --help` prints
+`typetorch <version>: hot-swap roblox-ts game code on live Roblox servers`.
 
 ### 3.4 tsconfig.json
 
@@ -523,7 +504,7 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
    add the `ServerScriptService.DataHost` Script from the Player data guide; publish.
 9. **Test locally in Studio:** `bun run watch` and `bun run studio` (two terminals), connect the Rojo plugin, Play.
    Server > Status shows "Studio: local payload". Use the dev menu's Reload to test a swap.
-10. **Check the kernel live:** join the game; F9 > Server shows `[TypeTorch] kernel 0.3.1@... on a public server,
+10. **Check the kernel live:** join the game; F9 > Server shows `[TypeTorch] kernel 0.3.1 (API 1) on a public server,
     branch prod, signed deploys only (keys: key asset)`. `/tt status` answers.
 11. **Dev branch:** `git switch -c dev`, `bun run typetorch deploy`, then `/tt new dev` in game. Earn some data, deploy
     again twice while playing, rejoin: nothing lost.
@@ -576,21 +557,17 @@ No game yet ("set up typetorch" in an empty folder):
 
    ```sh
    git clone https://github.com/typetorch/template my-game
-   git clone https://github.com/typetorch/framework
-   git clone https://github.com/typetorch/kernel
-   git clone https://github.com/typetorch/transformer
-   git clone https://github.com/typetorch/cli
    cd my-game
    git remote remove origin
+   bun install
+   rokit install
    ```
 
-2. `bun install` in `../framework`, `../transformer` and `../cli`; then in `my-game`: `bun scripts/packages.ts`,
-   `bun install`, `rokit install`.
-3. In `typetorch.json`: the user's ids (or placeholders `1`), `members` `{}` unless given, and **delete**
-   `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey` (they are the template's). Add the `typetorch` script
-   (3.3).
-4. Step 5 checks, commit.
-5. Step 7 list (skip data, legacy and kernel-copy items: the new place takes `--replace-place`).
+   `bun install` gets every `@typetorch/*` package from npm; the template already has the `typetorch` script.
+2. In `typetorch.json`: the user's ids (or placeholders `1`), `members` `{}` unless given, and **delete**
+   `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey` (they are the template's).
+3. Step 5 checks, commit.
+4. Step 7 list (skip data, legacy and kernel-copy items: the new place takes `--replace-place`).
 
 ## Optional: Claude Code
 

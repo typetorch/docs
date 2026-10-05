@@ -1,7 +1,8 @@
 # Testing in Studio
 
 Run your **local** code in Studio with the real kernel, the dev menu and DataStores, without uploading anything.
-Needs kernel 0.3.1 or newer in `node_modules/@typetorch/kernel` (`bun run packages` gets it).
+Needs kernel 0.3.1 or newer in `node_modules/@typetorch/kernel` (the template's `"@typetorch/kernel": "^0.3.1"`;
+`bun install` gets it).
 
 Deploy messages never reach Studio playtests, so Studio can't follow your deploys. Instead, the kernel mounts your
 compiled code straight from `ServerStorage.TypeTorchDev.Payload`.

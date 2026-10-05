@@ -17,12 +17,13 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    deployments, branch ls, config push, kernel deploy (not even `--dry-run`), keys, assets sync/status, doctor; no place
    publish; no remote-claude. These are user steps.
 3. Never push. Commit locally on `typetorch-migration`.
-4. Don't edit `../framework`, `../kernel`, `../transformer`, `../cli`, `../template`: copy from them.
+4. Don't edit `node_modules/@typetorch/*`, the reference `../template` or any TypeTorch checkout: copy from them.
 5. No new RemoteEvents, `loadstring`, `_G`, disabled guards or settings changes.
 6. Don't change player data formats, store names or keys.
 7. Never invent ids: the user's, or placeholder `1`.
-8. On npm: `@typetorch/*` and `npx @typetorch/cli`. Planned, never promise: `typetorch init`, kernel patch deploys, content packs,
-   CI, `typetorch test`, `/tt grant`, a kernel `onClose`.
+8. On npm: every `@typetorch/*` package (`bun install` in the template gets them; `npx @typetorch/cli` works too).
+   Planned, never promise: `typetorch init`, kernel patch deploys, content packs, CI, `typetorch test`, `/tt grant`, a
+   kernel `onClose`.
 
 ## Procedure
 
@@ -35,19 +36,20 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 2. **Plan.** Write `MIGRATION_NOTES.md` (inventory, old → new mapping, order of commits, risks: player data always,
    place content, third-party networking), show it, continue unless told to wait. Log every step there.
 3. **Toolchain** (branch `typetorch-migration`):
-   - Siblings next to the game: `../framework`, `../kernel`, `../transformer`, `../cli`, `../template` (clone from
-     `https://github.com/typetorch/<name>` if missing; `bun install` in framework, transformer and cli).
+   - The reference template next to the game: `../template` (clone https://github.com/typetorch/template there if
+     missing). Every `@typetorch/*` package comes from npm; no other checkouts.
    - **The template decides**: copy its `package.json` deps/devDeps/overrides (`@typetorch/framework`,
-     `@typetorch/kernel` and the devDependency `@typetorch/transformer` as `file:.typetorch/packages/*.tgz`; no
-     Flamework), `tsconfig.json` (`include` src only, `typeRoots` `@rbxts` + `@typetorch`,
+     `@typetorch/kernel`, devDependencies `@typetorch/transformer`, `@typetorch/cli`, `@typetorch/dev-server`, all npm
+     versions; no Flamework), `tsconfig.json` (`include` src only, `typeRoots` `@rbxts` + `@typetorch`,
      `types: ["types","compiler-types"]`, `plugins`: `rbxts-transform-debug` then `@typetorch/transformer`),
      `default.project.json` (payload: a `Model` with `Server`/`Shared`/`Client`/`include`, mapping `@rbxts` and only
      `@typetorch/framework`; keep the old one as `legacy.project.json`), `studio.project.json`, `rokit.toml` (rojo
-     7.7.0-rc.1, lune 0.10.5), `scripts/packages.ts`, `scripts/build-info.ts`. Compile only via `bun run build` or
-     `bunx rbxtsc` (`npx rbxtsc` runs a placeholder package in Bun projects on Windows).
+     7.7.0-rc.1, lune 0.10.5), `scripts/build-info.ts`. Compile only via `bun run build` or `bunx rbxtsc`
+     (`npx rbxtsc` runs a placeholder package in Bun projects on Windows).
    - Scripts: `build` = `bun scripts/build-info.ts && rbxtsc`, `watch`, `studio` = `rojo serve studio.project.json`,
-     `packages`, `postinstall` = `bun scripts/packages.ts --sync`, `typetorch` = `bun ../cli/src/index.ts`.
-   - Bun only (delete other lockfiles). `rokit install`. Then `bun scripts/packages.ts` and `bun install`.
+     `typetorch` = `typetorch`. Leave out `packages`, `postinstall` and `scripts/packages.ts` (an optional local
+     override for unreleased framework/kernel changes; only if the user asks).
+   - Bun only (delete other lockfiles). `rokit install`, then `bun install`.
    - `.gitignore`: `node_modules/ out/ include/ *.tsbuildinfo src/shared/build.ts .typetorch/
      .payload.gen.project.json .tsconfig.typetorch.json .env .env.*`.
    - `typetorch.json`: `project`, `universeId`, `placeId`, `creator` (`{groupId}` or `{userId}`: the experience
