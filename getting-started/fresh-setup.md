@@ -229,8 +229,8 @@ TYPETORCH_ENV_FILE=~/.config/typetorch/my-game.env
 
 - One shared key (`TYPETORCH_API_KEY`) is the simple setup. You may split it per job instead:
   `OPENCLOUD_ASSETS_KEY`, `OPENCLOUD_DEPLOY_KEY` and `OPENCLOUD_PLACE_KEY` (each falls back to the shared key).
-- remote-claude needs the shared key in the environment or a `.env` file (it doesn't read `TYPETORCH_ENV_FILE`); see
-  [remote-claude](../guides/remote-claude.md).
+- remote-claude reads the key the same way (environment, `TYPETORCH_ENV_FILE`, `.env`) and needs the shared key (`TYPETORCH_API_KEY`);
+  see [remote-claude](../guides/remote-claude.md).
 - Never commit a key, never paste it into chat or an issue, and never give it to an agent.
 
 **Check:** `bun run typetorch doctor`. The `key assets`, `key deploy` and `key place` lines are `ok` (or `warn` with

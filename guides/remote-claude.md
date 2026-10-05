@@ -12,20 +12,16 @@ Claude can act on your running server ("jump me", "give me 100 coins") or change
 - [Claude Code](https://claude.com/claude-code) installed and logged in with your Claude.ai account (`claude auth login`).
 - `cloudflared` (installed with winget on Windows when missing; macOS: `brew install cloudflared`). The tunnel is an
   account-free Cloudflare Quick Tunnel.
-- The [dev-server](https://github.com/typetorch/dev-server) checkout next to your game, with `bun install` run in it.
+- The [dev-server](https://github.com/typetorch/dev-server): Node 20+ or Bun 1.3+. Either a checkout next to your game
+  (`bun install` in it), `@typetorch/dev-server` in the game's dev dependencies, or npx (see below).
 - An Open Cloud key with `universe-messaging-service:publish`, as `TYPETORCH_API_KEY` (or `OPENCLOUD_API_KEY`,
-  `ROBLOX_API_KEY`) in the environment or a `.env` file in the game folder or above. The dev-server tells game servers
-  where the session is with it. It does **not** read `TYPETORCH_ENV_FILE` itself (it passes it on to the deploys it
-  runs). If your key lives only in an env file outside the repo, load it into the terminal first:
+  `ROBLOX_API_KEY`). The dev-server tells game servers where the session is with it. It finds the key the same way the
+  CLI does: the environment, then the env file (`--env-file`, else `TYPETORCH_ENV_FILE`), then `.env` files in the game
+  folder or above. A key in an env file outside the repo is the safest setup:
 
-  ```powershell
-  # PowerShell
-  Get-Content "$HOME\.config\typetorch\my-game.env" | ForEach-Object { if ($_ -match '^\s*([A-Z_]+)\s*=\s*(.*)$') { Set-Item "env:$($Matches[1])" $Matches[2] } }
-  ```
-
-  ```bash
-  # bash
-  set -a; . ~/.config/typetorch/my-game.env; set +a
+  ```text
+  # .env in the game folder (gitignored)
+  TYPETORCH_ENV_FILE=~/.config/typetorch/my-game.env
   ```
 
 - Experience settings: **Allow HTTP Requests** on. `LoadStringEnabled` on for `run_luau` (the kernel place file sets
@@ -40,10 +36,17 @@ On a dev-channel git branch of your game:
 
 ```sh
 git switch dev
-bun ../dev-server/src/index.ts remote-claude --users 111111111
+typetorch remote-claude --users 111111111
 ```
 
-**From the first npm release (planned):** `npx @typetorch/dev-server remote-claude --users 111111111`.
+`typetorch remote-claude` runs the dev-server with the same arguments. It finds it in `TYPETORCH_DEV_SERVER`, the game's
+`node_modules`, next to the CLI, or a sibling `../dev-server` checkout. Other ways to start it:
+
+```sh
+bun ../dev-server/src/index.ts remote-claude --users 111111111           # a checkout
+npx @typetorch/dev-server remote-claude --users 111111111                # npm, once released
+npx -p @typetorch/cli -p @typetorch/dev-server typetorch remote-claude --users 111111111
+```
 
 It prints a pairing code (and copies it to your clipboard):
 
