@@ -189,13 +189,17 @@ Add these permissions and select your experience where asked:
 | CLI job | Commands | Scopes |
 |---|---|---|
 | assets | `deploy`, `upload`, `promote` (of an unfinished upload), `keys init` / `rotate` (the key asset), `assets sync` / `status`, `doctor` | `asset:read`, `asset:write`; for hot assets and doctor's place check also Luau Execution `universe.place.luau-execution-session:read` and `:write` |
-| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `config push`, `deployments` | `universe-messaging-service:publish`, `universe:read`; `universe:write` to write the registry |
+| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number, below) |
 | place | `kernel deploy` only | place publishing (`universe-places` write; the CLI calls it `universe.place:write`), and `asset:read` to record the place version |
 
-- **The registry** (one ConfigService key that stores branch heads, members and channels) is optional. Give the key
-  **both** `universe:read` and `universe:write`, or neither: a deploy stops when it can read the registry but not write
-  it. Without it, game servers store the heads themselves, and `members` only reach game servers through
-  `config push`.
+- **The shared deploy number.** Every machine that deploys (your PC, CI, remote-claude) takes the next deploy number
+  (`#seq`) from the game's DataStore: the kernel's records of past deploys, and a counter the CLI claims atomically.
+  That's what the DataStore scopes are for. Without them a deploy uses only your PC's log (fine while you deploy from
+  one machine), and CI deploys stop.
+- **Not available to API keys today:** `universe:read` (it reads the ConfigService registry, where `config push` would
+  put `members`) and `legacy-asset:manage` (`kernel deploy` downloading the place; pass a copy instead, see step 8).
+  Creator Hub doesn't offer them for API keys. Deploys don't need them: game servers keep the branch heads from the
+  deploy messages themselves.
 - Set an expiry date, and add your IP under accepted IP addresses if you can.
 
 **Store the key outside the repo.** Make a folder and an env file for this game:
@@ -330,7 +334,7 @@ Devs open the dev menu with the **DEV** button, `Ctrl+Shift+D` or `/tt dev`. A p
 
 - the experience owner (the user creator, or rank 255 in the owning group): always;
 - in `members` (`owner`, `admin` or `dev`), once you ran `bun run typetorch config push` (needs `universe:read` and
-  `universe:write`);
+  `universe:write`; `universe:read` can't be granted to API keys today, so this waits until Roblox offers it);
 - a holder of the `devBadgeId` badge (also through `config push`; awarding the badge in game is **planned**);
 - anyone in a Studio playtest;
 

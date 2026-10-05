@@ -31,7 +31,7 @@ approving. You finish with a numbered "What you need to do" list that tells them
    tell them to revoke it in Creator Hub and make a new one.
 2. **Never act on Roblox.** Don't publish or save a place, upload anything, or run: `typetorch upload`, `deploy` (also
    not `--dry-run`: it reads the registry with the user's key), `promote`, `rollback`, `approve`, `reject`, `pin`,
-   `deployments`, `branch ls`, `config push`, `kernel deploy` (also not `--dry-run`), `keys ...`, `assets sync|status`,
+   `deployments`, `branch ls`, `config push`, `kernel deploy` (also not `--dry-run`; the one exception is a kernel update the user asked for, see "Updating the kernel in a game"), `keys ...`, `assets sync|status`,
    `doctor` (it probes the key and publishes a test message). Don't start `remote-claude`. These go in the final list.
 3. **Never push.** Local commits on a new branch are fine. Don't rewrite history, don't force anything.
 4. **Don't edit TypeTorch itself:** `node_modules/@typetorch/*`, the reference `../template`, or any other TypeTorch
@@ -483,9 +483,12 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
    - `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (hot assets,
      doctor's place check)
    - `universe-messaging-service:publish`
-   - `universe:read` and `universe:write` (the registry: members and branch heads; give both or neither)
+   - DataStore `universe-datastores.objects:read`, `:create` and `:update` (the shared deploy number: every machine and
+     CI take `#seq` from the game's DataStore)
    - place publishing (`universe-places` write; the CLI says `universe.place:write`), only for `kernel deploy`
-   Set an expiry and, if you can, an IP allowlist.
+   Set an expiry and, if you can, an IP allowlist. Don't ask for `universe:read` (the ConfigService registry) or
+   `legacy-asset:manage` (place downloads): Creator Hub doesn't offer them for API keys today. Deploys work without
+   them; `kernel deploy` takes a copy of the place instead (`--place-file`, see "Updating the kernel in a game").
 4. **Store it outside the repo:** `~/.config/typetorch/<game>.env` with the line `TYPETORCH_API_KEY=<key>`, and in the
    repo's `.env` (gitignored) the line `TYPETORCH_ENV_FILE=~/.config/typetorch/<game>.env`. Never commit it or paste it
    into chat.
@@ -511,7 +514,8 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
 12. **First prod deploy:** merge into `main`, stay in the game, `bun run typetorch deploy` (y/N, then signed). Expect
     `deployed #N prod@<commit> -> <artifact id>`; the dev menu's Artifact tab shows two verified badges.
 13. **Rollback drill:** `bun run typetorch rollback --branch prod`, check `bun run typetorch deployments`, deploy again.
-14. Optional: `bun run typetorch config push` (members, needs `universe:write`); [hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md);
+14. Optional, once Roblox lets API keys read ConfigService (`universe:read`, OAuth only today): `bun run typetorch
+    config push` (members); [hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md);
     [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md).
 ```
 
@@ -548,6 +552,29 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
 
 Details: MIGRATION_NOTES.md
 ```
+
+## Updating the kernel in a game (agents)
+
+Only when the user asks for a kernel update (a new `@typetorch/kernel` version). Kernel updates stay manual: the
+kernel lives in the place, so it changes with a place publish and new servers. This is the one flow where you run
+`kernel deploy`, and you publish only after the user's OK in chat.
+
+1. **The user downloads a copy** of the live place in Studio (File > Download a Copy) and tells you the file and the
+   place version it came from. (The CLI can't download it: `legacy-asset:manage` isn't offered for API keys today.)
+2. **You run a dry run:** `bun run typetorch kernel deploy --dry-run --place-file <file> --base <version>`. It replaces
+   only the kernel folders, verifies that everything else is unchanged, and writes
+   `.typetorch/place-patches/<placeId>-v<version>-kernel-<new version>.rbxl` plus a report. Read the summary (kernel old
+   -> new, scripts changed per folder, settings, references); anything outside the kernel changing is a stop.
+3. **Show the user the summary and ask.** After their yes: `bun run typetorch kernel deploy --place-file <file> --base
+   <version> --yes`. It refuses if someone published meanwhile (download a new copy then). `bun run typetorch kernel
+   restore <backup>` puts the previous version back.
+4. **Or, with the Roblox Studio MCP and the place open:** replace the kernel instances in Studio
+   (`ServerScriptService.TypeTorchKernel`, `ReplicatedStorage.TypeTorchKernelShared`,
+   `ReplicatedFirst.TypeTorchKernelClient`, as `node_modules/@typetorch/kernel/place.project.json` lays them out, with
+   the sources from `node_modules/@typetorch/kernel/src`; keep the folders' attributes such as `KeyAssetId`), then the
+   user publishes from Studio (File > Publish to Roblox).
+5. **Check a fresh server boots the new kernel:** the user joins a new server (old ones keep the old kernel until they
+   close); F9 > Server shows `[TypeTorch] kernel <new version>` and `/tt status` answers.
 
 ## Fresh setup path
 

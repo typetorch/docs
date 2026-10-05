@@ -82,8 +82,8 @@ files it read.
 Edit the key in Creator Hub and add the missing permission for this experience.
 
 **A deploy stops with a registry write error.**
-The key can read the ConfigService registry (`universe:read`) but not write it. Add `universe:write`, remove
-`universe:read`, or pass `--no-registry`. The upload is kept: finish it with `bun run typetorch promote`.
+The key can read the ConfigService registry (`universe:read`, only possible with OAuth today, not an API key) but not
+write it. Add `universe:write`, or pass `--no-registry`. The upload is kept: finish it with `bun run typetorch promote`.
 
 **`refusing to publish a kernel that can't verify prod deploys`.**
 Run `bun run typetorch keys init` and `bun run typetorch keys init --fallback` first, commit `typetorch.json`, then
@@ -119,7 +119,8 @@ permission to upload for that group.
 **Servers log `branch prod has no artifact yet; waiting for a deploy`, or (kernel 0.3)
 `nothing loaded (no verified, bootstrap or usable stored head); waiting for a signed deploy`.**
 Nothing was deployed to that branch yet, or no running server stored the head. Keep a server running (join the game)
-and deploy, or give the key `universe:read` and `universe:write` so the registry stores heads.
+and deploy again. (The ConfigService registry would also hold heads, but its read scope, `universe:read`, can't be
+granted to API keys today.)
 
 **A deploy doesn't reach Studio.**
 Deploy messages never reach Studio playtests. Use [the Studio local payload](studio-testing.md).

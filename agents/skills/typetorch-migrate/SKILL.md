@@ -14,8 +14,9 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 1. Never create, ask for, read, print or store secrets: Open Cloud keys, signing key files
    (`~/.config/typetorch/keys/*`), pairing codes. Don't open `.env` or the file named by `TYPETORCH_ENV_FILE`.
 2. Never act on Roblox: no `typetorch` upload, deploy (not even `--dry-run`), promote, rollback, approve, reject, pin,
-   deployments, branch ls, config push, kernel deploy (not even `--dry-run`), keys, assets sync/status, doctor; no place
-   publish; no remote-claude. These are user steps.
+   deployments, branch ls, config push, kernel deploy (not even `--dry-run`, except a kernel update the user asked
+   for: see "Kernel updates"), keys, assets sync/status, doctor; no place publish; no remote-claude. These are user
+   steps.
 3. Never push. Commit locally on `typetorch-migration`.
 4. Don't edit `node_modules/@typetorch/*`, the reference `../template` or any TypeTorch checkout: copy from them.
 5. No new RemoteEvents, `loadstring`, `_G`, disabled guards or settings changes.
@@ -93,8 +94,9 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 6. **Stop** at user actions (rule 2).
 7. **Finish** with "What you need to do" (numbered, filled in): fill the ids; Game Settings (HTTP on, Studio API access
    on); create the Open Cloud key (`asset:read`, `asset:write`, Luau Execution read/write,
-   `universe-messaging-service:publish`, `universe:read` + `universe:write` or neither, place publishing for
-   `kernel deploy`); store it in `~/.config/typetorch/<game>.env` as `TYPETORCH_API_KEY=` and put
+   `universe-messaging-service:publish`, DataStore `universe-datastores.objects:read` + `:create` + `:update` (the
+   shared deploy number), place publishing for `kernel deploy`; not `universe:read` or `legacy-asset:manage`, which API
+   keys can't get today); store it in `~/.config/typetorch/<game>.env` as `TYPETORCH_API_KEY=` and put
    `TYPETORCH_ENV_FILE=~/.config/typetorch/<game>.env` in the repo's `.env`; `bun run typetorch doctor`;
    `bun run typetorch keys init` + `keys init --fallback`, commit, back up the key files; kernel into the place (new place:
    `kernel deploy --dry-run` then `--replace-place --yes`; place with content: `kernel deploy --dry-run`, copy the three
@@ -102,3 +104,13 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    Studio (`bun run watch` + `bun run studio`, Play); check F9 `[TypeTorch] kernel ...`; dev branch deploy + `/tt new dev`
    + two deploys while playing; first prod deploy from `main` (y/N, signed); rollback drill. Then post the report
    (template in AGENTS.md).
+
+## Kernel updates (only when the user asks)
+
+Manual, and the one flow where you run `kernel deploy`: the user downloads a copy in Studio (File > Download a Copy) and
+gives you the file and its place version; run `bun run typetorch kernel deploy --dry-run --place-file <file> --base
+<version>`, read the summary (only the kernel folders may change), show it and ask; after the user's yes, the same
+command without `--dry-run` plus `--yes` publishes (`kernel restore <backup>` undoes it). Or, with the Roblox Studio MCP
+and the place open, replace the three kernel folders in Studio from `node_modules/@typetorch/kernel` and the user
+publishes from Studio. Then the user joins a fresh server: F9 shows `[TypeTorch] kernel <new version>`. Details:
+AGENTS.md "Updating the kernel in a game (agents)".
