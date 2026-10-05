@@ -1,0 +1,43 @@
+# TypeTorch
+
+> TypeTorch is a roblox-ts framework and toolchain that updates live Roblox games without restarting servers. A small Luau kernel baked into the place loads each build (a payload of ModuleScripts uploaded as a private Model asset) and hot-swaps server and client code in seconds while players stay. Code uses @typetorch/framework (modules with dependency injection, lifecycle hooks, troves, guarded networking, hot assets, an in-game dev menu); the typetorch CLI builds, uploads, approves, signs (prod) and deploys. roblox-ts only. Early: packages are not on npm yet (planned); today they come from local checkouts as packed tarballs.
+
+Key facts for agents:
+- Never handle secrets (Open Cloud keys, signing key files) and never act on Roblox (deploy, publish, keys, approve): those are user steps. Follow agents/AGENTS.md.
+- Every module must be stoppable and restartable: everything in this.trove, no module-level state (persist plain data with this.ctx.persist), players via onPlayerAdded/observePlayers (replays on every swap), no RemoteEvents (createNetwork), no _G.
+- The payload holds only Folders and ModuleScripts; entry points are src/server/boot.ts and src/client/boot.ts.
+- The template repo decides the toolchain (package.json, tsconfig.json, default.project.json, studio.project.json).
+
+## Get started
+
+- [README](https://github.com/typetorch/docs/blob/main/README.md): index, how it works, repositories
+- [Fresh setup](https://github.com/typetorch/docs/blob/main/getting-started/fresh-setup.md): tools, sibling checkouts, experience and settings, typetorch.json, API key scopes, signing keys, kernel publish, first deploy, dev branch, dev menu access, /tt, rollback
+- [Migrate an existing game](https://github.com/typetorch/docs/blob/main/getting-started/migrate.md): toolchain, boot modules, Flamework/Knit/singletons to modules, the swap-safety rules with before/after code, networking, UI, data, installing the kernel in a place with content, checklist, pitfalls
+
+## Agents
+
+- [Agent playbook](https://github.com/typetorch/docs/blob/main/agents/AGENTS.md): detect, plan, toolchain, migrate step by step, local checks, stop at user actions, "What you need to do" list, report template
+- [Claude Code skill](https://github.com/typetorch/docs/blob/main/agents/skills/typetorch-migrate/SKILL.md): the playbook's essentials as a skill
+
+## Guides
+
+- [Branches and channels](https://github.com/typetorch/docs/blob/main/guides/branches-and-channels.md): prod/dev, effective channel, private and reserved servers
+- [Deploy and rollback](https://github.com/typetorch/docs/blob/main/guides/deploy-and-rollback.md): deploy stages, artifact ids, approval and proposals, promote, rollback, deployment log, pins
+- [Prod signing](https://github.com/typetorch/docs/blob/main/guides/prod-signing.md): Root Key and Fallback Key, typetorch keys init/rotate/resign, key asset, kernel 0.3 rule, bootstrap heads, boot fail-safe
+- [Player data](https://github.com/typetorch/docs/blob/main/guides/player-data.md): the swap-safe pattern with a ProfileStore example
+- [Hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md): TypeTorchAsset, typetorch assets sync, hotAsset(), updating held tools, migrating templates
+- [Testing in Studio](https://github.com/typetorch/docs/blob/main/guides/studio-testing.md): studio.project.json, bun run watch + bun run studio, local payload
+- [The dev menu](https://github.com/typetorch/docs/blob/main/guides/dev-menu.md): Artifact (Signing), Modules, Server (Status, Branch), Admin, Logs, Dex, Network, Claude; /tt commands
+- [Runtime API](https://github.com/typetorch/docs/blob/main/guides/runtime-api.md): TypeTorch.* identity, startInfo, onSwapOut, onUpdatePending, onBranchChanged, persist, roles, status, logs, asset
+- [Networking](https://github.com/typetorch/docs/blob/main/guides/networking.md): createNetwork, guards, limits, requests
+- [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md): Claude Code prompted from a dev server; Live/Code modes, deploy approval, screenshots, Toolbox
+- [Security model](https://github.com/typetorch/docs/blob/main/guides/security.md): roles, what protects prod, keys, never publish secrets
+- [Troubleshooting](https://github.com/typetorch/docs/blob/main/guides/troubleshooting.md): real errors and fixes
+
+## Optional
+
+- [CLI README](https://github.com/typetorch/cli): every command and flag, identity, keys, registry, message format
+- [Framework README](https://github.com/typetorch/framework): API reference
+- [Template](https://github.com/typetorch/template): the starter game (Target Rush) and reference setup
+- [Transformer README](https://github.com/typetorch/transformer): user macros, guards, migrating from Flamework
+- [Dev-server README](https://github.com/typetorch/dev-server): remote-claude security model and HTTP contract

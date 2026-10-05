@@ -1,0 +1,12 @@
+# private working notes (kept locally, never pushed)
+CHANGELOG.md
+
+# secrets
+.env
+.env.*
+
+# editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
