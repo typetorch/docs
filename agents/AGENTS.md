@@ -45,7 +45,7 @@ approving. You finish with a numbered "What you need to do" list that tells them
 8. **Only promise what exists today.** On npm since 2026-10-05: `@typetorch/framework`, `transformer`, `kernel`, `cli`
    and `dev-server`; the template installs all five with `bun install` (`npx @typetorch/cli` works too). Planned:
    `typetorch init`, kernel deploys that patch only the kernel (today `--replace-place` wipes the place), content packs,
-   the typed asset map from files, CI/GitHub Action, `typetorch test`, `/tt grant`/`revoke`, a kernel `onClose` hook.
+   the typed asset map from files, `typetorch test`, `/tt grant`/`revoke`, a kernel `onClose` hook.
 
 ## Step 1: Detect
 
