@@ -7,6 +7,9 @@ server hot-swaps to it in a few seconds while players stay in the game.
 > **Status: early.** The core loop runs on live Roblox servers today. APIs and commands still change. These docs
 > describe the code as it is now. Features that don't exist yet are marked **planned**.
 
+> **No GitHub Actions, ever.** TypeTorch doesn't use or ship GitHub Actions or any hosted CI: they are a common
+> supply-chain risk and would need your keys. Builds, cloud tests, signing and deploys run on your own machine.
+
 ## Get started
 
 Pick one path:
@@ -25,10 +28,12 @@ TypeTorch is **roblox-ts only**. A plain Luau game has to move to roblox-ts firs
 flowchart LR
     A[typetorch deploy] --> B[build: roblox-ts -> payload.rbxm]
     B --> C[upload as a private Model asset<br/>moderation check]
-    C --> D[approve y/N<br/>prod: signed]
+    C --> T[cloud test<br/>prod: always]
+    T --> D[approve y/N<br/>prod: signed]
     D --> E[deploy message<br/>MessagingService]
     E --> F[live servers: the kernel loads the payload]
     F --> G[old version stops, new one starts<br/>server + clients, no restart]
+    G --> R[reports to the fleet API<br/>bad build: automatic rollback]
 ```
 
 - **Kernel:** a small Luau loader baked into the place. It picks each server's branch, loads payloads and swaps them.
@@ -39,19 +44,27 @@ flowchart LR
   inside every payload, so it hot-swaps too.
 - **Branches:** public servers run `prod`. Any other branch (`dev`, `feature-x`) runs in private or reserved servers of
   the same game.
-- **CLI:** `typetorch` builds, uploads, approves, signs and deploys, rolls back, and publishes the kernel.
+- **CLI:** `typetorch` builds, uploads, tests, approves, signs and deploys, rolls back, shows live servers and alerts,
+  and patches the kernel into the place. `typetorch update` keeps it current.
+- **Safe deploys:** a cloud test before every prod publish; on each server a health window that rolls a failing build
+  back; `deploy --wait`, which rolls the branch back when a build fails on 20% of servers; a new server plays within
+  15 s.
+- **Fleet API and analytics (optional, self-hosted):** live server status, deploy reports and alerts from the kernel,
+  and your own analytics with experiments, funnels and player journeys.
 
 ## Guides
 
 | Guide | What it covers |
 |---|---|
-| [Branches and channels](guides/branches-and-channels.md) | `prod` and `dev`, private servers on a branch, `/tt new` |
-| [Deploy and rollback](guides/deploy-and-rollback.md) | deploy, approval, proposals, promote, rollback, pins, the deployment log |
+| [Branches and channels](guides/branches-and-channels.md) | `prod` and `dev`, private servers on a branch, `/tt new`, owners switching any server in place |
+| [Deploy and rollback](guides/deploy-and-rollback.md) | deploy, approval, safe deploys (cloud test, health window, `--wait` and automatic rollback, reports), promote, rollback, pins, kernel updates |
+| [Live servers and alerts](guides/fleet-and-alerts.md) | the fleet API, `typetorch servers`, `report`, `alerts`, server lost and stuck, webhooks |
+| [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, DuckDB or Basin, experiments, queries, node graphs, privacy, a local quick start |
 | [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
 | [Player data](guides/player-data.md) | the swap-safe data pattern, with a ProfileStore example |
 | [Hot assets](guides/hot-assets.md) | models and UI templates from the place, updated live with `hotAsset()` |
 | [Testing in Studio](guides/studio-testing.md) | run your local code in Studio with the real kernel |
-| [The dev menu](guides/dev-menu.md) | every tab, who can use it, the `/tt` commands |
+| [The dev menu](guides/dev-menu.md) | every tab, owners and devs, the `/tt` commands |
 | [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, roles, logs |
 | [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests |
 | [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server: Live and Code modes, screenshots, Toolbox |
@@ -84,6 +97,7 @@ flowchart LR
 | [template](https://github.com/typetorch/template) | the starter game (Target Rush), also the reference setup |
 | [transformer](https://github.com/typetorch/transformer) | `@typetorch/transformer`, the compiler plugin for guards and dependency injection |
 | [dev-server](https://github.com/typetorch/dev-server) | `remote-claude`: Claude Code on your PC, prompted from inside a dev server |
+| [analytics](https://github.com/typetorch/analytics) | the analytics server (DuckDB), the fleet API (SQLite), the queries and `bun run report` (not on npm yet) |
 
 ## Conventions in these docs
 

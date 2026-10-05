@@ -7,32 +7,37 @@ Key facts for agents:
 - Every module must be stoppable and restartable: everything in this.trove, no module-level state (persist plain data with this.ctx.persist), players via onPlayerAdded/observePlayers (replays on every swap), no RemoteEvents (createNetwork), no _G.
 - The payload holds only Folders and ModuleScripts; entry points are src/server/boot.ts and src/client/boot.ts.
 - The template repo decides the toolchain (package.json, tsconfig.json, default.project.json, studio.project.json).
+- No GitHub Actions, ever (the owner's rule: supply-chain risk). Never add workflows, actions or hosted CI; builds, cloud tests and deploys run on the user's machine.
+- Roles in game: owner (experience creator or group owner, plus members with role "owner") and dev; a legacy "admin" counts as dev.
+- Analytics (AnalyticsEngine) and the fleet API are optional and self-hosted; the engine does nothing until a game creates it.
 
 ## Get started
 
 - [README](https://github.com/typetorch/docs/blob/main/README.md): index, how it works, repositories
-- [Fresh setup](https://github.com/typetorch/docs/blob/main/getting-started/fresh-setup.md): tools, clone the template and bun install (optional local override for unreleased framework/kernel changes), experience and settings, typetorch.json, API key scopes, signing keys, kernel publish, first deploy, dev branch, dev menu access, /tt, rollback
-- [Migrate an existing game](https://github.com/typetorch/docs/blob/main/getting-started/migrate.md): toolchain, boot modules, Flamework/Knit/singletons to modules, the swap-safety rules with before/after code, networking, UI, data, installing the kernel in a place with content, checklist, pitfalls
+- [Fresh setup](https://github.com/typetorch/docs/blob/main/getting-started/fresh-setup.md): tools, clone the template and bun install (optional local override for unreleased framework/kernel changes), typetorch update, experience and settings, typetorch.json, API key scopes (Luau Execution for the cloud test, DataStore scopes for the shared deploy number; universe:read and legacy-asset:manage can't be granted to API keys), signing keys, kernel publish, first deploy (cloud test, --wait), dev branch, owners and devs, /tt, rollback
+- [Migrate an existing game](https://github.com/typetorch/docs/blob/main/getting-started/migrate.md): toolchain, boot modules, Flamework/Knit/singletons to modules, the swap-safety rules with before/after code, shutdown in onStop, networking, UI, data, optional analytics, installing the kernel in a place with content (kernel deploy --place-file patches only the kernel), checklist, pitfalls
 
 ## Agents
 
-- [Agent playbook](https://github.com/typetorch/docs/blob/main/agents/AGENTS.md): detect, plan, toolchain, migrate step by step, local checks, stop at user actions, "What you need to do" list, report template
+- [Agent playbook](https://github.com/typetorch/docs/blob/main/agents/AGENTS.md): detect, plan, toolchain, migrate step by step, local checks, stop at user actions, "What you need to do" list, report template, manual kernel updates by agents
 - [Claude Code skill](https://github.com/typetorch/docs/blob/main/agents/skills/typetorch-migrate/SKILL.md): the playbook's essentials as a skill
 
 ## Guides
 
-- [Branches and channels](https://github.com/typetorch/docs/blob/main/guides/branches-and-channels.md): prod/dev, effective channel, private and reserved servers
-- [Deploy and rollback](https://github.com/typetorch/docs/blob/main/guides/deploy-and-rollback.md): deploy stages, artifact ids, approval and proposals, promote, rollback, deployment log, pins
+- [Branches and channels](https://github.com/typetorch/docs/blob/main/guides/branches-and-channels.md): prod/dev, effective channel, private and reserved servers, owners switch any server in place (Switch, Load here)
+- [Deploy and rollback](https://github.com/typetorch/docs/blob/main/guides/deploy-and-rollback.md): deploy stages, artifact ids, shared #seq, ProtocolHash, approval and proposals, safe deploys (cloud test, health window, last known good, 15 s boot budget, deploy --wait with resend and automatic rollback at 20%, deploy reports), rollouts, promote, rollback, deployment log, pins, manual kernel updates
+- [Live servers and alerts](https://github.com/typetorch/docs/blob/main/guides/fleet-and-alerts.md): kernel heartbeats, reports and alerts to a SQLite fleet API (TypeTorchFleet key, typetorch fleet setup), typetorch servers/report/alerts, server lost and stuck, alert codes, webhooks, the in-game roll call, no MemoryStore for fleet data
+- [Analytics](https://github.com/typetorch/docs/blob/main/guides/analytics.md): AnalyticsEngine (server and client, collectors, TTZone zones, first-session recording, never collected), the event format, DuckDB server or Cloudflare Basin, the TypeTorchAnalytics settings key, experiments per player and per server, queries, Mermaid node graphs, bun run report, privacy and Right to Erasure, a local quick start behind a quick tunnel
 - [Prod signing](https://github.com/typetorch/docs/blob/main/guides/prod-signing.md): Root Key and Fallback Key, typetorch keys init/rotate/resign, key asset, kernel 0.3 rule, bootstrap heads, boot fail-safe
 - [Player data](https://github.com/typetorch/docs/blob/main/guides/player-data.md): the swap-safe pattern with a ProfileStore example
 - [Hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md): TypeTorchAsset, typetorch assets sync, hotAsset(), updating held tools, migrating templates
 - [Testing in Studio](https://github.com/typetorch/docs/blob/main/guides/studio-testing.md): studio.project.json, bun run watch + bun run studio, local payload
-- [The dev menu](https://github.com/typetorch/docs/blob/main/guides/dev-menu.md): Artifact (Signing), Modules, Server (Status, Branch), Admin, Logs, Dex, Network, Claude; /tt commands
+- [The dev menu](https://github.com/typetorch/docs/blob/main/guides/dev-menu.md): Artifact (uptimes, Signing), Modules, Server (Status, Branch: Switch, Load here, Join), Manage (owners: Players, Servers, Load a build, Bans), Logs, Dex, Network, Claude; /tt commands
 - [Runtime API](https://github.com/typetorch/docs/blob/main/guides/runtime-api.md): TypeTorch.* identity, startInfo, onSwapOut, onUpdatePending, onBranchChanged, persist, roles, status, logs, asset
 - [Networking](https://github.com/typetorch/docs/blob/main/guides/networking.md): createNetwork, guards, limits, requests
 - [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md): Claude Code prompted from a dev server; Live/Code modes, deploy approval, screenshots, Toolbox
-- [Security model](https://github.com/typetorch/docs/blob/main/guides/security.md): roles, what protects prod, keys, never publish secrets
-- [Troubleshooting](https://github.com/typetorch/docs/blob/main/guides/troubleshooting.md): real errors and fixes
+- [Security model](https://github.com/typetorch/docs/blob/main/guides/security.md): owners and devs, what protects prod, accepted risks, keys and tokens, no GitHub Actions, never publish secrets
+- [Troubleshooting](https://github.com/typetorch/docs/blob/main/guides/troubleshooting.md): real errors and fixes (cloud test, --wait, fleet, quick tunnels, analytics)
 
 ## Optional
 
@@ -41,3 +46,5 @@ Key facts for agents:
 - [Template](https://github.com/typetorch/template): the starter game (Target Rush) and reference setup
 - [Transformer README](https://github.com/typetorch/transformer): user macros, guards, migrating from Flamework
 - [Dev-server README](https://github.com/typetorch/dev-server): remote-claude security model and HTTP contract
+- [Analytics README](https://github.com/typetorch/analytics): row format, programmatic API, queries with example output, Basin setup, the DuckDB server, the fleet API endpoints, a 1 GB VPS guide, load tests
+- [Analytics contract (SCHEMA.md)](https://github.com/typetorch/framework/blob/main/src/analytics/SCHEMA.md): every column, event and prop, tt-rec-1, sink settings, transport

@@ -89,6 +89,14 @@ write it. Add `universe:write`, or pass `--no-registry`. The upload is kept: fin
 Run `bun run typetorch keys init` and `bun run typetorch keys init --fallback` first, commit `typetorch.json`, then
 `kernel deploy`.
 
+**`kernel deploy` can't download the place (a 401/403 on the place download).**
+That needs `legacy-asset:manage`, which API keys can't get today. Download a copy in Studio (File > Download a Copy)
+and pass it: `--place-file <file> --base <version>` ([Kernel updates](deploy-and-rollback.md#kernel-updates)).
+
+**`fleet setup` (or writing the analytics settings) fails with 401/403.**
+Writing a ConfigService key needs `universe:write` on the deploy key. Nothing is read back: API keys can't read
+configs.
+
 ## Deploys
 
 **`refusing to deploy a dev-channel artifact ... to prod-channel branch "prod"`.**
@@ -105,6 +113,25 @@ The CLI wasn't in an interactive terminal (an agent, CI, the dev-server) or you 
 **Moderation times out.**
 The upload is recorded in `uploads.jsonl`. When Roblox approves it: `bun run typetorch promote <branch> <artifact id>`.
 `--moderation-timeout <s>` waits longer.
+
+**The cloud test fails.**
+Read its errors: they are your build's (an `onInit` or `onStart` that throws, a Shared module that errors, a stop that
+times out). Fix and deploy again. Game code that must not run in the test (it runs against real DataStores) can check
+`workspace:GetAttribute("TypeTorchTest")`. A missing Luau Execution scope fails it too: add
+`universe.place.luau-execution-session:read` and `:write` to the assets key. To publish anyway, knowingly:
+`--skip-test "<reason>"`.
+
+**`deploy --wait` rolled the branch back by itself (`auto_rollback`).**
+20% or more of the servers that tried the build failed or rolled back. `bun run typetorch report "#<seq>"` shows the
+errors and the servers. Fix, then deploy again. `--no-auto-rollback` keeps a build that fails on some servers.
+
+**`deploy --wait` warns about stuck servers (`server_stuck`).**
+Some servers didn't pick up the deploy in time and sent nothing. Nothing is rolled back. They poll the head every 60 s;
+check again with `bun run typetorch servers --branch <b>`.
+
+**`the fleet API isn't configured` (from `servers`, `report`, `alerts`, or `--wait` skipped).**
+Set it up once: [Live servers and alerts](fleet-and-alerts.md#set-it-up). The CLI needs `TYPETORCH_FLEET_TOKEN` and
+`TYPETORCH_FLEET_INGEST_TOKEN` in your env file, and `typetorch.json` `fleet.url`.
 
 **Asset names show up as `####` in Creator Hub.**
 Roblox's text filter censors some hex names unpredictably. The CLI renames censored payloads to `TypeTorch payload`;
@@ -138,8 +165,34 @@ The [boot fail-safe](prod-signing.md#the-boot-fail-safe) ran a stored build it c
 The key asset changed and no `TypeTorch/rekey` hint came with it. If you didn't run `keys rotate`, someone with asset
 write access in your group changed it: check the key asset's versions in Creator Hub.
 
-**"Use the CLI: typetorch pin" in the dev menu.**
-Prod-effective servers take only signed pins. Use `bun run typetorch pin ...`.
+**"Use the CLI: typetorch pin" or "Other prod servers: typetorch pin" in the dev menu.**
+Prod servers take only signed pins sent from outside, and on older kernels the dev menu can't load a build on a prod
+server at all. Use `bun run typetorch pin ...`.
+
+**Dev menu: "No fleet API".**
+The place's kernel has no `Fleet` module: a place project that maps the kernel's files one by one must map `Fleet`
+too (kernel 0.3.2+). Map it, then publish the place.
+
+**Dev menu: "Fleet API failing", or `servers` lists nothing.**
+The fleet URL doesn't answer or the token is wrong. A quick tunnel gets a new URL every time it starts: run
+`bun run typetorch fleet setup --url <new url>` again. Kernels re-read `TypeTorchFleet` every 5 minutes; new servers
+at once.
+
+**The quick tunnel answers 404 for everything.**
+Your `~/.cloudflared/config.yml` (a named tunnel) has a catch-all ingress rule, and it overrides `--url`. Start the
+quick tunnel with an empty config file: `cloudflared tunnel --config cloudflared-empty.yml --url http://127.0.0.1:8787`
+([analytics quick start](analytics.md#4-start-a-quick-tunnel)).
+
+**Analytics: no rows arrive.**
+Check, in order: an `AnalyticsEngine` is created on the server (the client alone sends nothing); Allow HTTP Requests is
+on; the `TypeTorchAnalytics` key exists and is valid (servers re-read it every 3 minutes; without it the engine keeps
+only the newest 1,000 rows); `analytics.stats()` on the server shows what was sent, dropped or refused. Game servers
+send every 15 s (`flushSeconds`); a DuckDB server loads them a few seconds later, Basin after its roll interval (1-2
+minutes).
+
+**Basin: rows are sent (2xx) but never show up.**
+Basin drops rows that don't match the stream's schema, silently. Create the streams from the analytics repo's
+`basin/*.schema.json` exactly; a schema can't be changed after the stream exists.
 
 **Kernel updates fail with HTTP 409 when publishing the place.**
 An active Team Create session blocks publishing. Close Studio sessions on that place (everyone), then retry.

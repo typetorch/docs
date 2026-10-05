@@ -151,7 +151,9 @@ export function boot(kernel: ClientKernel) {
 
 Lifecycle:
 
-- `onInit`: in dependency order, one at a time; may yield briefly (the generation has about 20 s to become ready).
+- `onInit`: in dependency order, one at a time; may yield briefly. A swap gives the generation about 20 s to become
+  ready, but a new server's first boot only about 6 s (kernel 0.3.2 starts a playable build within 15 s of a server
+  starting, whatever fails). Keep `onInit` short; slow loading belongs in `onStart`.
 - `onStart`: spawned per module after every `onInit`; runs inside the module's trove.
 - `onStop`: reverse order, before the trove is cleaned. The kernel gives a stopping generation 5 s.
 - `onTick` (Heartbeat), `onPhysics` (PreSimulation), `onRender` (client RenderStepped): connected through the trove.
@@ -491,9 +493,12 @@ Replace the deprecated `spawn`, `delay` and `wait` with `task.*` while you are t
 
 ### Rule 8: shutdown
 
-`game.BindToClose` can't be unbound, so bind it at most once per server (guard it with a persisted flag) and keep it
-short. A kernel `onClose` hook for generations is **planned**. `TypeTorch.onSwapOut` runs before a swap, never on
-shutdown.
+On kernel 0.3.2+, a server shutdown runs every module's `onStop` (the kernel's own `BindToClose` calls the running
+generation, for at most 20 s). Put shutdown saves in `onStop` and keep them short. `TypeTorch.onSwapOut` runs before a
+swap, never on shutdown.
+
+On older kernels, `game.BindToClose` can't be unbound, so bind it at most once per server (guard it with a persisted
+flag).
 
 ## 6. Networking
 
@@ -616,31 +621,55 @@ place, its session handles live in `persist`, sessions load on join and are rele
 
 Don't change store names, keys or the data format in the same step.
 
+### Analytics (optional)
+
+TypeTorch has its own analytics engine: joins, sessions, devices, tech health, zones and new players' first sessions are
+logged for you, and your code adds funnels, purchases, currency and custom events
+([Analytics](../guides/analytics.md)). Nothing runs until you create an `AnalyticsEngine`. An analytics SDK you
+already use can stay; if it logs "joined" from a join handler, guard it like any one-time effect (rule 3).
+
 ## 9. Install the kernel in your place
 
-The place keeps your Studio content and gains the kernel. Today `typetorch kernel deploy --replace-place` publishes the
-**whole** place from the kernel's place file, so it would **wipe** your maps and Studio UI. Patching only the kernel
-is **planned**. Until then, install the kernel in Studio:
+The place keeps your Studio content and gains the kernel. **Never run `kernel deploy --replace-place` on it:** that
+publishes the whole place from the kernel's place file and wipes your maps and Studio UI.
 
-1. Do [fresh setup](fresh-setup.md) steps 4, 6 and 7 (settings, API key, signing keys).
-2. Build the kernel place with your trust roots stamped (it publishes nothing):
+First do [fresh setup](fresh-setup.md) steps 4, 6 and 7 (settings, API key, signing keys). The kernel waits idle
+until your first deploy, so your old scripts keep running meanwhile. Remove the old game scripts that the payload
+replaces (keep the ones listed below) in Studio and publish just before the first deploy.
+
+**With the CLI (patches only the kernel):**
+
+1. In Studio, **File > Download a Copy** of the live place as a binary `.rbxl` file, and note its place version. (The
+   CLI can't download it: the scope for that, `legacy-asset:manage`, can't be given to API keys today.)
+2. Patch the copy without publishing:
 
    ```sh
-   bun run typetorch kernel deploy --dry-run
+   bun run typetorch kernel deploy --dry-run --install --place-file <file> --base <version>
    ```
 
-   It writes `.typetorch/place.rbxl` and prints the `keys` line (your key asset id and fallback key).
-3. Open `.typetorch/place.rbxl` in Studio. Copy these three folders into your place, at the same spots:
+   It adds the kernel folders (with your trust roots `KeyAssetId`, `FallbackPublicKey` and `BootstrapHeads`) and the
+   kernel's settings (`HttpService.HttpEnabled`, `ServerScriptService.LoadStringEnabled`), checks that everything else
+   is unchanged, and writes the patched file and a report to `.typetorch/place-patches/`. Read the summary.
+3. Publish it: the same command without `--dry-run`. It asks y/N and refuses if someone published meanwhile. Keep your
+   downloaded copy: `bun run typetorch kernel restore <file>` publishes it back (undo).
+4. Move players to the new version (restart servers from Creator Hub, or the dev menu's **Migrate** on servers that
+   still run the old kernel).
+
+Later kernel updates work the same way, without `--install` ([Kernel updates](../guides/deploy-and-rollback.md#kernel-updates)).
+An agent can run them for you, with your OK before the publish.
+
+**Or by hand in Studio:**
+
+1. `bun run typetorch kernel deploy --dry-run` builds the kernel place with your trust roots stamped (it publishes
+   nothing) into `.typetorch/place.rbxl`.
+2. Open it in Studio. Copy these three folders into your place, at the same spots:
    `ServerScriptService.TypeTorchKernel` (it carries the `KeyAssetId`, `FallbackPublicKey` and `BootstrapHeads`
    attributes), `ReplicatedStorage.TypeTorchKernelShared` and `ReplicatedFirst.TypeTorchKernelClient`.
-4. In your place, select ServerScriptService and turn on **LoadStringEnabled** if you will use remote-claude.
-5. Remove the old game scripts that the payload replaces (keep the ones listed below).
-6. **File > Publish to Roblox**, then move players to the new version (restart servers from Creator Hub, or use the
-   dev menu's **Migrate** on servers that still run the old kernel).
-7. Do the same copy again for every later kernel update.
+3. In your place, select ServerScriptService and turn on **LoadStringEnabled** if you will use remote-claude.
+4. **File > Publish to Roblox**, then move players to the new version.
 
-**Check:** the F9 server log shows `[TypeTorch] kernel 0.3.1 (API 1) on a public server, branch prod, signed deploys
-only (keys: key asset)`.
+**Check:** the F9 server log shows `[TypeTorch] kernel <version> (API 1) on a public server, branch prod, signed
+deploys only (keys: key asset)`.
 
 ### What stays in the place
 
@@ -660,10 +689,9 @@ service that uses tags.
 - **Hot assets (built):** builders mark models and UI templates in the place with the `TypeTorchAsset` attribute,
   `typetorch assets sync` uploads them, and running servers pick up new versions with no restart. Code that clones
   templates switches to `hotAsset(key, template)`. See [Hot assets](../guides/hot-assets.md#migrating-existing-templates).
-- **Builder workflows** (both decided, both later): (a) a separate Build experience whose content ships as
-  pinned content packs, or (b) Team Create in the prod place with kernel deploys that patch only the kernel. Content
-  packs and patch deploys are **planned**. Today builders work in the place and publish from Studio; maps need a
-  place publish and a restart (Admin > Servers > Migrate moves players to the new version).
+- **Builders** keep working in the place and publish from Studio: kernel deploys patch only the kernel, so they never
+  touch builders' content. Maps need a place publish and new servers (Manage > Servers > Migrate moves players to the
+  new version). A separate Build experience with pinned content packs is **planned**.
 - The typed asset map from files (Asphalt) is **planned**.
 
 ## 10. Verify, then ship
@@ -718,5 +746,7 @@ service that uses tags.
 | A Flamework import left (`@flamework/core` `OnStart`) | "You can only use npm scopes that are listed in your typeRoots" | import from `@typetorch/framework` |
 | `npx rbxtsc` in a Bun project on Windows | runs an unrelated placeholder package | `bun run build` or `bunx rbxtsc` |
 | Dev branch writes prod data | real players' data changes from a test server | split store names by `TypeTorch.channel` |
-| `kernel deploy --replace-place` on a real place | maps and Studio UI vanish from the live version | install the kernel in Studio (section 9) |
+| `kernel deploy --replace-place` on a real place | maps and Studio UI vanish from the live version | `kernel deploy --place-file <copy>` patches only the kernel (section 9) |
+| Slow work in `onInit` | a new server waits only about 6 s at boot, then starts an older build and swaps yours in later | load in `onStart`; keep `onInit` short |
+| Shutdown saves in `game.BindToClose` | on kernel 0.3.2+ `onStop` already runs at shutdown | save in `onStop` |
 | Template-literal types in a network leaf | the guard can't be generated: compile error | use `string` and check it in the handler |

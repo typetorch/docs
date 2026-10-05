@@ -31,8 +31,11 @@ approving. You finish with a numbered "What you need to do" list that tells them
    tell them to revoke it in Creator Hub and make a new one.
 2. **Never act on Roblox.** Don't publish or save a place, upload anything, or run: `typetorch upload`, `deploy` (also
    not `--dry-run`: it reads the registry with the user's key), `promote`, `rollback`, `approve`, `reject`, `pin`,
-   `deployments`, `branch ls`, `config push`, `kernel deploy` (also not `--dry-run`; the one exception is a kernel update the user asked for, see "Updating the kernel in a game"), `keys ...`, `assets sync|status`,
-   `doctor` (it probes the key and publishes a test message). Don't start `remote-claude`. These go in the final list.
+   `deployments`, `branch ls`, `config push`, `kernel deploy` (also not `--dry-run`; the one exception is a kernel
+   update the user asked for, see "Updating the kernel in a game"), `kernel restore`, `keys ...`, `assets
+   sync|status`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`, `doctor` (it probes the key
+   and publishes a test message). Don't start `remote-claude` (`typetorch dev`), the analytics server or a tunnel.
+   These go in the final list.
 3. **Never push.** Local commits on a new branch are fine. Don't rewrite history, don't force anything.
 4. **Don't edit TypeTorch itself:** `node_modules/@typetorch/*`, the reference `../template`, or any other TypeTorch
    checkout. Copy from them.
@@ -42,10 +45,16 @@ approving. You finish with a numbered "What you need to do" list that tells them
    flag everything for the user to test.
 7. **Keep ids honest.** Never invent a universe, place, group or user id. Use the user's, or the placeholder `1`, and
    say so in the final list.
-8. **Only promise what exists today.** On npm since 2026-10-05: `@typetorch/framework`, `transformer`, `kernel`, `cli`
-   and `dev-server`; the template installs all five with `bun install` (`npx @typetorch/cli` works too). Planned:
-   `typetorch init`, kernel deploys that patch only the kernel (today `--replace-place` wipes the place), content packs,
-   the typed asset map from files, `typetorch test`, `/tt grant`/`revoke`, a kernel `onClose` hook.
+8. **Only promise what exists today.** On npm: `@typetorch/framework`, `transformer`, `kernel`, `cli` and
+   `dev-server`; the template installs all five with `bun install` (`npx @typetorch/cli` works too). Built and usable:
+   kernel deploys that patch only the kernel into a downloaded copy (`kernel deploy --place-file`), the cloud test
+   (`typetorch test --cloud`, automatic before prod deploys), `onStop` at server shutdown (kernel 0.3.2), the fleet API
+   (`typetorch servers`, `report`, `alerts`) and the optional `AnalyticsEngine` (framework 0.3.0; its backend is
+   `@typetorch/analytics`, a git repo, not on npm). Owners switching any server in place needs kernel 0.3.4 and
+   framework 0.3.2 (not on npm yet). Planned: `typetorch init`, content packs, the typed asset map from files,
+   `typetorch test --unit`, `/tt grant`/`revoke`, a web analytics explorer.
+9. **No GitHub Actions, ever** (the owner's rule: they are a supply-chain risk). Don't add `.github/workflows`, actions,
+   or any hosted CI, and don't suggest them. Builds, cloud tests and deploys run on the user's machine.
 
 ## Step 1: Detect
 
@@ -254,7 +263,8 @@ At the repo root:
 - `universeId`, `placeId`, `creator`: the user's (`{ "groupId": … }` or `{ "userId": … }`, the experience owner), or
   the placeholder `1`.
 - `branches`: map the repo's default git branch (`main` or `master`) to `prod`.
-- `members`: `{}` unless the user gave user ids; the owner is always a dev.
+- `members`: `{}` unless the user gave user ids; each is `"owner"` or `"dev"` (an old `"admin"` counts as dev). The
+  experience's creator (or the owning group's owner) is always an owner.
 - `approval: "prod"`: dev deploys go out at once, prod ones wait for the user's y/N.
 - Never copy the template's `signingPublicKeys`, `keyAssetId` or `fallbackPublicKey`: they belong to the template's
   game. `typetorch keys init` writes the user's.
@@ -335,8 +345,9 @@ left in the payload fails `typetorch build` with "the payload may hold only Fold
   - type ids changed format (`@typetorch/framework:decorators@Service`, `server/services/x@X`): anything the game
     saved under Flamework ids (`Flamework.id<T>()`) won't match. Flag it under data.
 - No work in constructors (`this.trove` and `this.ctx` arrive right after).
-- `onInit` runs in dependency order and may yield briefly (about 20 s for the whole generation to be ready); `onStart`
-  is spawned per module inside its trove.
+- `onInit` runs in dependency order and may yield briefly (a swap allows about 20 s for the whole generation to be
+  ready, a new server's boot only about 6 s); move slow loading to `onStart`, which is spawned per module inside its
+  trove.
 
 ### 4.3 Swap-safety pass (every module)
 
@@ -361,7 +372,9 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 7. **`task.spawn`/`delay`/`defer` only through the trove:** `this.trove.add(task.delay(5, fn))`. Replace deprecated
    `spawn`, `delay`, `wait` with `task.*`.
 8. **Instances in the world** that a module creates go in its trove (or an observer's cleanup).
-9. **`game.BindToClose`:** at most once per server (a persisted flag), short. A kernel `onClose` hook is planned.
+9. **Shutdown:** kernel 0.3.2+ runs every module's `onStop` when the server shuts down, so shutdown saves go in
+   `onStop` (short). Remove `game.BindToClose` handlers that only did that; any that must stay bind at most once per
+   server (a persisted flag).
 
 ### 4.4 Networking
 
@@ -416,9 +429,18 @@ list.
 - **Hot assets** (optional; only if the user asks, or mention it in the report): code that clones templates can use
   `hotAsset("tools/sword", template)` (the second argument keeps today's template as the fallback). Marking templates
   with `TypeTorchAsset` and `typetorch assets sync` are user steps. See [Hot assets](../guides/hot-assets.md).
-- Never suggest `typetorch kernel deploy --replace-place` for a place with Studio content.
+- Never suggest `typetorch kernel deploy --replace-place` for a place with Studio content. The kernel goes in with
+  `kernel deploy --install --place-file <copy>` (a user step, Step 7) or by hand in Studio.
 
-### 4.8 Logging (optional)
+### 4.8 Analytics (optional)
+
+TypeTorch's own analytics ([Analytics](../guides/analytics.md)) is optional: an `AnalyticsEngine` created on the server
+and the client logs sessions, devices, tech health, zones and new players' first sessions; game code adds `step`,
+`purchase`, `currency`, `state` and `track`. Add it only if the user asks (or mention it in the report). Keep an
+existing analytics SDK as it is. Its backend (a DuckDB server or Cloudflare Basin, tokens, the settings key) is a user
+step.
+
+### 4.9 Logging (optional)
 
 `$print`, `$warn`, `$assert` from `rbxts-transform-debug` add `[file:line]` in dev builds and are removed from prod
 builds. Plain `print`/`warn` keep working.
@@ -459,11 +481,12 @@ Fix, rebuild, log.
 Don't do these; list them in Step 7:
 
 - create the group, the experience, an API key; change Creator Hub or Game Settings;
-- write a key anywhere; run `typetorch keys ...`, `doctor`, `deploy`, `upload`, `approve`, `promote`, `rollback`, `pin`,
-  `config push`, `assets sync|status`, `kernel deploy`, `deployments`, `branch ls`;
+- write a key or token anywhere; run `typetorch keys ...`, `doctor`, `deploy`, `upload`, `approve`, `promote`,
+  `rollback`, `pin`, `config push`, `assets sync|status`, `kernel deploy`, `kernel restore`, `deployments`,
+  `branch ls`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`;
 - publish a place; edit the place in Studio (kernel install, data library, `TypeTorchAsset` marks);
-- start `remote-claude`;
-- push to a remote.
+- start `remote-claude`, the analytics server or a tunnel; write the analytics settings;
+- push to a remote; add GitHub Actions or any CI workflow.
 
 ## Step 7: Finish with "What you need to do"
 
@@ -480,11 +503,12 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
    Assets (Toolbox inserts).
 3. **Create an Open Cloud API key** (Creator Hub > Open Cloud > API Keys, as the group owner or a member allowed to
    upload and publish for the group), for this experience:
-   - `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (hot assets,
-     doctor's place check)
+   - `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (the cloud
+     test that runs before every prod deploy, hot assets, doctor's place check)
    - `universe-messaging-service:publish`
-   - DataStore `universe-datastores.objects:read`, `:create` and `:update` (the shared deploy number: every machine and
-     CI take `#seq` from the game's DataStore)
+   - DataStore `universe-datastores.objects:read`, `:create` and `:update` (the shared deploy number: every machine
+     takes `#seq` from the game's DataStore)
+   - optional: `universe:write` (only for `typetorch fleet setup` and the analytics settings)
    - place publishing (`universe-places` write; the CLI says `universe.place:write`), only for `kernel deploy`
    Set an expiry and, if you can, an IP allowlist. Don't ask for `universe:read` (the ConfigService registry) or
    `legacy-asset:manage` (place downloads): Creator Hub doesn't offer them for API keys today. Deploys work without
@@ -498,25 +522,33 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
 7. **Put the kernel in the place** (needs a place publish and a restart):
    - empty or new place: `bun run typetorch kernel deploy --dry-run`, then
      `bun run typetorch kernel deploy --replace-place --yes`;
-   - place with Studio content (never `--replace-place`, it wipes the place): `bun run typetorch kernel deploy --dry-run`,
-     open `.typetorch/place.rbxl` in Studio, copy `ServerScriptService.TypeTorchKernel`,
-     `ReplicatedStorage.TypeTorchKernelShared` and `ReplicatedFirst.TypeTorchKernelClient` into your place, turn on
-     ServerScriptService.LoadStringEnabled if you want remote-claude, remove the old scripts listed in
-     MIGRATION_NOTES.md, File > Publish to Roblox.
+   - place with Studio content (never `--replace-place`, it wipes the place): File > Download a Copy (a binary
+     `.rbxl`), note its place version, and run `bun run typetorch kernel deploy --dry-run --install --place-file
+     <file> --base <version>`; read the summary (only the kernel folders and the kernel's settings may change), then
+     the same command without `--dry-run` publishes after a y/N. Keep the copy: `kernel restore <file>` undoes it. (Or
+     by hand: `kernel deploy --dry-run`, open `.typetorch/place.rbxl` in Studio, copy
+     `ServerScriptService.TypeTorchKernel`, `ReplicatedStorage.TypeTorchKernelShared` and
+     `ReplicatedFirst.TypeTorchKernelClient` into your place, turn on ServerScriptService.LoadStringEnabled if you want
+     remote-claude, File > Publish to Roblox.) The kernel waits idle until the first deploy.
+   - then, in Studio, remove the old scripts listed in MIGRATION_NOTES.md and publish, just before the first deploy.
 8. **Player data** (if listed in MIGRATION_NOTES.md): in Studio put the library at `ServerStorage.Packages.<Name>` and
    add the `ServerScriptService.DataHost` Script from the Player data guide; publish.
 9. **Test locally in Studio:** `bun run watch` and `bun run studio` (two terminals), connect the Rojo plugin, Play.
    Server > Status shows "Studio: local payload". Use the dev menu's Reload to test a swap.
-10. **Check the kernel live:** join the game; F9 > Server shows `[TypeTorch] kernel 0.3.1 (API 1) on a public server,
-    branch prod, signed deploys only (keys: key asset)`. `/tt status` answers.
+10. **Check the kernel live:** join the game; F9 > Server shows `[TypeTorch] kernel <version> (API 1) on a public
+    server, branch prod, signed deploys only (keys: key asset)`. `/tt status` answers.
 11. **Dev branch:** `git switch -c dev`, `bun run typetorch deploy`, then `/tt new dev` in game. Earn some data, deploy
     again twice while playing, rejoin: nothing lost.
-12. **First prod deploy:** merge into `main`, stay in the game, `bun run typetorch deploy` (y/N, then signed). Expect
-    `deployed #N prod@<commit> -> <artifact id>`; the dev menu's Artifact tab shows two verified badges.
+12. **First prod deploy:** merge into `main`, stay in the game, `bun run typetorch deploy` (the cloud test runs, then
+    y/N, then signed). Expect `deployed #N prod@<commit> -> <artifact id>`; the dev menu's Artifact tab shows two
+    verified badges.
 13. **Rollback drill:** `bun run typetorch rollback --branch prod`, check `bun run typetorch deployments`, deploy again.
-14. Optional, once Roblox lets API keys read ConfigService (`universe:read`, OAuth only today): `bun run typetorch
-    config push` (members); [hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md);
-    [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md).
+14. Optional: [live servers and alerts](https://github.com/typetorch/docs/blob/main/guides/fleet-and-alerts.md)
+    (`typetorch fleet setup`, then `servers`, `report`, `alerts`, and automatic rollback after bad deploys);
+    [analytics](https://github.com/typetorch/docs/blob/main/guides/analytics.md);
+    [hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md);
+    [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md); once Roblox lets API keys read
+    ConfigService (`universe:read`, OAuth only today), `bun run typetorch config push` (members).
 ```
 
 ### Final report template
@@ -559,15 +591,16 @@ Only when the user asks for a kernel update (a new `@typetorch/kernel` version).
 kernel lives in the place, so it changes with a place publish and new servers. This is the one flow where you run
 `kernel deploy`, and you publish only after the user's OK in chat.
 
-1. **The user downloads a copy** of the live place in Studio (File > Download a Copy) and tells you the file and the
-   place version it came from. (The CLI can't download it: `legacy-asset:manage` isn't offered for API keys today.)
+1. **The user downloads a copy** of the live place in Studio (File > Download a Copy, a binary `.rbxl`) and tells you
+   the file and the place version it came from. (The CLI can't download it: `legacy-asset:manage` isn't offered for API
+   keys today.)
 2. **You run a dry run:** `bun run typetorch kernel deploy --dry-run --place-file <file> --base <version>`. It replaces
    only the kernel folders, verifies that everything else is unchanged, and writes
    `.typetorch/place-patches/<placeId>-v<version>-kernel-<new version>.rbxl` plus a report. Read the summary (kernel old
    -> new, scripts changed per folder, settings, references); anything outside the kernel changing is a stop.
 3. **Show the user the summary and ask.** After their yes: `bun run typetorch kernel deploy --place-file <file> --base
-   <version> --yes`. It refuses if someone published meanwhile (download a new copy then). `bun run typetorch kernel
-   restore <backup>` puts the previous version back.
+   <version> --yes`. It refuses if someone published meanwhile (download a new copy then). Keep the downloaded copy:
+   `bun run typetorch kernel restore <file>` publishes it back (undo).
 4. **Or, with the Roblox Studio MCP and the place open:** replace the kernel instances in Studio
    (`ServerScriptService.TypeTorchKernel`, `ReplicatedStorage.TypeTorchKernelShared`,
    `ReplicatedFirst.TypeTorchKernelClient`, as `node_modules/@typetorch/kernel/place.project.json` lays them out, with

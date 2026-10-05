@@ -1,0 +1,151 @@
+# Live servers and alerts
+
+See every live server of your game, what each one did with a deploy, and get an alert when something breaks, within
+seconds. The **kernel** sends it, so it keeps working when a build is broken and the game's own code doesn't run.
+
+- Needs kernel 0.3.2+ in the place (a place project that maps the kernel's files one by one must map `Fleet` too; the
+  template's `studio.project.json` does).
+- Backend: the **fleet API**, a small server you host (SQLite inside). It is part of the
+  [analytics repo](https://github.com/typetorch/analytics) and runs in the same process as the analytics server, or
+  alone.
+- Without it everything else still works: `servers`, `report` and `alerts` say "not configured" in one line, and
+  deploys skip their wait with a note.
+
+## How it works
+
+```mermaid
+flowchart LR
+    K[kernel on each game server] -->|heartbeat, reports, alerts, closing| F[fleet API<br/>SQLite]
+    F -->|server lost, server stuck| F
+    F -->|critical alerts| W[webhook<br/>Discord, Slack, JSON]
+    C[typetorch servers, report, alerts, deploy --wait] -->|admin token| F
+```
+
+Each game server posts, with a write-only token:
+
+| What | When |
+|---|---|
+| **Heartbeat** | every 30 s, and at once on a swap, a health change or a player count change. Branch, build, `#seq`, players, health (`ok`, `failed`, `unverified`, `degraded`), kernel version, uptime, last error |
+| **Deploy report** | one per deploy outcome: `booted`, `swapped`, `failed`, `rolled_back` or `skipped`, with the error and the seconds it took |
+| **Alert** | at once ([codes below](#alerts)) |
+| **Closing notice** | when the server shuts down cleanly (so it isn't "lost") |
+
+That is under about 6 requests a minute per server, capped at 30 (Roblox allows 500 a minute per server, shared with
+your game). Failed posts are retried; a post never blocks a swap. The token is never logged.
+
+**No MemoryStore for fleet data.** Heartbeats and reports never touch your experience's MemoryStore, whose quota your
+game shares. (The kernel still keeps each branch's head there: one small key.)
+
+## Set it up
+
+1. **Run the fleet API.** On a VPS with a domain (the analytics README:
+   [Deploy on a 1 GB VPS](https://github.com/typetorch/analytics#deploy-on-a-1-gb-vps)), or on your PC behind a quick
+   tunnel for a test ([analytics quick start](analytics.md#quick-start-a-local-test)). For a game on Cloudflare Basin,
+   run only this part: `TT_SERVER_PARTS=fleet`. It needs two random tokens: an admin token (`TT_ANALYTICS_ADMIN_TOKEN`)
+   and an ingest token (`TT_ANALYTICS_INGEST_TOKENS`).
+2. **Give the CLI the tokens.** In your game's env file (outside the repo):
+
+   ```text
+   TYPETORCH_FLEET_TOKEN=<admin token>
+   TYPETORCH_FLEET_INGEST_TOKEN=<ingest token>
+   ```
+
+   The admin token reads; the ingest token only writes. The CLI never prints them or passes them to a child process.
+3. **Point game servers at it:**
+
+   ```sh
+   bun run typetorch fleet setup --url https://fleet.example.com
+   ```
+
+   It writes the server-only ConfigService key `TypeTorchFleet` = `{ url, token }` (the ingest token) and
+   `"fleet": { "url": ... }` in `typetorch.json`. The deploy key needs `universe:write`. Like every TypeTorch config
+   write it is blind: it puts only this key in the config draft and publishes it, so it also ships anyone else's
+   unpublished config edits. `--dry-run` shows what it would write.
+4. **Check:** kernels read the key at boot and every 5 minutes. Join a server, then `bun run typetorch servers`.
+
+## Commands
+
+```sh
+bun run typetorch servers
+bun run typetorch servers --branch prod --watch
+bun run typetorch report latest
+bun run typetorch report "#42"
+bun run typetorch alerts --since 120
+bun run typetorch alerts --follow --level critical
+```
+
+- **`servers [--branch <b>] [--watch]`:** every live server: JobId, branch, build, applied `#seq`, health, players,
+  kernel, uptime, last heartbeat. `--watch` redraws every 5 s. Reserved-server access codes are never shown.
+- **`report <seq|artifact|latest> [--branch <b>]`:** what the servers did with one deploy: counts per result, errors
+  grouped with the servers that hit them, and the servers still on an older `#seq`. It exits 1 when a server failed or
+  rolled back, and prints the rollback command.
+- **`alerts [--follow] [--level info|warning|critical] [--since <minutes>]`:** the last 60 minutes by default;
+  `--follow` keeps printing new ones.
+- **`deploy --wait`** reads the same reports: [Deploy and rollback](deploy-and-rollback.md#wait-and-automatic-rollback).
+
+In PowerShell, quote `"#42"`.
+
+## Alerts
+
+| Code | Level | From | Means |
+|---|---|---|---|
+| `deploy_failed` | critical | kernel | a deploy didn't load or start on a server |
+| `health_rollback` | critical | kernel | a new build failed its health window and the server went back to the last good one |
+| `lkg_exhausted` | critical | kernel | nothing known-good could run after a failure |
+| `health_failed`, `health_unverified` | critical | kernel | the server runs nothing, or booted an unverified prod build |
+| `health_degraded` | warning | kernel | the running build keeps erroring, or a deploy failed here |
+| `booted_unverified`, `no_trusted_head` | critical | kernel | [prod signing](prod-signing.md) problems at boot |
+| `kernel_api_mismatch`, `artifact_refused` | critical | kernel | a build the kernel can't or won't run |
+| `error_spike` | warning | kernel | 20 or more errors a minute from the running build |
+| `refused_deploy`, `refused_head`, `refused_pin`, `refused_swap` | warning | kernel | the kernel refused a message or a swap (for example an unsigned one on prod) |
+| `auto_rollback` | critical | CLI | `deploy --wait` rolled the branch back |
+| `server_stuck` | warning | CLI and fleet API | servers didn't pick up a deploy (below) |
+| `server_lost` | critical (3+ servers) or warning | fleet API | servers stopped reporting (below) |
+
+The kernel sends each code at most once a minute per server (`error_spike` every 5 minutes).
+
+- **Server lost:** no heartbeat for 90 s and no closing notice. One alert per branch and build per sweep, with the
+  JobIds; critical when 3 or more servers are lost at once.
+- **Server stuck:** 3 minutes after a deploy started, live servers on its branch are still below its `#seq` and haven't
+  reported anything for it. It lists them and says nothing about the build itself, so it never triggers a rollback.
+
+Reports are kept 30 days and alerts 90 days.
+
+## Webhooks
+
+The fleet API can post alerts to Discord, Slack or any URL that takes JSON. In its env file:
+
+```text
+TT_FLEET_WEBHOOK_URL=<your webhook URL>
+TT_FLEET_WEBHOOK_LEVELS=critical
+```
+
+- The format is detected from the URL (or set `TT_FLEET_WEBHOOK_FORMAT` to `discord`, `slack` or `json`).
+- Critical only by default (`TT_FLEET_WEBHOOK_LEVELS=critical,warning` adds warnings).
+- The same alert (code, branch, build) at most once per 10 minutes; at most 20 posts a minute.
+- A webhook URL is a secret: keep it in the server's env file only.
+
+The API also streams changes live (Server-Sent Events, `GET /v1/fleet/stream`, admin token) for your own tools; the
+CLI polls for now.
+
+## In game: Manage > Servers
+
+The dev menu's server list (owners) doesn't use the fleet API or any storage. When you open it, your server asks every
+server over MessagingService (a roll call), collects the answers for 3 s and caches the list for 15 s. Each server
+answers with the same status the kernel sends as its heartbeat. See [The dev menu](dev-menu.md#manage).
+
+## In the dev menu
+
+Server > Status shows these when the kernel's sender has a problem:
+
+| Attention item | Fix |
+|---|---|
+| No fleet API | the place's kernel lacks its `Fleet` module: map it in your place project (kernel 0.3.2+), then publish |
+| Fleet settings | `TypeTorchFleet` is invalid: run `fleet setup` again |
+| Fleet API failing | the URL doesn't answer (a stopped server, a restarted quick tunnel) or the token is wrong |
+
+## History
+
+The fleet API is the live view. The [AnalyticsEngine](analytics.md) also forwards each server's status and deploy
+reports as `fleet` rows (option `fleet`, on by default), so the analytics queries `servers` and `deployReport` can
+look back further.

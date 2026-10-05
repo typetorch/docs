@@ -183,5 +183,5 @@ generation, so a change made just before a swap is not lost.
 2. Change some data (earn coins).
 3. Deploy again twice while you play. Your data must still be there and keep changing.
 4. Leave, join a new `dev` server: the data loaded.
-5. Shut a server down (dev menu > Admin > Servers > Shut down) and rejoin: nothing lost.
+5. Shut a server down (dev menu > Manage > Servers > Shut down; "Admin" on older frameworks) and rejoin: nothing lost.
 6. Only then ship it to `prod`.

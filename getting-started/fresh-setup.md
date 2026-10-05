@@ -61,8 +61,10 @@ bun run typetorch build
 - `rojo --version` prints `7.7.0-rc.1` inside `my-game`.
 - `bun run build` compiles with no errors.
 - `bun run typetorch build` ends with a `built <id> (branch ..., channel ...)` line,
-  `.typetorch/payload.rbxm ... modules`, and `sources  template <commit>, framework v0.2.0, kernel v0.3.1` (the npm
+  `.typetorch/payload.rbxm ... modules`, and `sources  template <commit>, framework v0.3.0, kernel v0.3.2` (the npm
   versions you installed).
+- Later, `bun run typetorch update` moves the CLI to the newest version on npm (it asks first; `--check` only shows
+  the versions).
 
 ### Unreleased framework or kernel changes (optional)
 
@@ -121,7 +123,7 @@ In Studio, with the place open: **File > Game Settings > Security**.
 
 | Setting | Value | Why |
 |---|---|---|
-| Allow HTTP Requests | on | the Claude tab (remote-claude) calls your PC. Harmless otherwise. The kernel place file turns it on too |
+| Allow HTTP Requests | on | the kernel's live server reports ([fleet API](../guides/fleet-and-alerts.md)), [analytics](../guides/analytics.md), and the Claude tab (remote-claude). The kernel place file turns it on too |
 | Enable Studio Access to API Services | on | Studio playtests read branch heads and DataStores |
 | Allow Mesh / Image APIs | optional | only for images Claude shows in the chat; the owner must be 13+ and ID-verified |
 | Allow Loading Third Party Assets | optional | only for remote-claude Toolbox inserts. It applies to every server of the experience |
@@ -162,12 +164,13 @@ Remove the template's `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey`:
 | `defaultBranch` | the branch public servers run (`prod`) |
 | `branches` | git branch → TypeTorch branch. Unlisted git branches map to their own name, lowercased, `/` → `-` |
 | `channels` | TypeTorch branch → `prod` or `dev`. Unlisted: `prod` for `defaultBranch`, `dev` for everything else |
-| `members` | Roblox user id → `owner`, `admin` or `dev` (who gets the dev menu; see step 11) |
+| `members` | Roblox user id → `owner` or `dev` (who gets the dev menu; see step 11). The old role `admin` counts as `dev` |
 | `revoked` | optional: user ids that lose dev access |
 | `devBadgeId` | optional badge id; its holders are devs |
 | `approval` | `all` (default): every deploy waits for your y/N; `prod`: only prod-channel deploys do; `none` |
 | `kernel` | the kernel folder for `kernel deploy` (`node_modules/@typetorch/kernel`, or a kernel checkout) |
 | `signingPublicKeys`, `revokedKeys`, `fallbackPublicKey`, `keyAssetId` | written by `typetorch keys` (step 7). Don't edit by hand |
+| `fleet` | optional, `{ "url": ... }`: written by `typetorch fleet setup` ([Live servers and alerts](../guides/fleet-and-alerts.md)) |
 
 Commit it:
 
@@ -188,19 +191,21 @@ Add these permissions and select your experience where asked:
 
 | CLI job | Commands | Scopes |
 |---|---|---|
-| assets | `deploy`, `upload`, `promote` (of an unfinished upload), `keys init` / `rotate` (the key asset), `assets sync` / `status`, `doctor` | `asset:read`, `asset:write`; for hot assets and doctor's place check also Luau Execution `universe.place.luau-execution-session:read` and `:write` |
-| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number, below) |
+| assets | `deploy`, `upload`, `promote` (of an unfinished upload), `test --cloud`, `keys init` / `rotate` (the key asset), `assets sync` / `status`, `doctor` | `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (the cloud test that runs before every prod deploy, hot assets, doctor's place check) |
+| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `fleet setup` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number, below); `universe:write` only for `fleet setup` and the analytics settings |
 | place | `kernel deploy` only | place publishing (`universe-places` write; the CLI calls it `universe.place:write`), and `asset:read` to record the place version |
 
-- **The shared deploy number.** Every machine that deploys (your PC, CI, remote-claude) takes the next deploy number
-  (`#seq`) from the game's DataStore: the kernel's records of past deploys, and a counter the CLI claims atomically.
-  That's what the DataStore scopes are for. Without them a deploy uses only your PC's log (fine while you deploy from
-  one machine), and CI deploys stop.
+- **The shared deploy number.** Every machine that deploys (your PC, a second PC, remote-claude) takes the next
+  deploy number (`#seq`) from the game's DataStore: the kernel's records of past deploys, and a counter the CLI claims
+  atomically. That's what the DataStore scopes are for. Without them a deploy uses only your PC's log (fine while you
+  deploy from one machine), and `--require-shared-seq` stops instead.
 - **Not available to API keys today:** `universe:read` (it reads the ConfigService registry, where `config push` would
   put `members`) and `legacy-asset:manage` (`kernel deploy` downloading the place; pass a copy instead, see step 8).
   Creator Hub doesn't offer them for API keys. Deploys don't need them: game servers keep the branch heads from the
   deploy messages themselves.
 - Set an expiry date, and add your IP under accepted IP addresses if you can.
+- Everything runs from your machine. TypeTorch never uses GitHub Actions or other hosted CI, so the key never has to
+  leave your PC.
 
 **Store the key outside the repo.** Make a folder and an env file for this game:
 
@@ -275,19 +280,19 @@ bun run typetorch kernel deploy --replace-place --yes
   the `keys` line shows your key asset id.
 - `--replace-place --yes` publishes it. It refuses without the keys from step 7.
 - **Never use `--replace-place` on a place with Studio-built content**: it wipes it (it stays in the place's version
-  history). Patching only the kernel is **planned**. For such places, see
+  history). For such places `kernel deploy` patches only the kernel into a copy of the place: see
   [migrate: install the kernel](migrate.md#9-install-the-kernel-in-your-place).
 - Studio must not have the place open in Team Create while you publish: that returns 409.
 
 **Check:** join the game from the Roblox app. Open the Developer Console (F9) > **Server**. You should see:
 
 ```text
-[TypeTorch] kernel 0.3.1 (API 1) on a public server, branch prod, signed deploys only (keys: key asset)
+[TypeTorch] kernel 0.3.2 (API 1) on a public server, branch prod, signed deploys only (keys: key asset)
 [TypeTorch] branch prod: nothing loaded (no verified, bootstrap or usable stored head); waiting for a signed deploy
 ```
 
-(A kernel from the [local override](#unreleased-framework-or-kernel-changes-optional) shows its commit:
-`kernel 0.3.1@<commit>`.)
+(The version is the kernel you installed. A kernel from the
+[local override](#unreleased-framework-or-kernel-changes-optional) shows its commit: `kernel 0.3.2@<commit>`.)
 
 Type `/tt status` in chat: it answers (you are the owner, so you are a dev).
 
@@ -302,8 +307,11 @@ bun run typetorch deploy
 ```
 
 - `main` maps to the TypeTorch branch `prod` (prod channel), so the CLI builds a clean prod build (debug prints
-  removed), uploads it, waits for moderation, then asks **y/N**. Answer `y`: it signs the message with both keys and
-  publishes it.
+  removed), uploads it, waits for moderation, runs the **cloud test** (the build boots headless in your place, about
+  11 s), then asks **y/N**. Answer `y`: it signs the message with both keys and publishes it.
+- Then it waits up to 90 s for the servers' reports, and rolls the branch back by itself if the build fails on them
+  ([safe deploys](../guides/deploy-and-rollback.md#safe-deploys)). That needs the fleet API; until you set it up, the
+  wait is skipped with a note.
 - Keep a server running for the first deploy: without a writable registry, the head is stored by the servers that
   receive the message. Later servers boot from that stored head.
 
@@ -333,13 +341,14 @@ play. More in [Branches and channels](../guides/branches-and-channels.md).
 Devs open the dev menu with the **DEV** button, `Ctrl+Shift+D` or `/tt dev`. A player is a dev when they are:
 
 - the experience owner (the user creator, or rank 255 in the owning group): always;
-- in `members` (`owner`, `admin` or `dev`), once you ran `bun run typetorch config push` (needs `universe:read` and
+- in `members` (`owner` or `dev`; an old `admin` counts as `dev`), once you ran `bun run typetorch config push` (needs `universe:read` and
   `universe:write`; `universe:read` can't be granted to API keys today, so this waits until Roblox offers it);
 - a holder of the `devBadgeId` badge (also through `config push`; awarding the badge in game is **planned**);
 - anyone in a Studio playtest;
 
-and not in `revoked`. Prod-channel servers (every public server) show the menu read-only. Tabs:
-[The dev menu](../guides/dev-menu.md).
+and not in `revoked`. **Owners** are the experience's creator (or the owning group's owner) and `members` with the role
+`owner`: they also get the Manage tab and can switch any server in place. Prod-channel servers (every public server)
+show the menu read-only. Tabs: [The dev menu](../guides/dev-menu.md).
 
 **Check:** as the owner you see the DEV button in game. After `config push`, a member sees it too.
 
@@ -350,11 +359,11 @@ Devs only. They work even when a build is broken, so they are the fallback when 
 | Command | What it does | Who |
 |---|---|---|
 | `/tt status` | branch, channel, artifact, kernel build, signing mode | dev |
-| `/tt branch <name>` | switch this server to a branch | dev, private or reserved servers only |
+| `/tt branch <name>` | switch this server to a branch | devs on private or reserved servers; owners on any server |
 | `/tt new <branch> [assetId]` | open a reserved server on a branch (pinned to an artifact if given) and teleport you | dev |
 | `/tt reload` | load the branch head again | dev |
-| `/tt rollback` | swap this server back to its previous artifact | dev; owner/admin on prod-channel servers |
-| `/tt pin <assetId>` / `/tt unpin` | hold this server on a known artifact / release it | dev servers; prod servers take only signed pins (`typetorch pin`) |
+| `/tt rollback` | swap this server back to its previous artifact | dev; owners on prod-channel servers |
+| `/tt pin <assetId>` / `/tt unpin` | hold this server on a known artifact / release it | devs on dev servers; owners on any server |
 | `/tt dev` | open the dev menu | dev |
 
 `/tt grant` and `/tt revoke` are **planned**.
@@ -374,6 +383,10 @@ It points `prod` back to the previous different build. Nothing is rebuilt or upl
 ## Next steps
 
 - [Testing in Studio](../guides/studio-testing.md): run your local code with `bun run watch` and `bun run studio`.
+- [Live servers and alerts](../guides/fleet-and-alerts.md): `typetorch servers`, deploy reports, alerts, and the
+  automatic rollback after a bad deploy.
+- [Analytics](../guides/analytics.md): your own analytics, experiments and player journeys (the template already
+  creates the engine).
 - [Player data](../guides/player-data.md) before you save anything for players.
 - [Hot assets](../guides/hot-assets.md): let builders update models and UI live.
 - [remote-claude](../guides/remote-claude.md): prompt Claude Code from inside a dev server.

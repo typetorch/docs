@@ -40,6 +40,8 @@ git switch dev
 bun run typetorch remote-claude --users 111111111
 ```
 
+`typetorch dev` is the same command, shorter (`bun run typetorch dev --users 111111111`).
+
 `typetorch remote-claude` runs the dev-server with the same arguments. It finds it in `TYPETORCH_DEV_SERVER`, the game's
 `node_modules` (where the template's `bun install` puts it), next to the CLI, or a sibling `../dev-server` checkout.
 Other ways to start it:
