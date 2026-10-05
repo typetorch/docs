@@ -44,7 +44,7 @@ typetorch remote-claude --users 111111111
 
 ```sh
 bun ../dev-server/src/index.ts remote-claude --users 111111111           # a checkout
-npx @typetorch/dev-server remote-claude --users 111111111                # npm, once released
+npx @typetorch/dev-server remote-claude --users 111111111                # from npm
 npx -p @typetorch/cli -p @typetorch/dev-server typetorch remote-claude --users 111111111
 ```
 

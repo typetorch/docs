@@ -32,8 +32,15 @@ Each prints a version (Bun 1.3 or newer).
 
 ## 2. Get the code
 
-TypeTorch packages are not on npm yet (**planned** for the first npm release). Today your game uses packed copies of
-local checkouts that sit **next to** your game:
+The packages are on npm (`@typetorch/framework`, `transformer`, `kernel`, `cli`, `dev-server`). Two ways to get them:
+
+- **From npm:** clone only the template and switch three entries (see [From npm](#from-npm) below).
+- **Local checkouts** (what the template does today): packed copies of checkouts next to your game. Use this to try
+  framework or kernel changes that aren't released yet.
+
+### Local checkouts
+
+The checkouts sit **next to** your game:
 
 ```text
 games/                 any folder
@@ -85,9 +92,35 @@ Add a script so you can run the CLI from the game folder. In `package.json`, und
 From now on, `bun run typetorch <command>` runs the CLI. (The CLI checkout also has `bin/typetorch` and
 `bin/typetorch.cmd`: put `cli/bin` on your PATH to type `typetorch <command>` anywhere.)
 
-**From the first npm release (planned):** `npm i @typetorch/framework` and `npm i -D @typetorch/transformer` (or the
-`bun add` equivalents), then the CLI with `npx @typetorch/cli <command>` (no install) or `npm i -g @typetorch/cli` and
-`typetorch <command>`. No sibling checkouts. The CLI runs on Node 20+ or Bun; builds still need Bun.
+### From npm
+
+```sh
+git clone https://github.com/typetorch/template my-game
+cd my-game
+git remote remove origin
+```
+
+In `package.json`, change the three local `file:` entries to npm versions and delete the `postinstall` and `packages`
+scripts (they only copy local tarballs):
+
+```json
+"@typetorch/framework": "^0.2.0",
+"@typetorch/kernel": "^0.3.1",
+```
+
+and under `devDependencies`, `"@typetorch/transformer": "^0.2.0"`. Then:
+
+```sh
+bun add -d @typetorch/cli
+bun install
+rokit install
+```
+
+Add `"typetorch": "typetorch"` under `"scripts"`, so `bun run typetorch <command>` works as in the rest of these docs.
+Without installing, `npx @typetorch/cli <command>` runs the same CLI. The CLI runs on Node 20+ or Bun; builds still
+need Bun.
+
+### Both ways
 
 Run the compiler through `bun run build` (or `bunx rbxtsc`). In a Bun project on Windows, `npx rbxtsc` runs an
 unrelated placeholder package.

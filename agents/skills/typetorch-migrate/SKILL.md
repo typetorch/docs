@@ -21,7 +21,7 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 5. No new RemoteEvents, `loadstring`, `_G`, disabled guards or settings changes.
 6. Don't change player data formats, store names or keys.
 7. Never invent ids: the user's, or placeholder `1`.
-8. Planned, never promise: npm packages / `npx @typetorch/cli`, `typetorch init`, kernel patch deploys, content packs,
+8. On npm: `@typetorch/*` and `npx @typetorch/cli`. Planned, never promise: `typetorch init`, kernel patch deploys, content packs,
    CI, `typetorch test`, `/tt grant`, a kernel `onClose`.
 
 ## Procedure

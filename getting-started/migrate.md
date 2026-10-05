@@ -70,9 +70,9 @@ contents for each.
    `.tsconfig.typetorch.json`, `.env`, `.env.*`.
 8. **`typetorch.json`**: see [fresh setup step 5](fresh-setup.md#5-typetorchjson).
 
-**From the first npm release (planned):** `npm i @typetorch/framework`, `npm i -D @typetorch/transformer` (version
-`^0.2.0`), `@typetorch/kernel` from npm for the kernel files, and `npx @typetorch/cli <command>`; no sibling checkouts
-and no `scripts/packages.ts`.
+**From npm instead** (no sibling checkouts, no `scripts/packages.ts`): `bun add @typetorch/framework
+@typetorch/kernel` and `bun add -d @typetorch/transformer @typetorch/cli`, then the script
+`"typetorch": "typetorch"`. See [fresh setup, From npm](fresh-setup.md#from-npm).
 
 **Check:** `bun run build` compiles. A Flamework game doesn't yet: every `@flamework/core` import fails with "You can
 only use npm scopes that are listed in your typeRoots". That's expected; section 4 fixes it.

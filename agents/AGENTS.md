@@ -38,8 +38,8 @@ approving. You finish with a numbered "What you need to do" list that tells them
    flag everything for the user to test.
 7. **Keep ids honest.** Never invent a universe, place, group or user id. Use the user's, or the placeholder `1`, and
    say so in the final list.
-8. **Only promise what exists today.** Planned: `@typetorch/*` on npm and `npx @typetorch/cli` (today: local tarballs and
-   `bun run typetorch`), `typetorch init`, kernel deploys that patch only the kernel (today `--replace-place` wipes the
+8. **Only promise what exists today.** On npm since 2026-10-05: `@typetorch/framework`, `transformer`, `kernel`, `cli`
+   and `dev-server` (`npx @typetorch/cli`). Planned: `typetorch init`, kernel deploys that patch only the kernel (today `--replace-place` wipes the
    place), content packs, the typed asset map from files, CI/GitHub Action, `typetorch test`, `/tt grant`/`revoke`, a
    kernel `onClose` hook.
 
@@ -100,7 +100,8 @@ first; ask if unsure).
 
 ### 3.1 Sibling checkouts
 
-Until the first npm release, the game uses packed copies of local checkouts **next to** the game repo:
+The template uses packed copies of local checkouts **next to** the game repo (the npm way is the last bullet of this
+section):
 
 ```text
 <workspace>/
@@ -145,10 +146,11 @@ the path in the `typetorch` script (3.3).
   `../transformer` like the framework and the kernel); `Modding`, `Reflect` and `t` come from `@typetorch/framework`.
 - If the template you find still depends on `@flamework/core` and `rbxts-transformer-flamework` (an older checkout),
   `git pull` the sibling checkouts first.
-- **From the first npm release (planned)**, when the template depends on `@typetorch/framework` with a version range
-  instead of `file:`: install from npm (`bun add @typetorch/framework`, `bun add -d @typetorch/transformer
-  @typetorch/cli`, or the npm equivalents), skip the sibling checkouts and `scripts/packages.ts`, and run the CLI as
-  `npx @typetorch/cli <command>` (or `bunx typetorch` after `bun add -d @typetorch/cli`).
+- **From npm** (released 2026-10-05; the template itself still uses `file:` entries): `bun add @typetorch/framework
+  @typetorch/kernel` and `bun add -d @typetorch/transformer @typetorch/cli` (or the npm equivalents), drop the
+  `postinstall` and `packages` scripts, skip the sibling checkouts, and add the script `"typetorch": "typetorch"` (or run
+  `npx @typetorch/cli <command>`). Verified 2026-10-05: a template copy built this way compiles and `typetorch build`
+  packs it.
 
 ### 3.2 Tools
 
