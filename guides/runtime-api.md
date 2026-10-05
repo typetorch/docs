@@ -70,12 +70,16 @@ is the same.)
 ## Devs and roles
 
 ```ts
-if (TypeTorch.isAdmin(player)) this.showAdminPanel(player);
+if (TypeTorch.isOwner(player)) this.showOwnerPanel(player);
 TypeTorch.isDev(player);
-TypeTorch.role(player); // "owner" | "admin" | "dev" | undefined
+TypeTorch.role(player); // "owner" | "dev" | undefined
 TypeTorch.devInfo(player);
-this.trove.add(TypeTorch.onPlayerDevChanged((player, info) => this.setAdminTools(player, info.dev)));
+this.trove.add(TypeTorch.onPlayerDevChanged((player, info) => this.setDevTools(player, info.dev)));
 ```
+
+Two roles (framework 0.3.2, kernel 0.3.4): **owner** (the experience creator, the owning group's owner, `members` with
+role `"owner"`) and **dev**. There are no admins: a `members` entry with the old role `"admin"`, or an older kernel's
+`"admin"`, counts as a dev. `TypeTorch.isAdmin` still exists as a deprecated alias of `isOwner`.
 
 On the server the kernel decides (it may yield once per player for badge and group checks). On the client only the
 local player is known, and only cosmetically: the server re-checks everything.
@@ -86,7 +90,7 @@ local player is known, and only cosmetically: the server re-checks everything.
 TypeTorch.status(); // uptime, players, memory, generation history, last deploy message, signing state: cheap
 TypeTorch.branches(); // known branches and heads: cached, yields at most every 30 s
 TypeTorch.artifacts(); // known deployments, newest first: cached, yields at most every 30 s
-TypeTorch.requestReload(player); // owner and admins: reload this server to its branch head
+TypeTorch.requestReload(player); // owners only: reload this server to its branch head
 ```
 
 Don't call `branches()` or `artifacts()` per player or per frame.
