@@ -703,6 +703,7 @@ onStart() {
 }
 ```
 
+- Atoms synced from the server (charm-sync): [State with charm](../guides/state.md).
 - Pop in and out with `popIn` / `popOut` / `bump` (a UIScale; never tween `Size`). One `PopupQueue` for modals.
 - React, Roact or Vide: mount the root in a controller and unmount it through the trove
   (`this.trove.add(() => root.unmount())`).
@@ -714,6 +715,9 @@ place, its session handles live in `persist`, sessions load on join and are rele
 [Player data](../guides/player-data.md) before you migrate any data code, and test it on a dev branch first.
 
 - Don't change store names, keys or the data format in the same step.
+- Library calls that write (load, save, release) run as jobs of the place's `DataHost` script, so a deploy can't cut
+  one off ([why](../guides/player-data.md#the-swap-safe-pattern)). ProfileService has its own example
+  ([ProfileService](../guides/player-data.md#example-profileservice)).
 - The data code must not wait for place scripts in the cloud test ([why](../guides/player-data.md#the-cloud-test)).
 - Developer products: record the PurchaseId in the player's profile with the grant, and return `PurchaseGranted`
   only after a save holds it ([Developer products](../guides/player-data.md#developer-products)). `persist` alone
