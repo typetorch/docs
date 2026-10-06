@@ -92,6 +92,10 @@ In PowerShell, quote `"#42"`.
 | `deploy_failed` | critical | kernel | a deploy didn't load or start on a server |
 | `health_rollback` | critical | kernel | a new build failed its health window and the server went back to the last good one |
 | `lkg_exhausted` | critical | kernel | nothing known-good could run after a failure |
+| `backup_build` | critical | kernel | 0.3.6: nothing else could run, so the backup build baked into the place runs ([never an empty server](deploy-and-rollback.md#never-an-empty-server)) |
+| `boot_failed_teleport` | critical | kernel | 0.3.6: nothing runs at all; players are being moved to another server |
+| `bounce_kick` | critical | kernel | 0.3.6: a player was kicked after 3 moves (or failed teleports) |
+| `client_failed` | warning | kernel | 0.3.6: a player's game code didn't start even after a re-send; they were moved |
 | `health_failed`, `health_unverified` | critical | kernel | the server runs nothing, or booted an unverified prod build |
 | `health_degraded` | warning | kernel | the running build keeps erroring, or a deploy failed here |
 | `booted_unverified`, `no_trusted_head` | critical | kernel | [prod signing](prod-signing.md) problems at boot |
