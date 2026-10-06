@@ -121,12 +121,18 @@ Guards check shapes only. Keep your game's own checks in the handler: distance, 
   become request leaves (`handle` / `invoke`).
 - **Template literal types can't be guarded** (`` `item_${string}` ``): use `string` and check it in the handler.
 - Classes can't be guarded either: send plain data.
+- **Supported parameter types:** string, number, boolean, undefined and optional, literals and TS enums, Enum items,
+  Roblox datatypes (Vector3, CFrame, Color3, UDim2, ...), Instances by class, arrays, tuples, Maps, Sets, plain objects
+  and interfaces, unions, `buffer`, and `unknown` / `any`. The transformer names the leaf when a guard can't be built,
+  and warns about generic or conditional leaves (checked loosely: use a union of tuples) and about values that never
+  arrive (functions, threads, signals, connections, AnimationTracks).
 - Register handlers through the trove, so a swap removes them.
 - During a swap, a message sent with the old build's id gets a "resync" answer, and the client waits for its own swap.
   Pending `invoke`s reject with "This version of the game is shutting down".
 - Third-party networking (`@rbxts/net`, `@flamework/networking`, Zap, Blink, ByteNet) doesn't run inside a payload.
   From `@flamework/networking`: `connect` → `on`, `setCallback` → `handle`, `broadcast` → `fireAll`, `except` →
-  `fireExcept`, `predict` → `emit`, `invokeWithTimeout` keeps its name (seconds).
+  `fireExcept`, `predict` → `emit`, `invokeWithTimeout` keeps its name (seconds). Or keep Flamework's names for now
+  with `createFlameworkCompat` ([Coming from Flamework](from-flamework.md)).
 
 ## Seeing the traffic
 

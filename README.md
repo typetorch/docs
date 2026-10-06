@@ -68,6 +68,7 @@ flowchart LR
 | [The dev menu](guides/dev-menu.md) | every tab, owners and devs, the `/tt` commands |
 | [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, playerState, `Dependency<T>()`, roles, logs |
 | [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests, timeouts, `emit` |
+| [Coming from Flamework](guides/from-flamework.md) | `typetorch migrate --from flamework` (the codemod and its report), `createFlameworkCompat`, the mapping |
 | [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server: Live and Code modes, screenshots, Toolbox |
 | [Security model](guides/security.md) | who can do what, dev access (`access push`), keys, signing, never publish secrets |
 | [Troubleshooting](guides/troubleshooting.md) | real errors and their fixes |
