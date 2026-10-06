@@ -51,8 +51,10 @@ approving. You finish with a numbered "What you need to do" list that tells them
    (`typetorch test --cloud`, automatic before prod deploys), `onStop` at server shutdown (kernel 0.3.2), the fleet API
    (`typetorch servers`, `report`, `alerts`) and the optional `AnalyticsEngine` (framework 0.3.0; its backend is
    `@typetorch/analytics`, a git repo, not on npm). Owners switching any server in place needs kernel 0.3.4 and
-   framework 0.3.2 (both on npm). Dev access lists through `typetorch access push` need CLI 0.7.3 or newer and
-   kernel 0.3.6 on the servers. Planned: `typetorch init`, content packs, the typed asset map from files,
+   framework 0.3.2 (both on npm). Dev access lists through `typetorch access push` need kernel 0.3.8 on the servers
+   (the signed settings record; 0.3.6-0.3.7 read the old ConfigService key). Cross-server messages
+   (`TypeTorch.messaging`), `TypeTorch.servers()`, `TypeTorch.liveConfig` and the loading screen signals need kernel
+   0.3.8. Planned: `typetorch init`, content packs, the typed asset map from files,
    `typetorch test --unit`, `/tt grant`/`revoke`, a web analytics explorer.
 9. **No GitHub Actions, ever** (the owner's rule: they are a supply-chain risk). Don't add `.github/workflows`, actions,
    or any hosted CI, and don't suggest them. Builds, cloud tests and deploys run on the user's machine.
@@ -318,6 +320,12 @@ export function boot(kernel: ClientKernel) {
 One sub-step per commit. After each: `bun run build` must pass, then log it in `MIGRATION_NOTES.md`. (Flamework
 projects: do 4.1 and 4.2 together; the build passes once no `@flamework/*` import is left.)
 
+**Flamework projects: run the codemod first.** On a clean tree after Step 3, `bun run typetorch migrate --from
+flamework --dry-run`, then without `--dry-run`: it makes 4.1, 4.2 and the networking part of 4.4 (call sites stay,
+through `createFlameworkCompat`) and writes `typetorch-migrate-report.md`. Commit that as one step, then work through
+the report's flagged items with 4.3 and the rest of this step; keep the report's counts in `MIGRATION_NOTES.md`. Local
+only, no keys. See [Coming from Flamework](../guides/from-flamework.md).
+
 ### 4.1 Entry points
 
 Move what each `*.server.ts` / `*.client.ts` does into modules, then delete the script (`git rm`). Delete
@@ -330,26 +338,30 @@ left in the payload fails `typetorch build` with "the payload may hold only Fold
 |---|---|
 | Flamework `@Service()` / `@Controller()` | `@Service()` / `@Controller()` from `@typetorch/framework`; the class `extends Module`; a constructor calls `super()` |
 | Flamework `OnInit`, `OnStart`, `OnTick`, `OnPhysics`, `OnRender` | the same names from `@typetorch/framework` |
-| Flamework `Dependency<T>()` | constructor injection |
+| Flamework `Dependency<T>()` | constructor injection in a module; `Dependency<T>()` from `@typetorch/framework` everywhere else (methods, plain classes, command handlers), from `onInit` on |
+| a dependency cycle (A injects B, B injects A) | `Lazy<T>` on one side (a field `= Lazy<T>()`, or a constructor parameter with transformer 0.2.1+), or `Dependency<T>()` in a method |
 | `Modding`, `Reflect`, `t` from `@flamework/core` | the same names from `@typetorch/framework` |
 | custom decorators (`Modding.createDecorator`, `@metadata flamework:parameters injectable`) | `Modding.createDecorator` from `@typetorch/framework`, `@metadata typetorch:parameters injectable` |
 | Flamework `@Component` / `@flamework/components` | a module using `observeElement(this.trove, tag, …)` or `@rbxts/observers` |
 | Flamework `Flamework.createGuard<T>()`, `Flamework.id<T>()` | `t` guards written by hand, or a user macro (transformer README "Migrating from Flamework"); note it for the user |
 | Knit `CreateService({ Name, Client, KnitInit, KnitStart })` | `@Service()` class; `KnitInit` → `onInit`, `KnitStart` → `onStart`, `Client` → network leaves |
-| Knit `Knit.GetService("X")` / `GetController` | constructor injection |
+| Knit `Knit.GetService("X")` / `GetController` | constructor injection, or `Dependency<X>()` in a method |
 | singleton module with top-level state | a `@Service()` / `@Controller()` class; state on the instance or in `persist` |
 | shutdown cleanup | `onStop` (reverse order; the kernel gives a stopping generation 5 s) and the trove |
 
 - Server modules go in `src/server/services/`, client modules in `src/client/controllers/` (subfolders are fine);
   kebab-case names (`coin.service.ts`).
 - Import only from `@typetorch/framework`: `Module`, `Service`, `Controller`, `OnInit`, `OnStart`, `OnStop`, `OnTick`,
-  `OnPhysics`, `OnRender`, `OnPlayerAdded`, `TypeTorch`, `createNetwork`, `observePlayers`, `observeElement`,
-  `isRealFrame`, `popIn`, `popOut`, `bump`, `PopupQueue`, `hotAsset`, `setNetworkLimits`, and `Modding`, `Reflect`,
-  `t` for your own macros and decorators.
-- **If the project uses Flamework,** the migration is mostly a swap: the decorators, constructor injection and
-  lifecycle interfaces keep their names, so change the imports to `@typetorch/framework`, add `extends Module` and
-  `super()`, and do the swap-safety pass (4.3). The rest is the toolchain (Step 3), `createNetwork` for
-  `@flamework/networking` (4.4) and observers for components. Then:
+  `OnPhysics`, `OnRender`, `OnPlayerAdded`, `TypeTorch`, `Dependency`, `Lazy`, `createNetwork`, `observePlayers`,
+  `observeElement`, `isRealFrame`, `popIn`, `popOut`, `bump`,
+  `PopupQueue`, `hotAsset`, `setNetworkLimits`, and `Modding`, `Reflect`, `t` for your own macros and decorators.
+- **If the project uses Flamework,** the migration is mostly a swap: the decorators, constructor injection,
+  `Dependency<T>()` and the lifecycle interfaces keep their names, so change the imports to `@typetorch/framework`,
+  add `extends Module` and `super()`, and do the swap-safety pass (4.3). The rest is the toolchain (Step 3),
+  `createNetwork` for `@flamework/networking` (4.4) and observers for components. `Dependency<T>()` is the cycle
+  breaker (with `Lazy<T>`) and the way plain classes reach modules; it works from `onInit` on, so move every call in a
+  constructor, a field initializer or at the top level of a module (`const X = Dependency<X>()` in a command file) into
+  a method or `onInit`. Keep `import type` for the class. Then:
   - no file under `src/` imports `@flamework/*`: `git grep -n "@flamework/" -- src` prints nothing;
   - remove `@flamework/*` and `rbxts-transformer-flamework` from `package.json` (`bun remove ...`);
   - type ids changed format (`@typetorch/framework:decorators@Service`, `server/services/x@X`): anything the game
@@ -368,13 +380,14 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 2. **No module-level state or side effects.** Constants may stay. Per-generation state goes on the instance. State that
    must survive a swap goes in `this.ctx.persist("key.v1", () => init)`, plain data only (tables, Maps, Sets of
    strings, numbers, booleans, Players); never functions, class instances, Promises, threads, connections, charm atoms
-   or Instances the generation made. Version the key.
+   or Instances the generation made. Version the key. Per-player maps (cooldowns, states, sessions):
+   `this.ctx.playerState("key.v1", (player) => init)` (`get`/`set`/`has`/`delete`, persisted, removed on a real leave).
 3. **Players through `onPlayerAdded(player, playerTrove)` or `observePlayers(this.trove, …)`**, never
    `Players.PlayerAdded.Connect`. They replay everyone on every swap, so **join handlers must be idempotent**: guard
    one-time effects (join rewards, welcome popups, "joined" analytics) with a persisted set. Work for real leaves only:
    `this.trove.connect(Players.PlayerRemoving, …)` (a `playerTrove` is also cleaned on every swap).
 4. **Tags and characters through observers:** `observeElement(this.trove, tag, (instance, elementTrove) => …)`, or
-   `@rbxts/observers` with its stop function in the trove, or (characters, no extra package) `player.Character` plus
+   `@rbxts/observers` with its stop function in the trove (`this.trove.add(Observers.observeCharacter(…))`), or (characters, no extra package) `player.Character` plus
    `playerTrove.connect(player.CharacterAdded, …)`.
 5. **No global connections or loops outside troves.** A loop directly in `onStart` is fine. Elsewhere:
    `this.trove.add(task.spawn(() => { … }))`. Prefer `onTick` for per-frame work.
@@ -407,14 +420,21 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 - Delete every RemoteEvent/RemoteFunction/UnreliableRemoteEvent the game created, in code, the Rojo project or the
   place notes. RemoteFunctions become request leaves.
 - Template literal types can't be guarded: use `string`. Keep game checks (distance, ownership, cooldowns) in handlers.
-- `@rbxts/net`, `@flamework/networking`, Zap, Blink, ByteNet: convert to `createNetwork`.
+- `@rbxts/net`, `@flamework/networking`, Zap, Blink, ByteNet: convert to `createNetwork`. Flamework names: `connect` →
+  `on`, `setCallback` → `handle`, `broadcast` → `fireAll`, `except` → `fireExcept`, `predict` → `emit` (runs the local
+  `on` handlers, no traffic), `invokeWithTimeout(seconds, …)` keeps its name; check the unit (seconds, 0.5 to 120: a
+  Flamework call with `5000` meant milliseconds by mistake). A leaf's default timeout: `setNetworkLimits({ "x.y": {
+  timeout: 30 } })` in `src/shared/net.ts` (the client reads it).
+- A big Flamework network can stay on `createFlameworkCompat` (the codemod's default) and move to `createNetwork`
+  later (`typetorch migrate --from flamework --net native`); `typetorch build` reminds you while it is in use.
 
 ### 4.5 UI
 
 - Code-built UI: build it in a controller; `this.trove.add(screenGui)`.
 - Studio-built UI stays in the place (StarterGui): tag what code touches (`Element:<Area>.<Name>`), drive it with
   `observeElement`. The payload can't carry ScreenGuis.
-- charm atoms live per generation; persist their plain values if they must survive a swap.
+- charm atoms live per generation; persist their plain values if they must survive a swap. charm-sync: the recipe in
+  [State with charm](../guides/state.md) (server atoms from persist, a `createNetwork` leaf, hydrate request in onStart).
 - React/Roact/Vide: mount in a controller, `this.trove.add(() => root.unmount())`.
 - `popIn`/`popOut`/`bump` (UIScale, never tweened `Size`); one `PopupQueue` for modals.
 
@@ -426,7 +446,7 @@ handles live in `persist`; load on join (re-attach after a swap), release on a r
 
 | The project uses | Do |
 |---|---|
-| ProfileStore / ProfileService | rewrite the data module as the guide's `DataService` (same store names and keys, `PlayerData_dev` for non-prod channels); the require of the place copy and the `DataHost` Script are **user steps** (Studio) |
+| ProfileStore / ProfileService | rewrite the data module as the guide's `DataService` for that library (same store names and keys, a `_dev` name for non-prod channels; loads, saves and releases as DataHost jobs); the place copy and the `DataHost` Script (with its job queue) are **user steps** (Studio) |
 | plain DataStores, small per-player values | keep them in the payload: read once per join, `UpdateAsync` on change, pending writes in `persist` (like the template's `BestService`) |
 | anything else (DataStore2, Lapis, custom sessions) | wrap it in a `@Service()` unchanged, and write in `MIGRATION_NOTES.md` that it must move to the place and follow the pattern before prod |
 

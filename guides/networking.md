@@ -63,6 +63,37 @@ this.trove.addPromise(
 - `invoke` resolves with the handler's result or rejects after 15 s ("The server didn't answer in time"), or when the
   generation stops.
 
+### Timeouts
+
+A button that must fail fast, or a call that takes long (a reserved server, a teleport), sets its own timeout in
+seconds:
+
+```ts
+network.client.vc.spawn.invokeWithTimeout(30).then(([ok]) => ...); // this call
+setNetworkLimits({ "vc.status": { timeout: 5 } }); // every invoke of this leaf
+```
+
+- `invokeWithTimeout(seconds, ...args)` wins over the leaf's `timeout`, which wins over the default 15 s.
+- Both are in **seconds**, from 0.5 to 120. A value outside is clamped, with one warning (Flamework code that passed
+  `5000` meaning milliseconds gets 120 s).
+- The client reads the leaf's `timeout`, so call that `setNetworkLimits` in code both realms load (next to
+  `createNetwork` in `src/shared/net.ts`).
+
+### Run local handlers: `emit`
+
+`emit` runs this generation's own `on` handlers for a leaf, right now, as if the message had arrived. Nothing goes over
+the network, and no guard runs. It is Flamework's `predict`: one handler for both server messages and local feedback.
+
+```ts
+// client: show an error toast through the same handler the server's notify.error uses
+network.client.notify.error.emit("Not enough coins");
+
+// server, for tests: run the shop.buy listeners as if the player had sent it
+network.server.shop.buy.emit(player, "sword", 1);
+```
+
+Handlers run in order on the calling thread; one that throws is warned, and the others still run.
+
 ## Guards and limits
 
 Every client → server message is checked on the server, in this order:
@@ -90,10 +121,18 @@ Guards check shapes only. Keep your game's own checks in the handler: distance, 
   become request leaves (`handle` / `invoke`).
 - **Template literal types can't be guarded** (`` `item_${string}` ``): use `string` and check it in the handler.
 - Classes can't be guarded either: send plain data.
+- **Supported parameter types:** string, number, boolean, undefined and optional, literals and TS enums, Enum items,
+  Roblox datatypes (Vector3, CFrame, Color3, UDim2, ...), Instances by class, arrays, tuples, Maps, Sets, plain objects
+  and interfaces, unions, `buffer`, and `unknown` / `any`. The transformer names the leaf when a guard can't be built,
+  and warns about generic or conditional leaves (checked loosely: use a union of tuples) and about values that never
+  arrive (functions, threads, signals, connections, AnimationTracks).
 - Register handlers through the trove, so a swap removes them.
 - During a swap, a message sent with the old build's id gets a "resync" answer, and the client waits for its own swap.
   Pending `invoke`s reject with "This version of the game is shutting down".
 - Third-party networking (`@rbxts/net`, `@flamework/networking`, Zap, Blink, ByteNet) doesn't run inside a payload.
+  From `@flamework/networking`: `connect` → `on`, `setCallback` → `handle`, `broadcast` → `fireAll`, `except` →
+  `fireExcept`, `predict` → `emit`, `invokeWithTimeout` keeps its name (seconds). Or keep Flamework's names for now
+  with `createFlameworkCompat` ([Coming from Flamework](from-flamework.md)).
 
 ## Seeing the traffic
 

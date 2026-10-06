@@ -64,13 +64,15 @@ flowchart LR
 | [Loading screens](guides/loading-screen.md) | your own loading screen: `ClientReady`, `Holding`, `TypeTorchBootScreen`, `TypeTorchKernelScreen` |
 | [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, DuckDB or Basin, experiments, queries, node graphs, privacy, a local quick start |
 | [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
-| [Player data](guides/player-data.md) | the swap-safe data pattern, with a ProfileStore example, the cloud test and developer product receipts |
+| [Player data](guides/player-data.md) | the swap-safe data pattern (DataHost runs the library's writes), ProfileStore and ProfileService examples, the cloud test and developer product receipts |
+| [State with charm](guides/state.md) | charm atoms across swaps: server atoms from `persist`, charm-sync over `createNetwork`, the client's hydrate request |
 | [Go-live checklist](guides/go-live-checklist.md) | moving a game with live players: prepare, a copy, a dev-branch soak, live tests, cut-over, what to do if it goes wrong |
 | [Hot assets](guides/hot-assets.md) | models and UI templates from the place, updated live with `hotAsset()` |
 | [Testing in Studio](guides/studio-testing.md) | run your local code in Studio with the real kernel |
 | [The dev menu](guides/dev-menu.md) | every tab, owners and devs, the `/tt` commands |
-| [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, roles, logs, messaging, live settings |
-| [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests |
+| [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, playerState, `Dependency<T>()`, roles, logs, messaging, live settings |
+| [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests, timeouts, `emit` |
+| [Coming from Flamework](guides/from-flamework.md) | `typetorch migrate --from flamework` (the codemod and its report), `createFlameworkCompat`, the mapping |
 | [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server: Live and Code modes, screenshots, Toolbox |
 | [Security model](guides/security.md) | who can do what, dev access (`access push`), keys, signing, never publish secrets |
 | [Troubleshooting](guides/troubleshooting.md) | real errors and their fixes |

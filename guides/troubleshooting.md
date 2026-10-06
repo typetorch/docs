@@ -53,7 +53,18 @@ TypeTorch no longer uses Flamework. Import `Service`, `Controller`, the lifecycl
 
 **`X needs Y, which is not a loaded @Service/@Controller`, or `dependency cycle: A -> B -> A`.**
 A constructor parameter is not a module of the same realm, its file isn't under the folders `boot.ts` passes in
-`modules`, or two modules need each other. Move shared logic into a third module.
+`modules`, or two modules need each other. For a cycle, take one side as `Lazy<T>` (a field `= Lazy<T>()`, or a
+constructor parameter with `@typetorch/transformer` 0.2.1+), call `Dependency<T>()` inside a method, or move shared
+logic into a third module ([Dependency cycles](../getting-started/migrate.md#dependency-cycles-lazyt)).
+
+**`ShopService isn't constructed yet: call Dependency<ShopService>() from onInit/onStart or later`.**
+`Dependency<T>()`, `TypeTorch.module<T>()` or `Lazy<T>.get()` ran before every module was constructed: in a
+constructor, a field initializer, or at the top level of a module ("ran while the modules were loading"). Call it in a
+method or in `onInit`.
+
+**`X: constructor parameter 2 is a Lazy<T>, but this build's @typetorch/transformer doesn't record T`.**
+`Lazy<T>` constructor parameters need `@typetorch/transformer` 0.2.1 or later. Update it, or declare a field instead:
+`private readonly team = Lazy<TeamService>()`.
 
 **`the payload may hold only Folders and ModuleScripts under one Model root; found: ... (Script)`.**
 A `*.server.ts` / `*.client.ts` (or a model file) is in a synced folder. Move its work into a module and delete it.

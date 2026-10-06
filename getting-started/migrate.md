@@ -92,12 +92,21 @@ TypeTorch doesn't use Flamework any more: its own `@typetorch/transformer` gener
 - `Modding`, `Reflect`, `t` from `@flamework/core` → the same from `@typetorch/framework`. Custom decorators use
   `@metadata typetorch:parameters injectable`.
 - `Flamework.addPaths` / `ignite` → the boot modules (section 3). `@flamework/networking` → `createNetwork`
-  (section 6). `@flamework/components` → observers (rule 4). `Dependency<T>()` → constructor injection.
+  (section 6: `predict` → `emit`, `invokeWithTimeout` takes seconds). `@flamework/components` → observers (rule 4).
+- `Dependency<T>()` stays: import it from `@typetorch/framework`. It works from `onInit`/`onStart` on, not in a
+  constructor, a field initializer or at the top level of a module (section 4). It is also the cycle breaker, with
+  `Lazy<T>`.
 - Remove `@flamework/*` and `rbxts-transformer-flamework` from `package.json`, `node_modules/@flamework` from
   `typeRoots` and the Rojo projects; delete `flamework.build`, `flamework.json` and `include/flamework`.
 - Type ids changed format (`@typetorch/framework:decorators@Service`): anything saved under Flamework ids
   (`Flamework.id<T>()`) won't match.
 - Then the swap-safety rules (section 5). That part is the real work.
+
+**Let the CLI do the mechanical part.** Once the toolchain builds, `bun run typetorch migrate --from flamework`
+(`--dry-run` first) makes the changes above, turns the ignite files into boot modules, keeps every
+`@flamework/networking` call site through the framework's `createFlameworkCompat`, and writes
+`typetorch-migrate-report.md` listing each swap-safety item with its file and line. Details and the full mapping:
+[Coming from Flamework](../guides/from-flamework.md).
 
 ## 3. Entry points become boot modules
 
@@ -146,10 +155,11 @@ export function boot(kernel: ClientKernel) {
 |---|---|
 | Flamework `@Service()` / `@Controller()` | `@Service()` / `@Controller()` from `@typetorch/framework`, class `extends Module` |
 | Flamework `OnInit`, `OnStart`, `OnTick`, `OnPhysics`, `OnRender` | the same names from `@typetorch/framework` |
-| Flamework `Dependency<T>()`, constructor injection | constructor injection (call `super()`) |
+| Flamework constructor injection | constructor injection (call `super()`) |
+| Flamework `Dependency<T>()` | `Dependency<T>()` from `@typetorch/framework`, from `onInit`/`onStart` on (below) |
 | Flamework `@Component` | a module using `observeElement` or `@rbxts/observers` (rule 4) |
 | Knit `CreateService({ Name, Client, KnitInit, KnitStart })` | `@Service()` class; `KnitInit` → `onInit`, `KnitStart` → `onStart`, `Client` → network leaves |
-| Knit `Knit.GetService("X")` | constructor injection |
+| Knit `Knit.GetService("X")` | constructor injection, or `Dependency<X>()` in a method |
 | singleton module with top-level state | a `@Service()` / `@Controller()` class |
 | shutdown cleanup | `onStop` and the module trove |
 
@@ -201,6 +211,51 @@ export class CoinService extends Module implements OnStart {
 ```
 
 Don't do work in the constructor: `this.trove` and `this.ctx` are attached right after it.
+
+### Modules outside the constructor: `Dependency<T>()`
+
+Plain classes a module builds (UI helpers), command handlers and methods reach other modules with `Dependency<T>()`
+(or `TypeTorch.module<T>()`; `TypeTorch.tryModule<T>()` returns `undefined` instead of throwing):
+
+```ts
+import { Dependency } from "@typetorch/framework";
+import type { CharacterController } from "../controllers/character.controller"; // `import type`: no require cycle
+
+export class SidebarHelper {
+	open() {
+		Dependency<CharacterController>().freeze();
+	}
+}
+```
+
+- It works once every module is constructed: from `onInit` on. In a constructor, a field initializer or at the top
+  level of a module it throws "ShopService isn't constructed yet: ...". Move such calls into a method, or into `onInit`.
+- Only this realm's modules: a `@Service` on the server, a `@Controller` on the client.
+- It returns the running generation's module, so after a swap it returns the new one.
+
+### Dependency cycles: `Lazy<T>`
+
+Two modules that need each other (A injects B, B injects A) are a startup error ("dependency cycle: A -> B -> A"). Take
+one side lazily; it resolves on first use, and the start order ignores it:
+
+```ts
+import { Lazy, Module, Service } from "@typetorch/framework";
+import type { TeamService } from "./team.service";
+
+@Service()
+export class ItemService extends Module {
+	private readonly team = Lazy<TeamService>(); // a field works with every transformer
+
+	// or a constructor parameter (needs @typetorch/transformer 0.2.1+):
+	// constructor(private readonly team: Lazy<TeamService>) { super(); }
+
+	give(player: Player) {
+		if (this.team.get().isGuard(player)) return; // from onInit on; in a constructor it throws
+	}
+}
+```
+
+`Dependency<T>()` inside a method breaks a cycle too, the Flamework way.
 
 ### Knit
 
@@ -351,6 +406,21 @@ atoms or Instances the generation created: they keep the old code alive or get d
 (`"cooldowns.v2"`) when the shape changes. (Handles from a library that lives outside the payload are the one
 exception; see [Player data](../guides/player-data.md).)
 
+Per-player maps (cooldowns, states, sessions) use `playerState`: persisted, keyed by UserId, and a player's entry is
+removed when they really leave (never on a swap), so nothing leaks:
+
+```ts
+private cooldowns!: PlayerState<{ lastUse: number }>; // import type { PlayerState } from "@typetorch/framework"
+
+onInit() {
+	this.cooldowns = this.ctx.playerState("cooldowns.v1", () => ({ lastUse: 0 }));
+}
+
+use(player: Player) {
+	this.cooldowns.get(player).lastUse = os.clock(); // also set, has, delete
+}
+```
+
 ### Rule 3: players through `onPlayerAdded` or `observePlayers`
 
 Before:
@@ -383,7 +453,8 @@ or, anywhere: `observePlayers(this.trove, (player, playerTrove) => ...)`.
   ```
 
 - For work on a real leave only (not on a swap), connect `Players.PlayerRemoving` through the trove:
-  `this.trove.connect(Players.PlayerRemoving, (player) => ...)`.
+  `this.trove.connect(Players.PlayerRemoving, (player) => ...)`. Per-player state in `playerState` is removed on a
+  real leave by itself (rule 2).
 
 ### Rule 4: tags and characters through observers
 
@@ -403,8 +474,8 @@ observeElement<BasePart>(this.trove, "Lava", (part, partTrove) => {
 });
 ```
 
-After, with [`@rbxts/observers`](https://www.npmjs.com/package/@rbxts/observers) (each observer returns a stop function
-for the trove):
+Characters, with [`@rbxts/observers`](https://www.npmjs.com/package/@rbxts/observers) (each observer returns a stop
+function for the trove):
 
 ```ts
 import Observers from "@rbxts/observers";
@@ -508,6 +579,23 @@ Use `onStop` for short extras.
 On older kernels, `game.BindToClose` can't be unbound, so bind it at most once per server (guard it with a persisted
 flag).
 
+### Rule 9: packages and libraries follow the same rules
+
+It doesn't matter who wrote the code: a package from npm or a vendored library that runs inside a generation is
+stopped and loaded again on every swap, like your own modules. The same two rules apply to it:
+
+- what must survive a swap goes in `persist`;
+- everything it creates (Instances, ScreenGuis, RenderStep bindings, connections, loops) is destroyed through a trove
+  when the generation stops.
+
+Examples:
+
+- **TopbarPlus:** destroy your icons in the trove: `const icon = new Icon(); this.trove.add(() => icon.destroy());`.
+- **CameraShaker:** it binds a fixed RenderStep name, so stop it on stop: `this.trove.add(() => shaker.Stop());`
+  (or `this.trove.add(() => RunService.UnbindFromRenderStep("CameraShaker"))`).
+- **A library with its own registry** (zones, hitboxes): destroy what you registered through the trove, and keep only
+  what must outlive the swap (plain data such as ids or settings) in `persist`, then hand it back in `onInit`.
+
 ## 6. Networking
 
 Replace every RemoteEvent and RemoteFunction with one typed network. The kernel owns the only two remotes; a generation
@@ -576,8 +664,12 @@ this.trove.addPromise(
 - The guards (`coinId` is a string) are generated from the types; the server also applies rate and shape limits and
   kicks clients that flood it. Keep your own game checks (distance, ownership, cooldowns).
 - RemoteFunctions become request leaves: `handle` on the server returns `[value]` or `[false, "reason"]`, `invoke` on
-  the client returns a Promise (15 s timeout).
-- `@rbxts/net`, `@flamework/networking`, Zap, Blink and ByteNet don't work inside a payload: convert them.
+  the client returns a Promise (15 s timeout; `invokeWithTimeout(seconds, ...args)` or a leaf's `timeout` in
+  `setNetworkLimits` changes it).
+- `@rbxts/net`, `@flamework/networking`, Zap, Blink and ByteNet don't work inside a payload: convert them. From
+  Flamework: `connect` → `on` (in the trove), `setCallback` → `handle`, `broadcast` → `fireAll`, `except` →
+  `fireExcept`, `predict` → `emit` (runs the client's own `on` handlers, no traffic), `invokeWithTimeout(seconds, ...)`
+  keeps its name (seconds, 0.5 to 120).
 - Remove RemoteEvents defined in the Rojo project or the place.
 - More: [Networking](../guides/networking.md).
 
@@ -617,6 +709,7 @@ onStart() {
 }
 ```
 
+- Atoms synced from the server (charm-sync): [State with charm](../guides/state.md).
 - Pop in and out with `popIn` / `popOut` / `bump` (a UIScale; never tween `Size`). One `PopupQueue` for modals.
 - React, Roact or Vide: mount the root in a controller and unmount it through the trove
   (`this.trove.add(() => root.unmount())`).
@@ -628,6 +721,9 @@ place, its session handles live in `persist`, sessions load on join and are rele
 [Player data](../guides/player-data.md) before you migrate any data code, and test it on a dev branch first.
 
 - Don't change store names, keys or the data format in the same step.
+- Library calls that write (load, save, release) run as jobs of the place's `DataHost` script, so a deploy can't cut
+  one off ([why](../guides/player-data.md#the-swap-safe-pattern)). ProfileService has its own example
+  ([ProfileService](../guides/player-data.md#example-profileservice)).
 - The data code must not wait for place scripts in the cloud test ([why](../guides/player-data.md#the-cloud-test)).
 - Developer products: record the PurchaseId in the player's profile with the grant, and return `PurchaseGranted`
   only after a save holds it ([Developer products](../guides/player-data.md#developer-products)). `persist` alone
@@ -807,10 +903,12 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 - [ ] no `*.server.ts` / `*.client.ts` left; `src/server/boot.ts` and `src/client/boot.ts`
 - [ ] every service/controller is a `@Service()` / `@Controller()` class extending `Module`
 - [ ] no game code imports `@flamework/*`; no `@flamework/*` or `rbxts-transformer-flamework` in `package.json`
+- [ ] `Dependency<T>()` only in methods and `onInit`/`onStart` (never a constructor, field initializer or module top
+      level); cycles broken with `Lazy<T>`
 - [ ] connections, instances, threads in troves; loops only in `onStart` or the trove
-- [ ] no module-level state; what must survive is in `persist` as plain data
+- [ ] no module-level state; what must survive is in `persist` as plain data (per-player maps in `playerState`)
 - [ ] players via `onPlayerAdded` / `observePlayers`; join handlers idempotent
-- [ ] tags and characters via observers
+- [ ] tags via `observeElement`, characters via `@rbxts/observers` (stop function in the trove)
 - [ ] no `_G` / `shared`
 - [ ] no RemoteEvent/RemoteFunction anywhere; one `createNetwork`
 - [ ] UI: code-built in troves, Studio-built tagged and observed
@@ -836,6 +934,10 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 | `Players.LocalPlayer.PlayerGui.Hud` grabbed once | the reference breaks when the GUI resets | `observeElement` with a tag |
 | Helper modules with side effects in `services/` | they run when `startServer` requires the folder | keep top-level code side-effect free |
 | A Flamework import left (`@flamework/core` `OnStart`) | "You can only use npm scopes that are listed in your typeRoots" | import from `@typetorch/framework` |
+| `Dependency<T>()` in a constructor, a field initializer or at module top level (`const X = Dependency<X>()`) | the start fails: "X isn't constructed yet" | call it in a method or `onInit` |
+| Two modules that inject each other | the start fails: "dependency cycle: A -> B -> A" | `Lazy<T>` on one side, or `Dependency<T>()` in a method (section 4) |
+| `invokeWithTimeout(5000)` kept from Flamework code that meant milliseconds | clamped to 120 s, with a warning | seconds: `invokeWithTimeout(5)` |
+| A per-player Map in `persist` with no leave cleanup | it grows with every player who ever joined the server | `this.ctx.playerState` (rule 2) |
 | `npx rbxtsc` in a Bun project on Windows | runs an unrelated placeholder package | `bun run build` or `bunx rbxtsc` |
 | Dev branch writes prod data | real players' data changes from a test server | split store names by `TypeTorch.channel` |
 | `kernel deploy --replace-place` on a real place | maps and Studio UI vanish from the live version | `kernel deploy --place-file <copy>` patches only the kernel (section 9) |

@@ -75,11 +75,15 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    - **Flamework projects are mostly a swap:** same decorator and lifecycle names, imports from
      `@typetorch/framework` (also `Modding`, `Reflect`, `t`; custom decorators use
      `@metadata typetorch:parameters injectable`), `extends Module` + `super()`, `@flamework/networking` →
-     `createNetwork`, components → observers, `Dependency<T>()` → injection. Then `bun remove` every `@flamework/*` and
+     `createNetwork` (`predict` → `emit`, `invokeWithTimeout` in seconds), components → observers.
+     `Dependency<T>()` stays (from `@typetorch/framework`): the
+     cycle breaker (with `Lazy<T>`) and the way plain classes reach modules, from `onInit` on; move calls in
+     constructors, field initializers and module top level into methods. Then `bun remove` every `@flamework/*` and
      `rbxts-transformer-flamework`, delete `flamework.build`, `flamework.json`, `include/flamework`. Type ids changed
      format: data saved under Flamework ids won't match (flag it). The swap-safety pass is the real work.
    - Swap safety: everything in `this.trove`; no module-level state (instance fields, or
-     `this.ctx.persist("key.v1", () => init)` with plain data only); players via `onPlayerAdded(player, playerTrove)` /
+     `this.ctx.persist("key.v1", () => init)` with plain data only; per-player maps via
+     `this.ctx.playerState("key.v1", init)`, removed on a real leave); players via `onPlayerAdded(player, playerTrove)` /
      `observePlayers`, idempotent (persisted set for one-time effects), real leaves via
      `this.trove.connect(Players.PlayerRemoving, …)`; tags/characters via `observeElement` or `@rbxts/observers`
      (stop function in the trove); loops only in `onStart` or `this.trove.add(task.spawn(…))`; no `_G`/`shared`;
@@ -92,9 +96,11 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    - UI: code-built in the trove; Studio-built stays in StarterGui, tagged and driven by `observeElement`; charm atoms
      per generation (persist plain values); `popIn/popOut/bump`; one `PopupQueue`.
    - Player data: the library lives in the place (`ServerStorage.Packages.<Lib>` + a `DataHost` Script, user steps),
-     handles in `persist`, load on join, release on real leave, store names split by `TypeTorch.channel`. ProfileStore:
-     use the Player data guide's `DataService` (keep its `TypeTorchTest` line: place scripts never run in the cloud
-     test, so waiting for `DataHost` there fails every prod deploy). Developer products: the PurchaseId goes into the
+     handles in `persist`, load on join, release on real leave, store names split by `TypeTorch.channel`. Library
+     loads, saves and releases run as jobs on DataHost's thread (`library.TypeTorchJobs`): a deploy stops the
+     generation's threads mid-call, which jams the library for that player. ProfileStore or ProfileService: use the
+     Player data guide's `DataService` for that library (keep its `TypeTorchTest` line: place scripts never run in the
+     cloud test, so waiting for `DataHost` there fails every prod deploy). Developer products: the PurchaseId goes into the
      profile with the grant, `PurchaseGranted` only after a save holds it (`grantOnce`), never only `persist`.
      Others: wrap unchanged and flag.
    - The cloud test runs `onInit`/`onStart` against the live game's data (real DataStores, MemoryStores,
