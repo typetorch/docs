@@ -101,6 +101,7 @@ In PowerShell, quote `"#42"`.
 | `auto_rollback` | critical | CLI | `deploy --wait` rolled the branch back |
 | `server_stuck` | warning | CLI and fleet API | servers didn't pick up a deploy (below) |
 | `server_lost` | critical (3+ servers) or warning | fleet API | servers stopped reporting (below) |
+| `fleet_flood` | critical | fleet API | too many never-seen JobIds in a minute (below) |
 
 The kernel sends each code at most once a minute per server (`error_spike` every 5 minutes).
 
@@ -108,6 +109,11 @@ The kernel sends each code at most once a minute per server (`error_spike` every
   JobIds; critical when 3 or more servers are lost at once.
 - **Server stuck:** 3 minutes after a deploy started, live servers on its branch are still below its `#seq` and haven't
   reported anything for it. It lists them and says nothing about the build itself, so it never triggers a rollback.
+- **Fleet flood:** the fleet API admits at most 2,000 JobIds it has never seen per minute (enough for a 1,250-server
+  fleet restarting at once). Past that, new ones get a 429 until the minute ends (they get in on their next
+  heartbeat), known servers keep working, and one `fleet_flood` alert is raised per minute. The cause is a huge fleet
+  restart or someone with the ingest token sending made-up JobIds. Raise `TT_FLEET_NEW_JOBS_PER_MINUTE` for a bigger
+  fleet.
 
 Reports are kept 30 days and alerts 90 days.
 

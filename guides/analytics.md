@@ -47,10 +47,12 @@ const variant = analytics.experiment("onboarding", ["short", "long"]); // the sa
 - **Server calls take the player first.** Without a player, an event is server-only (no player id).
 - **Client calls** are about the local player. They are marked `src = "client"` (a client can lie), and the server
   checks their shape, size (props at most 4 KB) and rate (120 a minute, 5,000 a session; a client's experiment calls
-  count too).
-- **Revenue counts server-sent purchases only.** Payers and Robux in every query come from `purchase` rows the server
-  sent; a client-sent `purchase` row is kept but never counts (rows from before `src` existed still count). Call
-  `analytics.purchase` on the server, after the receipt is granted.
+  count too). `purchase` and `currency` are server-only (revenue and the economy are server-authoritative): on the
+  client they warn once and send nothing, and both the game server and the analytics server refuse them from clients.
+- **Revenue counts server-sent purchases only.** Payers and Robux come from `purchase` rows the server sent. Clients
+  can't send `purchase` or `currency` at all (framework after 0.3.2; older engines' client rows are refused at ingest
+  and never counted). Rows from before `src` existed still count. Call `analytics.purchase` on the server, after the
+  receipt is granted.
 - **The cloud test sends nothing** (framework after 0.3.2). In `typetorch test --cloud` (before every prod deploy)
   the engine collects as usual but never uploads: no event rows, no identity rows, no HTTP request. A prod deploy
   never adds a fake server session.
@@ -71,7 +73,7 @@ the player's state (`zone:Lobby|screen:Shop|activity:round`).
 
 | Group | Option | Events |
 |---|---|---|
-| Sessions | `sessions` | join and leave, session length, where they came from (direct, teleport, friend follow, share link...), device and input type, screen size, account age bucket, Premium, country, friends in the server, first visit or returning, days since the last visit |
+| Sessions | `sessions` | join and leave, session length, where they came from (direct, teleport, friend follow, share link...), device and input type, screen size, account age bucket, Premium, country, friends in the server (one friend-list lookup per join), first visit or returning, days since the last visit |
 | Tech health | `tech` | server FPS and heartbeat, client FPS, ping, memory, load time, client and server errors, hot swaps and rollbacks, and who left within 60 s of a swap |
 | Zones | `zones` | entering and leaving zones: parts or models tagged `TTZone` in the place, named by a `Name` attribute or the instance name. The smallest zone around the player wins |
 | Screens | `screens` | ScreenGuis in PlayerGui, and GuiObjects tagged `TTScreen` |
