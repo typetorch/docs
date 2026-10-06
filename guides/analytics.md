@@ -321,14 +321,22 @@ and node graph (Mermaid). Without `--pid` it picks the player seen last. It neve
   DataStore `TypeTorchAnalytics`, key `p/<UserId>` = `{ pid, first, last }` (one read per join, a write on the first
   join and at leave). `first` marks the first-ever session.
 - **Deleting that key makes the player's analytics anonymous**, on both backends.
+- **Your own server also keeps pid -> UserId.** Once a player's pid is known, the game server sends one identity row
+  `{ pid, uid, t }` (the UserId and nothing else) per session to your analytics server: DuckDB games in the upload
+  batch, Basin games to the fleet API's `/v1/identity` (Basin rows can't be deleted, so they never go there). It lands in
+  a deletable table next to the fleet data, never in the events, and lets you look a player up by UserId (the explorer's
+  Players page, `GET /v1/identity?uid=`) and answer erasure requests without a DataStore read. Players who joined
+  before this update are mapped only by a backfill from the DataStore links (`POST /v1/identity/backfill`, needs
+  `TT_ANALYTICS_OPENCLOUD_KEY` with `universe-datastores.objects:list` and `:read`). Turn it off with the framework
+  option `identity: false`.
 - **The DuckDB server also deletes the rows.** In Creator Hub > Webhooks, add `https://<your host>/v1/erasure` for
   "Right to erasure request" with a secret (`TT_ANALYTICS_WEBHOOK_SECRET`). The server checks Roblox's signature,
-  ignores other games (`TT_ANALYTICS_UNIVERSE_ID`), and maps the UserId to the pid through Open Cloud
-  (`TT_ANALYTICS_OPENCLOUD_KEY`, a key with `universe-datastores.objects:read`; add `:delete` and
-  `TT_ANALYTICS_ERASURE_DELETE_LINK=1` to also delete the link). The pid's rows leave the live file at once; day files,
-  rollups and raw archives are rewritten in the background, and later rows of that pid are dropped. Its log keeps the
-  notification id and outcome, never the UserId. The admin token can also erase by pid: `POST /v1/erasure`
-  `{ "pid": "..." }`.
+  ignores other games (`TT_ANALYTICS_UNIVERSE_ID`), and maps the UserId to its pids through the identity table, and
+  through Open Cloud when `TT_ANALYTICS_OPENCLOUD_KEY` is set (a key with `universe-datastores.objects:read`; add
+  `:delete` and `TT_ANALYTICS_ERASURE_DELETE_LINK=1` to also delete the link). The pids' rows leave the live file at
+  once; day files, rollups and raw archives are rewritten in the background, and later rows of those pids are dropped.
+  Then the UserId's identity rows are deleted (and refused afterwards). Its log keeps the notification id and outcome,
+  never the UserId. The admin token can also erase by pid: `POST /v1/erasure` `{ "pid": "..." }`.
 - **Basin can't delete rows** (its SQL is read-only). Delete the `p/<UserId>` link with the rest of the player's data:
   their rows stay, anonymous.
 
