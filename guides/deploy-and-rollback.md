@@ -28,7 +28,7 @@ don't all load at once. Measured end to end: about 7 to 9 seconds from the comma
 about 11 s for the cloud test on prod.
 
 Useful flags: `--branch <b>`, `--channel prod|dev`, `--message <text>` (shown in the dev menu), `--no-build` (deploy
-the last build), `--no-registry`, `--force` (a dev-channel or dirty build to a prod-channel branch), `--test` /
+the last build), `--force` (a dev-channel or dirty build to a prod-channel branch), `--test` /
 `--skip-test "<reason>"`, `--wait [s]` / `--no-wait`, `--rollout <1-99>` (dev-channel branches).
 
 ### Artifact ids and the deployment number

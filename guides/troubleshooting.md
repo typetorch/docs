@@ -81,10 +81,6 @@ files it read.
 **A scope probe in `doctor` fails with 401/403.**
 Edit the key in Creator Hub and add the missing permission for this experience.
 
-**A deploy stops with a registry write error.**
-The key can read the ConfigService registry (`universe:read`, only possible with OAuth today, not an API key) but not
-write it. Add `universe:write`, or pass `--no-registry`. The upload is kept: finish it with `bun run typetorch promote`.
-
 **`refusing to publish a kernel that can't verify prod deploys`.**
 Run `bun run typetorch keys init` and `bun run typetorch keys init --fallback` first, commit `typetorch.json`, then
 `kernel deploy`.
@@ -93,9 +89,23 @@ Run `bun run typetorch keys init` and `bun run typetorch keys init --fallback` f
 That needs `legacy-asset:manage`, which API keys can't get today. Download a copy in Studio (File > Download a Copy)
 and pass it: `--place-file <file> --base <version>` ([Kernel updates](deploy-and-rollback.md#kernel-updates)).
 
-**`fleet setup`, `access push` (or writing the analytics settings) fails with 401/403.**
-Writing a ConfigService key needs `universe:write` on the deploy key. Nothing is read back: API keys can't read
-configs.
+**`fleet setup`, `access push` or `settings ...` fails with 401/403.**
+The [settings record](settings.md) is a DataStore entry: the deploy key needs `universe-datastores.objects:read`,
+`:create` and `:update` (the ping also needs `universe-messaging-service:publish`). `universe:write` isn't used any more.
+
+**`... signed with both prod keys: run typetorch keys init`.**
+Settings writes (`settings set`, `fleet setup`, `access push`) sign the record with both prod keys. Set them up
+([fresh setup step 7](../getting-started/fresh-setup.md#7-prod-signing-keys)), or copy the key files from the machine
+that has them.
+
+**`the current settings record isn't signed by your keys`.**
+Someone else's keys (or game code) wrote it, or you rotated without `keys rotate` re-signing it. Check
+`bun run typetorch settings status`. `--force` replaces it: the old fields are dropped, never re-signed with your keys,
+so run `settings push`, `fleet setup` and `settings set analytics -` again afterwards.
+
+**`typetorch config push` is gone.**
+Kernel 0.3.8 reads no ConfigService keys. Use `typetorch settings push` (defaultBranch, channels, dev access),
+`typetorch fleet setup` and `typetorch settings set analytics -`.
 
 ## Deploys
 
@@ -153,8 +163,7 @@ permission to upload for that group.
 **Servers log `branch prod has no artifact yet; waiting for a deploy`, or (kernel 0.3)
 `nothing loaded (no verified, bootstrap or usable stored head); waiting for a signed deploy`.**
 Nothing was deployed to that branch yet, or no running server stored the head. Keep a server running (join the game)
-and deploy again. (The ConfigService registry would also hold heads, but its read scope, `universe:read`, can't be
-granted to API keys today.)
+and deploy again.
 
 **A deploy doesn't reach Studio.**
 Deploy messages never reach Studio playtests. Use [the Studio local payload](studio-testing.md).
@@ -182,8 +191,8 @@ too (kernel 0.3.2+). Map it, then publish the place.
 
 **Dev menu: "Fleet API failing", or `servers` lists nothing.**
 The fleet URL doesn't answer or the token is wrong. A quick tunnel gets a new URL every time it starts: run
-`bun run typetorch fleet setup --url <new url>` again. Kernels re-read `TypeTorchFleet` every 5 minutes; new servers
-at once.
+`bun run typetorch fleet setup --url <new url>` again (or restart `bun run local` in the analytics folder). Running
+servers (kernel 0.3.8+) switch within seconds; new servers at once.
 
 **The quick tunnel answers 404 for everything.**
 Your `~/.cloudflared/config.yml` (a named tunnel) has a catch-all ingress rule, and it overrides `--url`. Start the
@@ -192,8 +201,8 @@ quick tunnel with an empty config file: `cloudflared tunnel --config cloudflared
 
 **Analytics: no rows arrive.**
 Check, in order: an `AnalyticsEngine` is created on the server (the client alone sends nothing); Allow HTTP Requests is
-on; the `TypeTorchAnalytics` key exists and is valid (servers re-read it every 3 minutes; without it the engine keeps
-only the newest 1,000 rows); `analytics.stats()` on the server shows what was sent, dropped or refused. Game servers
+on; the settings record has a valid `analytics` field (`bun run typetorch settings get analytics`; kernel 0.3.8+;
+without it the engine keeps only the newest 1,000 rows); `analytics.stats()` on the server shows what was sent, dropped or refused. Game servers
 send every 15 s (`flushSeconds`); a DuckDB server loads them a few seconds later, Basin after its roll interval (1-2
 minutes).
 
@@ -221,8 +230,9 @@ such as a test place.
 
 **A member doesn't get the dev menu (or a revoked dev still does).**
 Servers see `members`, `revoked` and `devBadgeId` only after `bun run typetorch access push`, and only on kernel
-0.3.6+. Run it after every change; `bun run typetorch access status` says whether `typetorch.json` changed since the
-last push. Running servers pick it up within about a minute of ConfigService delivering it.
+0.3.8+ (0.3.6 and 0.3.7 read the old ConfigService key: push again after the kernel update). Run it after every
+change; `bun run typetorch access status` compares the settings record with `typetorch.json`. Running servers apply it
+within seconds.
 
 **`typetorch doctor` warns that the place holds `ServerStorage.TypeTorchDev`.**
 A Studio test session was published. Delete the folder in Studio and publish again (live servers ignore it).

@@ -183,10 +183,11 @@ Know these before you start:
   handle this). It is billed by data scanned.
 - Not yet tested against a live Basin account (the analytics README lists the open points).
 
-## Settings: the TypeTorchAnalytics key
+## Settings: the `analytics` field
 
-Game servers read their sink settings from the ConfigService key `TypeTorchAnalytics`. It is server-only (never sent to
-clients) and re-read every 3 minutes, so you change dials live, with no deploy or place publish.
+Game servers read their sink settings from the `analytics` field of the game's [signed settings record](settings.md)
+(kernel 0.3.8+). It is server-only (never sent to clients), and a change reaches running servers within seconds, so
+you change dials live, with no deploy or place publish.
 
 ```json
 {
@@ -211,13 +212,20 @@ clients) and re-read every 3 minutes, so you change dials live, with no deploy o
 | `techEvery` | seconds between tech samples, 15-3600 (default 60) |
 | `experiments` | live dials per [experiment](#experiments) |
 
-**How to write it:** `writeSettings()` from `@typetorch/analytics` (see the [quick start](#5-point-the-game-at-it)),
-or by hand in Creator Hub (the experience's Configs). `writeSettings` is write-only: it puts only this key in the config
-draft and publishes it, with an Open Cloud key that has `universe:write`. API keys can't read configs, so nothing reads
-it back, and the publish ships the whole draft (including someone else's unpublished edits).
+**How to write it:** from your game folder, with the JSON on stdin so the token never sits in a command line:
 
-Without the key the engine still collects, but keeps only the newest 1,000 rows until settings appear. Removing the key
-stops sending, live.
+```sh
+bun run typetorch settings set analytics - < my-analytics.json
+bun run typetorch settings get analytics      # read it back (the token hidden)
+bun run typetorch settings unset analytics    # stop sending
+```
+
+Or `writeSettings({ gameDir, settings })` from `@typetorch/analytics`, which checks the fields and runs the same
+command (see the [quick start](#5-point-the-game-at-it)). Both need your two prod signing keys: the CLI signs the
+record, and servers refuse one that doesn't verify. Keep `my-analytics.json` out of git (it holds the token).
+
+Without settings the engine still collects, but keeps only the newest 1,000 rows until settings appear. Removing them
+stops sending, live. On a kernel before 0.3.8 the engine sends nothing and warns once (update the kernel).
 
 ## Experiments
 
@@ -426,25 +434,27 @@ a browser; it answers `{"ok":true}`.
 
 ### 5. Point the game at it
 
-**Fleet** (live server status), from your game folder. The deploy key needs `universe:write`:
+Both go into the game's [signed settings record](settings.md), so you need the prod signing keys
+([fresh setup step 7](../getting-started/fresh-setup.md#7-prod-signing-keys)) and kernel 0.3.8+ in the place.
+
+**Fleet** (live server status), from your game folder:
 
 ```sh
 bun run typetorch fleet setup --url https://<words>.trycloudflare.com
 ```
 
-**Analytics settings.** Save this as `my-settings.ts` in the analytics folder (it holds no secret: it reads the key and
-the token from your env file):
+**Analytics settings.** Save this as `my-settings.ts` in the analytics folder (it holds no secret: the token comes
+from your env file, and your game's CLI signs and writes the record):
 
 ```ts
 import { writeSettings } from "./src/index.ts";
 
 const url = process.argv[2];
-await writeSettings({
-	apiKey: (process.env.OPENCLOUD_DEPLOY_KEY ?? process.env.TYPETORCH_API_KEY)!,
-	universeId: 1234567890, // yours
+const result = await writeSettings({
+	gameDir: "../my-game", // your game folder
 	settings: { backend: "duckdb", events: `${url}/v1/ingest`, token: process.env.TYPETORCH_FLEET_INGEST_TOKEN! },
 });
-console.log("TypeTorchAnalytics published");
+console.log(`settings.analytics written (settings #${result.seq})`);
 ```
 
 ```sh
@@ -453,12 +463,16 @@ bun --env-file="$HOME/.config/typetorch/my-game.env" my-settings.ts https://<wor
 
 (The same line works in PowerShell and bash.)
 
+**Or all of steps 3 to 5 at once:** in the analytics folder, `bun run local -- --env-file analytics.env --game
+../my-game` starts the server and a quick tunnel, then runs `fleet setup` and `settings set analytics` through your
+game's CLI. Ctrl+C stops both.
+
 ### 6. Play, then look
 
 1. Make sure the game creates an `AnalyticsEngine` on the server and the client (the template does), and deploy it,
    for example to `dev`.
-2. Join a server and play for a minute. Kernels read `TypeTorchFleet` within 5 minutes and analytics settings within 3
-   (new servers at once).
+2. Join a server and play for a minute. Running servers switch to the new fleet URL and analytics settings within
+   seconds of the write (new servers at once).
 3. `bun run typetorch servers` lists your server.
 4. In the analytics folder: `bun run report -- --env-file analytics.env`.
 

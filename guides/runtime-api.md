@@ -95,6 +95,34 @@ TypeTorch.requestReload(player); // owners only: reload this server to its branc
 
 Don't call `branches()` or `artifacts()` per player or per frame.
 
+## Cross-server (server only)
+
+```ts
+this.trove.add(TypeTorch.messaging.subscribe<Announcement>("announce", (data, meta) => this.show(data, meta.branch)));
+TypeTorch.messaging.publish("announce", { text: "Double coins!" }); // queued and retried, at most 1 KiB
+TypeTorch.messaging.status(); // the kernel's counters: rate on the topic, queued, dropped
+const servers = TypeTorch.servers(); // the game's live servers (cached; yields up to ~3 s when it asks)
+TypeTorch.setServerInfo({ mode: "ranked" }); // public fields of this server, in every server's list
+```
+
+Kernel 0.3.8+. See [Cross-server messages and the server list](messaging.md).
+
+## Live settings (server only)
+
+```ts
+const price = TypeTorch.liveConfig("shop.price", { default: 50 }); // `typetorch settings set game.shop.price 75`
+price.get();
+this.trove.add(price.onChanged((value) => this.reprice(value)));
+TypeTorch.settings(); // the whole verified settings record: holds tokens, never send it to a client
+```
+
+Kernel 0.3.8+. See [Settings](settings.md).
+
+## Loading screens
+
+Your own loading screen (a place script in `ReplicatedFirst`) waits for `ClientReady` on
+`ReplicatedFirst.TypeTorchKernelClient` (kernel 0.3.8). See [Loading screens](loading-screen.md).
+
 ## Logs
 
 ```ts

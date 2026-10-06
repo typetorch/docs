@@ -199,17 +199,18 @@ Add these permissions and select your experience where asked:
 | CLI job | Commands | Scopes |
 |---|---|---|
 | assets | `deploy`, `upload`, `promote` (of an unfinished upload), `test --cloud`, `keys init` / `rotate` (the key asset), `assets sync` / `status`, `doctor` | `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (the cloud test that runs before every prod deploy, hot assets, doctor's place check) |
-| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `fleet setup`, `access push` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number, below); `universe:write` only for `fleet setup`, `access push` and the analytics settings |
+| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `settings`, `fleet setup`, `access push` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number and the [signed settings](../guides/settings.md), below) |
 | place | `kernel deploy` only | place publishing (`universe-places` write; the CLI calls it `universe.place:write`), and `asset:read` to record the place version |
 
 - **The shared deploy number.** Every machine that deploys (your PC, a second PC, remote-claude) takes the next
   deploy number (`#seq`) from the game's DataStore: the kernel's records of past deploys, and a counter the CLI claims
   atomically. That's what the DataStore scopes are for. Without them a deploy uses only your PC's log (fine while you
   deploy from one machine), and `--require-shared-seq` stops instead.
-- **Not available to API keys today:** `universe:read` (it reads the ConfigService registry; `members` go through
-  `access push` instead, which needs only `universe:write`) and `legacy-asset:manage` (`kernel deploy` downloading the
-  place; pass a copy instead, see step 8). Creator Hub doesn't offer them for API keys. Deploys don't need them: game
-  servers keep the branch heads from the deploy messages themselves.
+- **Not needed:** `universe:write` and `universe:read` (ConfigService). Since kernel 0.3.8 TypeTorch keeps no
+  ConfigService keys: dev access, the fleet API and the analytics settings live in one
+  [signed settings record](../guides/settings.md) in the game's DataStore.
+- **Not available to API keys today:** `legacy-asset:manage` (`kernel deploy` downloading the place; pass a copy
+  instead, see step 8). Creator Hub doesn't offer it for API keys.
 - Set an expiry date, and add your IP under accepted IP addresses if you can.
 - Everything runs from your machine. TypeTorch never uses GitHub Actions or other hosted CI, so the key never has to
   leave your PC.
@@ -363,10 +364,12 @@ show the menu read-only. Tabs: [The dev menu](../guides/dev-menu.md).
 bun run typetorch access push
 ```
 
-- It writes the server-only ConfigService key `TypeTorchAccess` (the deploy key needs `universe:write`). Game code
-  can't write ConfigService, so nothing in your game can make itself a dev. `--dry-run` shows the value first.
-- Servers need **kernel 0.3.6+** to read it. Running servers pick a push up within about a minute of ConfigService
-  delivering it.
+- It writes the `access` field of the game's [signed settings record](../guides/settings.md) (DataStore `TypeTorch`,
+  key `settings`), signed with both prod keys (step 7), then pings the servers. Game code can write DataStores but
+  can't sign, and servers refuse a record that doesn't verify, so nothing in your game can make itself a dev.
+  `--dry-run` shows the lists first.
+- Servers need **kernel 0.3.8+** to read it. Running servers apply a push within seconds (the ping), or within about a
+  minute without it.
 - Before the first push, only the experience owner is a dev. After a change, servers keep the old lists until the
   next push (a revoked dev stays a dev). `deploy` and `doctor` (`dev access`) warn about both;
   `bun run typetorch access status` compares `typetorch.json` with the last push.

@@ -57,11 +57,12 @@ game shares. (The kernel still keeps each branch's head there: one small key.)
    bun run typetorch fleet setup --url https://fleet.example.com
    ```
 
-   It writes the server-only ConfigService key `TypeTorchFleet` = `{ url, token }` (the ingest token) and
-   `"fleet": { "url": ... }` in `typetorch.json`. The deploy key needs `universe:write`. Like every TypeTorch config
-   write it is blind: it puts only this key in the config draft and publishes it, so it also ships anyone else's
-   unpublished config edits. `--dry-run` shows what it would write.
-4. **Check:** kernels read the key at boot and every 5 minutes. Join a server, then `bun run typetorch servers`.
+   It writes `fleet` = `{ url, token }` (the ingest token) into the game's [signed settings record](settings.md) and
+   `"fleet": { "url": ... }` into `typetorch.json`, then pings the servers. It needs both prod signing keys (the record
+   is signed; servers refuse one that doesn't verify) and kernel 0.3.8+. `--dry-run` shows what it would write;
+   `bun run typetorch settings status` shows the record (the token hidden).
+4. **Check:** kernels read the record at boot, about every minute, and within seconds of a ping. Join a server, then
+   `bun run typetorch servers`.
 
 ## Commands
 
@@ -142,7 +143,8 @@ CLI polls for now.
 
 The dev menu's server list (owners) doesn't use the fleet API or any storage. When you open it, your server asks every
 server over MessagingService (a roll call), collects the answers for 3 s and caches the list for 15 s. Each server
-answers with the same status the kernel sends as its heartbeat. See [The dev menu](dev-menu.md#manage).
+answers with the same status the kernel sends as its heartbeat. See [The dev menu](dev-menu.md#manage). Game code gets
+the same list, with public fields only, from [`TypeTorch.servers()`](messaging.md#the-server-list).
 
 ## In the dev menu
 
@@ -151,7 +153,8 @@ Server > Status shows these when the kernel's sender has a problem:
 | Attention item | Fix |
 |---|---|
 | No fleet API | the place's kernel lacks its `Fleet` module: map it in your place project (kernel 0.3.2+), then publish |
-| Fleet settings | `TypeTorchFleet` is invalid: run `fleet setup` again |
+| Fleet settings | the settings record's `fleet` is invalid: run `fleet setup` again |
+| Settings | the [settings record](settings.md) is missing, unsigned or doesn't verify (`typetorch settings status`) |
 | Fleet API failing | the URL doesn't answer (a stopped server, a restarted quick tunnel) or the token is wrong |
 
 ## History

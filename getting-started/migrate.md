@@ -72,7 +72,7 @@ contents for each.
 7. **`.gitignore`**: `out/`, `include/`, `.typetorch/`, `src/shared/build.ts`, `.payload.gen.project.json`,
    `.tsconfig.typetorch.json`, `.env`, `.env.*`.
 8. **`typetorch.json`**: see [fresh setup step 5](fresh-setup.md#5-typetorchjson). After you add or change
-   `members`, `revoked` or `devBadgeId`, run `bun run typetorch access push`: servers (kernel 0.3.6+) see the lists only
+   `members`, `revoked` or `devBadgeId`, run `bun run typetorch access push`: servers (kernel 0.3.8+) see the lists only
    after that ([who gets the dev menu](fresh-setup.md#11-the-dev-menu-and-who-gets-it)).
 
 You don't need `scripts/packages.ts` or the template's `packages` and `postinstall` scripts. They are only for
@@ -735,28 +735,31 @@ onStart() {
 Guard only the side effects, so the test still boots your real code:
 
 - **global resets and one-time jobs:** season rollovers, leaderboard wipes, migrations of shared keys;
-- **MessagingService publishes:** cross-server announcements, "a server started" pings;
+- **raw MessagingService publishes:** cross-server announcements, "a server started" pings
+  (`TypeTorch.messaging.publish` already sends nothing from the test);
 - **"server started" rows:** DataStore or MemoryStore writes, webhooks, your own HTTP APIs;
 - **waits on place scripts:** they never run there, so the wait times out and the test fails
   ([the player data library](../guides/player-data.md#the-cloud-test)).
 
-## MessagingService topics
+## Cross-server messages
 
-Roblox allows a server **5 + 2 × players** subscriptions: an empty server has room for 5. Count your game's topics
-before you migrate (`git grep -n "SubscribeAsync" -- src`, and any in place scripts). TypeTorch uses these:
+Move your MessagingService topics to **`TypeTorch.messaging`** (kernel 0.3.8+). The kernel holds one subscription
+for all of them for the server's life, so a swap never subscribes again, and messages from dev branches don't reach
+prod servers:
 
-| Who | Topics | When |
-|---|---|---|
-| kernel | 3: `TypeTorch/deploy`, `TypeTorch/pin`, `TypeTorch/rekey` | every server |
-| kernel 0.3.6 peers | 1 more for about 3 s: `TypeTorch/peers/<JobId>` (its question rides `TypeTorch/deploy`) | only while the server asks other servers for a build: nothing else runs (at boot, or while the backup build runs), or it is moving players |
-| framework roll call (Manage > Servers) | 1: `TypeTorch/rollcall`, plus 1 more while a dev on that server collects the list | every server running a build |
-| framework remote-claude | 2 | dev-channel servers only |
+```ts
+// before: MessagingService.SubscribeAsync("ban", (message) => kick(message.Data as BanMessage));
+this.trove.add(TypeTorch.messaging.subscribe<BanMessage>("ban", (data, meta) => kick(data)));
 
-So a prod server uses 4, briefly 5. With kernel 0.3.6, a server that asks other servers for a build runs nothing
-(3 + 1 = 4) or runs the backup build (3 + 1 + 1 = 5): still within 5 on an empty server, as long as your game adds
-none. A game with 2 topics of its own goes over the limit on an empty server, and the
-extra subscription fails. Merge your topics into one (with a `kind` field in the message), or subscribe once the first
-player is in. Count again after a kernel or framework update.
+// before: pcall(() => MessagingService.PublishAsync("ban", data)), plus a TypeTorchTest guard
+TypeTorch.messaging.publish("ban", data); // queued and retried; nothing is sent from the cloud test
+```
+
+Messages stay under 1 KiB, and the whole game gets about 80 messages a minute on one topic. Details, limits and the
+server list (`TypeTorch.servers()`): [Cross-server messages](../guides/messaging.md).
+
+Roblox allows a server **20 + 8 × players** subscriptions. TypeTorch uses 5 (briefly 7), so raw MessagingService
+topics you keep still fit, but each one subscribes again on every swap.
 
 ## 10. Verify, then ship
 
@@ -814,7 +817,7 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 - [ ] player data follows [the pattern](../guides/player-data.md); store names split by channel
 - [ ] developer product receipts recorded in the profile before `PurchaseGranted`; no saves only in `onStop`
 - [ ] side effects guarded from the cloud test (`TypeTorchTest`); `typetorch test --cloud` passes
-- [ ] MessagingService topics counted: yours + TypeTorch's 4 fit in 5 on an empty server
+- [ ] MessagingService topics moved to `TypeTorch.messaging` (kernel 0.3.8), messages under 1 KiB
 - [ ] kernel installed in the place; old game scripts removed
 - [ ] `bun run build` and `bun run typetorch build` pass; a committed tree builds a clean id (no `-dirty`)
 - [ ] a dev branch survived two deploys while you played

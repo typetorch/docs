@@ -14,10 +14,11 @@
   Everyone else in `members` is a dev; the old role `"admin"` counts as dev.
 - Dev status is decided on the server by the kernel: the experience owner, `members`, dev-badge holders, Studio; minus
   `revoked`. Every dev-menu request is re-checked on the server.
-- **`members`, `revoked` and `devBadgeId` reach servers only through `bun run typetorch access push`.** It publishes
-  the server-only ConfigService key `TypeTorchAccess` (deploy key with `universe:write`; kernel 0.3.6+ reads it).
-  ConfigService, not a DataStore, because game code can't write it: a backdoored model can't make itself an owner.
-  Run it after every change. Revoking takes effect within about a minute of ConfigService delivering the push.
+- **`members`, `revoked` and `devBadgeId` reach servers only through `bun run typetorch access push`.** It writes
+  them into the game's [signed settings record](settings.md) (kernel 0.3.8+), signed with both prod keys. Game code can
+  write the DataStore it lives in but can't sign, and servers refuse a record that doesn't verify: a backdoored model
+  can't make itself an owner. Run it after every change. Revoking takes effect within seconds (the CLI pings the
+  servers), or within about a minute.
   `deploy` and `doctor` warn when `typetorch.json` lists people that were never pushed, or changed since the last
   push (until then a revoked dev stays a dev).
 - **Public servers are always effective `prod`:** read-only dev menu, and (kernel 0.3) only signed deploys and signed
@@ -48,8 +49,16 @@ What stays open, by design or for now:
   to `prod` or closes.
 - The [boot fail-safe](prod-signing.md#the-boot-fail-safe) may boot an unverified stored head when nothing verifies.
 - Group members with asset write access can change the key asset.
-- The registry and the stored heads live in your universe's ConfigService, MemoryStore and DataStores, which game code
-  can write; prod servers re-verify everything they read there.
+- The stored heads and the settings record live in your universe's MemoryStore and DataStores, which game code can
+  write; prod servers re-verify everything they read there.
+- **Settings rollback by replay:** game code can't forge the settings record, but it can write back an *older* signed
+  copy (say, from before you revoked someone). Running servers refuse a lower seq; a server that starts meanwhile takes
+  the old copy until the next write. If you suspect it, write again (`typetorch access push` gives a new seq) and check
+  `typetorch settings status`.
+- The settings record's tokens (fleet ingest, analytics send) are readable by any server code in your universe, as
+  they were in ConfigService. They are write-only tokens; never put a read token there.
+- **Cross-server messages** (`TypeTorch.messaging`): the sender tags (JobId, branch, channel) are for routing, not
+  proof. Anything that can publish to your universe's MessagingService can forge them; check what a message asks for.
 
 ## Keys and tokens
 
@@ -58,7 +67,7 @@ What stays open, by design or for now:
 | Open Cloud API key(s) | an env file outside the repo (`~/.config/typetorch/<game>.env`, named by `TYPETORCH_ENV_FILE`), or the real environment | in git, in chat, in an issue, in a screenshot, given to an agent |
 | Signing key files | `~/.config/typetorch/keys/<universeId>.key` and `.fallback.key` | inside any git work tree (the CLI refuses), copied to another machine you don't control |
 | Fleet and analytics admin token (`TYPETORCH_FLEET_TOKEN`, the server's `TT_ANALYTICS_ADMIN_TOKEN`) | your env file and the server's env file | anywhere a game server or a client can read it |
-| Ingest and send tokens (write-only) | the server-only ConfigService keys `TypeTorchFleet` and `TypeTorchAnalytics`, and `TYPETORCH_FLEET_INGEST_TOKEN` | in code, in a payload |
+| Ingest and send tokens (write-only) | the signed settings record's `fleet` and `analytics` fields (server only), and `TYPETORCH_FLEET_INGEST_TOKEN` | in code, in a payload, sent to a client |
 | Basin R2 token (SQL reads) | your PC only | in the game's settings |
 | Erasure webhook secret, fleet webhook URL, the analytics server's Open Cloud key | the analytics server's env file | in git |
 | remote-claude pairing codes | your terminal and clipboard | in a commit (they expire after one use or 3 hours) |

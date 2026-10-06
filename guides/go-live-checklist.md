@@ -13,9 +13,10 @@ Nothing here touches your live game until step 8, the cut-over.
       Discord or Slack [webhook](fleet-and-alerts.md#webhooks). On your PC behind a quick tunnel it stops when your PC
       does: no automatic rollback, no alerts. If you accept that for the first weeks, watch
       `bun run typetorch servers --watch` yourself after every deploy.
-- [ ] **MessagingService topics:** yours fit next to TypeTorch's 4 ([count them](../getting-started/migrate.md#messagingservice-topics)).
+- [ ] **Cross-server messages:** your topics moved to [`TypeTorch.messaging`](messaging.md) (or counted next to
+      TypeTorch's: [Cross-server messages](../getting-started/migrate.md#cross-server-messages)).
 - [ ] **Who gets the dev menu:** `members` (and `revoked`, `devBadgeId`) in `typetorch.json`, then
-      `bun run typetorch access push`, for the copy and later for the live game. Servers need kernel 0.3.6+ to see them
+      `bun run typetorch access push`, for the copy and later for the live game. Servers need kernel 0.3.8+ to see them
       ([who gets it](../getting-started/fresh-setup.md#11-the-dev-menu-and-who-gets-it)).
 
 ## 2. Copy the game

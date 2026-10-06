@@ -4,7 +4,7 @@ Every TypeTorch game has an in-game developer menu. It ships in the framework, s
 
 - **Open it:** the **DEV** button (devs only), `Ctrl+Shift+D`, or `/tt dev` in chat.
 - **Who:** devs only. The server decides and re-checks every request: the experience owner, `members` from
-  `typetorch.json` (after `typetorch access push`; kernel 0.3.6+), dev-badge holders, anyone in a Studio playtest;
+  `typetorch.json` (after `typetorch access push`; kernel 0.3.8+), dev-badge holders, anyone in a Studio playtest;
   minus `revoked`.
 - **Two roles:** **owner** (the experience's creator or the owning group's owner, plus `members` with the role
   `"owner"`) and **dev**. A `members` entry with the old role `"admin"` counts as a dev.
@@ -73,7 +73,8 @@ A sidebar group with a **Server | Client** toolbar:
 ### Server
 
 - **Status:** JobId, server type, uptimes, the build's health window ("3 errors / 30 s"), place version, players,
-  memory, the last deploy message and how long it took to arrive, recent swaps. **Attention** lists what needs a look, and the tab shows a **badge** (red for errors, yellow
+  memory, the last deploy message and how long it took to arrive, recent swaps, and (kernel 0.3.8) **Settings**: the
+  [signed settings record](settings.md) this server holds ("#12, 3m old (sig)"). **Attention** lists what needs a look, and the tab shows a **badge** (red for errors, yellow
   for warnings):
 
   | Attention item | Meaning |
@@ -96,7 +97,9 @@ A sidebar group with a **Server | Client** toolbar:
   | run_luau off | `LoadStringEnabled` is off (dev servers; right for a live game) |
   | Pinned / A/B experiment | this server holds a pinned build |
   | Studio: local payload | a Studio session runs your local code ([Testing in Studio](studio-testing.md)) |
-  | Registry, High memory | the registry can't be read; the server uses a lot of memory |
+  | Registry, High memory | the settings record can't be read; the server uses a lot of memory |
+  | No settings / Settings refused / Settings unreadable / Settings copy refused | the [settings record](settings.md) is missing, doesn't verify, can't be read, or a newer copy was refused while a good one is kept (`typetorch settings status`) |
+  | Messaging offline / Messaging busy / Messages dropped | [`TypeTorch.messaging`](messaging.md): the kernel can't subscribe, the universe's topic is near its rate limit, or messages were given up |
 
 - **Branch:** this server (type, branch, channel, the running build, whether it is pinned), the known branches, and the
   deployed builds, newest first, grouped by branch (tap a row to see what changed). A row's button says what it does:
@@ -119,7 +122,8 @@ server, logged, and rate-limited.
 - **Players:** each player's role, user id and ping, and the actions: Teleport to, Bring, Respawn, Kick (with a
   reason), Ban (1 h, 1 d, 7 d or permanent; alt accounts too by default).
 - **Servers:** the game's live servers (type, branch, channel, build, players, uptime), found by a MessagingService roll
-  call when you open the list (3 s, cached 15 s; no storage). A summary line per build says how many servers and
+  call when you open the list (3 s, cached 15 s; no storage; game code gets the same list from
+  [`TypeTorch.servers()`](messaging.md#the-server-list)). A summary line per build says how many servers and
   players run it. Join a server, open a **New server** on this branch, **Shut down** a server, **Migrate** this server.
 - **Load a build...:** pick a build, then where it runs:
   - **This server** (players stay);

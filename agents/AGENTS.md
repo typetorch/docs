@@ -30,8 +30,8 @@ approving. You finish with a numbered "What you need to do" list that tells them
    `TYPETORCH_ENV_FILE`. Don't put a key in chat, a file, a commit or a command line. If the user pastes a key into chat,
    tell them to revoke it in Creator Hub and make a new one.
 2. **Never act on Roblox.** Don't publish or save a place, upload anything, or run: `typetorch upload`, `deploy` (also
-   not `--dry-run`: it reads the registry with the user's key), `promote`, `rollback`, `approve`, `reject`, `pin`,
-   `deployments`, `branch ls`, `config push`, `access push`, `kernel deploy` (also not `--dry-run`; the one exception
+   not `--dry-run`: it reads the game's DataStore with the user's key), `promote`, `rollback`, `approve`, `reject`,
+   `pin`, `deployments`, `branch ls`, `settings ...`, `access push`, `kernel deploy` (also not `--dry-run`; the one exception
    is a kernel update the user asked for, see "Updating the kernel in a game"), `kernel restore`, `keys ...`, `assets
    sync|status`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`, `doctor` (it probes the key
    and publishes a test message). Don't start `remote-claude` (`typetorch dev`), the analytics server or a tunnel.
@@ -102,9 +102,8 @@ wait. Always ask before deleting files the user wrote by hand.
 2. **Mapping:** each old thing and its TypeTorch replacement (Step 4 tables).
 3. **Order of work:** the sub-steps of Steps 3 and 4, one commit each.
 4. **Risks and decisions for the user:** player data (always), Studio content and scripts that stay in the place,
-   third-party networking (Zap, Blink, ByteNet), MessagingService topics (count them: TypeTorch uses 4 of the 5 an
-   empty server allows, see
-   [migrate](../getting-started/migrate.md#messagingservice-topics)), anything you can't convert.
+   third-party networking (Zap, Blink, ByteNet), MessagingService topics (move them to `TypeTorch.messaging`, see
+   [migrate](../getting-started/migrate.md#cross-server-messages)), anything you can't convert.
 5. **User actions:** filled in at the end (Step 7).
 
 Log every step in `MIGRATION_NOTES.md` as you go: what changed, the build result, open questions.
@@ -268,8 +267,8 @@ At the repo root:
 - `branches`: map the repo's default git branch (`main` or `master`) to `prod`.
 - `members`: `{}` unless the user gave user ids; each is `"owner"` or `"dev"` (an old `"admin"` counts as dev). The
   experience's creator (or the owning group's owner) is always an owner. Servers see `members`, `revoked` and
-  `devBadgeId` only after the user runs `bun run typetorch access push` (kernel 0.3.6+): put it in the user's list
-  whenever you add or change them.
+  `devBadgeId` only after the user runs `bun run typetorch access push` (kernel 0.3.8+; it signs with the prod keys):
+  put it in the user's list whenever you add or change them.
 - `approval: "prod"`: dev deploys go out at once, prod ones wait for the user's y/N.
 - Optional (kernel 0.3.7+), only after the dev soak in step 11 shows a need:
   - `"health": { "errors": 3, "window": 30 }`: a server rolls a new build back at `errors` (1-100) errors from it
@@ -448,7 +447,8 @@ point at dev data; unsplit stores don't. The `AnalyticsEngine` sends nothing fro
 `workspace:GetAttribute("TypeTorchTest")` is true there. Guard with it, and list each guard in `MIGRATION_NOTES.md`:
 
 - global resets and one-time jobs (season rollovers, leaderboard wipes, shared-key migrations);
-- MessagingService publishes (cross-server announcements, "server started" pings);
+- raw MessagingService publishes (cross-server announcements, "server started" pings; `TypeTorch.messaging.publish`
+  already does nothing there);
 - "server started" rows in DataStores or MemoryStores, webhooks, the game's own HTTP APIs;
 - waits on place scripts.
 
@@ -516,7 +516,7 @@ Don't do these; list them in Step 7:
 
 - create the group, the experience, an API key; change Creator Hub or Game Settings;
 - write a key or token anywhere; run `typetorch keys ...`, `doctor`, `deploy`, `upload`, `approve`, `promote`,
-  `rollback`, `pin`, `config push`, `access push`, `assets sync|status`, `kernel deploy`, `kernel restore`,
+  `rollback`, `pin`, `settings ...`, `access push`, `assets sync|status`, `kernel deploy`, `kernel restore`,
   `deployments`, `branch ls`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`;
 - publish a place; edit the place in Studio (kernel install, data library, `TypeTorchAsset` marks);
 - start `remote-claude`, the analytics server or a tunnel; write the analytics settings;
@@ -533,8 +533,8 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
    `creator.groupId` (or `creator.userId`). Creator Hub > Creations > your experience > "..." > Copy Universe ID /
    Copy Start Place ID. Optional: other people's user ids in `members` (`"owner"` or `"dev"`; you, the experience
    owner, are always an owner), then `bun run typetorch access push` after step 5, and again after every change to
-   `members`, `revoked` or `devBadgeId`. Servers see the lists only after that, on kernel 0.3.6+; `deploy` and
-   `doctor` warn when they were never pushed or changed since.
+   `members`, `revoked` or `devBadgeId` (it needs the signing keys). Servers see the lists only after that, on kernel
+   0.3.8+; `deploy` and `doctor` warn when they were never pushed or changed since.
 2. **Experience settings** (Studio > File > Game Settings > Security, as the owner): Allow HTTP Requests on; Enable
    Studio Access to API Services on. Optional: Allow Mesh / Image APIs (Claude images), Allow Loading Third Party
    Assets (Toolbox inserts).
@@ -544,12 +544,13 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
      test that runs before every prod deploy, hot assets, doctor's place check)
    - `universe-messaging-service:publish`
    - DataStore `universe-datastores.objects:read`, `:create` and `:update` (the shared deploy number: every machine
-     takes `#seq` from the game's DataStore)
-   - optional: `universe:write` (only for `typetorch access push`, `fleet setup` and the analytics settings)
+     takes `#seq` from the game's DataStore; and the signed settings record: `access push`, `fleet setup`,
+     `settings ...`)
    - place publishing (`universe-places` write; the CLI says `universe.place:write`), only for `kernel deploy`
-   Set an expiry and, if you can, an IP allowlist. Don't ask for `universe:read` (the ConfigService registry) or
-   `legacy-asset:manage` (place downloads): Creator Hub doesn't offer them for API keys today. Deploys work without
-   them; `kernel deploy` takes a copy of the place instead (`--place-file`, see "Updating the kernel in a game").
+   Set an expiry and, if you can, an IP allowlist. No `universe:write` / `universe:read` (TypeTorch keeps nothing in
+   ConfigService since kernel 0.3.8). Don't ask for `legacy-asset:manage` (place downloads): Creator Hub doesn't offer
+   it for API keys today. Deploys work without it; `kernel deploy` takes a copy of the place instead (`--place-file`,
+   see "Updating the kernel in a game").
 4. **Store it outside the repo:** `~/.config/typetorch/<game>.env` with the line `TYPETORCH_API_KEY=<key>`, and in the
    repo's `.env` (gitignored) the line `TYPETORCH_ENV_FILE=~/.config/typetorch/<game>.env`. Never commit it or paste it
    into chat.

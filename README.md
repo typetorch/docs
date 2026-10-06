@@ -59,6 +59,9 @@ flowchart LR
 | [Branches and channels](guides/branches-and-channels.md) | `prod` and `dev`, private servers on a branch, `/tt new`, owners switching any server in place |
 | [Deploy and rollback](guides/deploy-and-rollback.md) | deploy, approval, safe deploys (cloud test, health window, `--wait` and automatic rollback, reports), promote, rollback, pins, kernel updates |
 | [Live servers and alerts](guides/fleet-and-alerts.md) | the fleet API, `typetorch servers`, `report`, `alerts`, server lost and stuck, webhooks |
+| [Settings](guides/settings.md) | the signed settings record: dev access, fleet, analytics and your own live values (`liveConfig`), `typetorch settings` |
+| [Cross-server messages](guides/messaging.md) | `TypeTorch.messaging` (one kernel-held topic, dev branches kept off prod, limits), `TypeTorch.servers()` |
+| [Loading screens](guides/loading-screen.md) | your own loading screen: `ClientReady`, `Holding`, `TypeTorchBootScreen`, `TypeTorchKernelScreen` |
 | [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, DuckDB or Basin, experiments, queries, node graphs, privacy, a local quick start |
 | [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
 | [Player data](guides/player-data.md) | the swap-safe data pattern, with a ProfileStore example, the cloud test and developer product receipts |
@@ -66,7 +69,7 @@ flowchart LR
 | [Hot assets](guides/hot-assets.md) | models and UI templates from the place, updated live with `hotAsset()` |
 | [Testing in Studio](guides/studio-testing.md) | run your local code in Studio with the real kernel |
 | [The dev menu](guides/dev-menu.md) | every tab, owners and devs, the `/tt` commands |
-| [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, roles, logs |
+| [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, roles, logs, messaging, live settings |
 | [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests |
 | [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server: Live and Code modes, screenshots, Toolbox |
 | [Security model](guides/security.md) | who can do what, dev access (`access push`), keys, signing, never publish secrets |

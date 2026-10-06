@@ -58,5 +58,6 @@ published place still holds it. Publish the place only through the kernel deploy
 ## Without a local payload
 
 A Studio playtest with no `ServerStorage.TypeTorchDev.Payload` boots an uploaded build: the head of
-`ServerStorage.TypeTorchDev`'s `Branch` attribute, or of `defaultBranch`. A number attribute `BootAssetId` boots one
-specific uploaded payload. These read the stored heads from DataStores, so they also need Studio API access.
+`ServerStorage.TypeTorchDev`'s `Branch` attribute, or of `defaultBranch`. It reads the stored heads from DataStores, so
+it also needs Studio API access. (Kernel 0.3.8 dropped the `BootAssetId` and `Registry` attributes, stand-ins for the
+old ConfigService registry.)
