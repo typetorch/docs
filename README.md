@@ -61,7 +61,8 @@ flowchart LR
 | [Live servers and alerts](guides/fleet-and-alerts.md) | the fleet API, `typetorch servers`, `report`, `alerts`, server lost and stuck, webhooks |
 | [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, DuckDB or Basin, experiments, queries, node graphs, privacy, a local quick start |
 | [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
-| [Player data](guides/player-data.md) | the swap-safe data pattern, with a ProfileStore example, the cloud test and developer product receipts |
+| [Player data](guides/player-data.md) | the swap-safe data pattern (DataHost runs the library's writes), ProfileStore and ProfileService examples, the cloud test and developer product receipts |
+| [State with charm](guides/state.md) | charm atoms across swaps: server atoms from `persist`, charm-sync over `createNetwork`, the client's hydrate request |
 | [Go-live checklist](guides/go-live-checklist.md) | moving a game with live players: prepare, a copy, a dev-branch soak, live tests, cut-over, what to do if it goes wrong |
 | [Hot assets](guides/hot-assets.md) | models and UI templates from the place, updated live with `hotAsset()` |
 | [Testing in Studio](guides/studio-testing.md) | run your local code in Studio with the real kernel |

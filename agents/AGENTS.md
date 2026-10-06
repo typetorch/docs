@@ -425,7 +425,8 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 - Code-built UI: build it in a controller; `this.trove.add(screenGui)`.
 - Studio-built UI stays in the place (StarterGui): tag what code touches (`Element:<Area>.<Name>`), drive it with
   `observeElement`. The payload can't carry ScreenGuis.
-- charm atoms live per generation; persist their plain values if they must survive a swap.
+- charm atoms live per generation; persist their plain values if they must survive a swap. charm-sync: the recipe in
+  [State with charm](../guides/state.md) (server atoms from persist, a `createNetwork` leaf, hydrate request in onStart).
 - React/Roact/Vide: mount in a controller, `this.trove.add(() => root.unmount())`.
 - `popIn`/`popOut`/`bump` (UIScale, never tweened `Size`); one `PopupQueue` for modals.
 
@@ -437,7 +438,7 @@ handles live in `persist`; load on join (re-attach after a swap), release on a r
 
 | The project uses | Do |
 |---|---|
-| ProfileStore / ProfileService | rewrite the data module as the guide's `DataService` (same store names and keys, `PlayerData_dev` for non-prod channels); the require of the place copy and the `DataHost` Script are **user steps** (Studio) |
+| ProfileStore / ProfileService | rewrite the data module as the guide's `DataService` for that library (same store names and keys, a `_dev` name for non-prod channels; loads, saves and releases as DataHost jobs); the place copy and the `DataHost` Script (with its job queue) are **user steps** (Studio) |
 | plain DataStores, small per-player values | keep them in the payload: read once per join, `UpdateAsync` on change, pending writes in `persist` (like the template's `BestService`) |
 | anything else (DataStore2, Lapis, custom sessions) | wrap it in a `@Service()` unchanged, and write in `MIGRATION_NOTES.md` that it must move to the place and follow the pattern before prod |
 
