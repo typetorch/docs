@@ -4,7 +4,7 @@
 
 Key facts for agents:
 - Never handle secrets (Open Cloud keys, signing key files) and never act on Roblox (deploy, publish, keys, approve): those are user steps. Follow agents/AGENTS.md.
-- Every module must be stoppable and restartable: everything in this.trove, no module-level state (persist plain data with this.ctx.persist; per-player maps with this.ctx.playerState), players via onPlayerAdded/observePlayers and characters via observeCharacters (replay on every swap), no RemoteEvents (createNetwork), no _G.
+- Every module must be stoppable and restartable: everything in this.trove, no module-level state (persist plain data with this.ctx.persist; per-player maps with this.ctx.playerState), players via onPlayerAdded/observePlayers (replays on every swap), characters via @rbxts/observers with the stop function in the trove, no RemoteEvents (createNetwork), no _G.
 - Modules reach each other by constructor injection; elsewhere (methods, plain classes, command handlers) with Dependency<T>() / TypeTorch.module<T>(), from onInit on (never in a constructor, field initializer or module top level). A dependency cycle is broken with Lazy<T> (a field `= Lazy<T>()`, or a constructor parameter with @typetorch/transformer 0.2.1+) or Dependency<T>() in a method.
 - The payload holds only Folders and ModuleScripts; entry points are src/server/boot.ts and src/client/boot.ts.
 - The template repo decides the toolchain (package.json, tsconfig.json, default.project.json, studio.project.json).

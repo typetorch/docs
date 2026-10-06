@@ -468,23 +468,37 @@ observeElement<BasePart>(this.trove, "Lava", (part, partTrove) => {
 });
 ```
 
-Characters, with the framework's `observeCharacters` (replays characters that already exist, after a swap too;
-`characterTrove` is cleaned when that character goes or the module stops):
+Characters, with [`@rbxts/observers`](https://www.npmjs.com/package/@rbxts/observers) (each observer returns a stop
+function for the trove):
 
 ```ts
-import { observeCharacters } from "@typetorch/framework";
+import Observers from "@rbxts/observers";
 
-observeCharacters(this.trove, (player, character, characterTrove) => {
-	const humanoid = character.WaitForChild("Humanoid") as Humanoid;
-	humanoid.WalkSpeed = 20;
-	characterTrove.connect(humanoid.Died, () => print(`${player.Name} died`));
-});
+this.trove.add(
+	Observers.observeCharacter((player, character) => {
+		const humanoid = character.WaitForChild("Humanoid") as Humanoid;
+		humanoid.WalkSpeed = 20;
+		return () => print(`${player.Name}'s character is gone`);
+	}),
+);
 ```
 
-On the client, `observeLocalCharacter(this.trove, (character, characterTrove) => ...)` does the same for the local
-player. They replace `Observers.observeCharacter` / `observeLocalCharacter`. Other observers from
-[`@rbxts/observers`](https://www.npmjs.com/package/@rbxts/observers) still work: put the stop function each one returns
-in the trove (`this.trove.add(Observers.observeTag(...))`).
+Characters without extra packages:
+
+```ts
+onPlayerAdded(player: Player, playerTrove: Trove) {
+	let characterTrove: Trove | undefined;
+	const onCharacter = (character: Model) => {
+		if (characterTrove) playerTrove.remove(characterTrove);
+		const trove = playerTrove.extend();
+		characterTrove = trove;
+		const humanoid = character.WaitForChild("Humanoid") as Humanoid;
+		trove.connect(humanoid.Died, () => print(`${player.Name} died`));
+	};
+	if (player.Character) task.spawn(onCharacter, player.Character);
+	playerTrove.connect(player.CharacterAdded, onCharacter);
+}
+```
 
 ### Rule 5: no global connections or loops outside troves
 
@@ -864,7 +878,7 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 - [ ] connections, instances, threads in troves; loops only in `onStart` or the trove
 - [ ] no module-level state; what must survive is in `persist` as plain data (per-player maps in `playerState`)
 - [ ] players via `onPlayerAdded` / `observePlayers`; join handlers idempotent
-- [ ] tags via `observeElement`, characters via `observeCharacters`
+- [ ] tags via `observeElement`, characters via `@rbxts/observers` (stop function in the trove)
 - [ ] no `_G` / `shared`
 - [ ] no RemoteEvent/RemoteFunction anywhere; one `createNetwork`
 - [ ] UI: code-built in troves, Studio-built tagged and observed

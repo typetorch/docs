@@ -346,7 +346,7 @@ left in the payload fails `typetorch build` with "the payload may hold only Fold
   kebab-case names (`coin.service.ts`).
 - Import only from `@typetorch/framework`: `Module`, `Service`, `Controller`, `OnInit`, `OnStart`, `OnStop`, `OnTick`,
   `OnPhysics`, `OnRender`, `OnPlayerAdded`, `TypeTorch`, `Dependency`, `Lazy`, `createNetwork`, `observePlayers`,
-  `observeCharacters`, `observeLocalCharacter`, `observeElement`, `isRealFrame`, `popIn`, `popOut`, `bump`,
+  `observeElement`, `isRealFrame`, `popIn`, `popOut`, `bump`,
   `PopupQueue`, `hotAsset`, `setNetworkLimits`, and `Modding`, `Reflect`, `t` for your own macros and decorators.
 - **If the project uses Flamework,** the migration is mostly a swap: the decorators, constructor injection,
   `Dependency<T>()` and the lifecycle interfaces keep their names, so change the imports to `@typetorch/framework`,
@@ -379,10 +379,9 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
    `Players.PlayerAdded.Connect`. They replay everyone on every swap, so **join handlers must be idempotent**: guard
    one-time effects (join rewards, welcome popups, "joined" analytics) with a persisted set. Work for real leaves only:
    `this.trove.connect(Players.PlayerRemoving, …)` (a `playerTrove` is also cleaned on every swap).
-4. **Tags and characters through observers:** `observeElement(this.trove, tag, (instance, elementTrove) => …)`;
-   characters with `observeCharacters(this.trove, (player, character, characterTrove) => …)` (client:
-   `observeLocalCharacter(this.trove, (character, characterTrove) => …)`), which replace `Observers.observeCharacter`
-   / `observeLocalCharacter`; other `@rbxts/observers` with their stop function in the trove.
+4. **Tags and characters through observers:** `observeElement(this.trove, tag, (instance, elementTrove) => …)`, or
+   `@rbxts/observers` with its stop function in the trove (`this.trove.add(Observers.observeCharacter(…))`), or (characters, no extra package) `player.Character` plus
+   `playerTrove.connect(player.CharacterAdded, …)`.
 5. **No global connections or loops outside troves.** A loop directly in `onStart` is fine. Elsewhere:
    `this.trove.add(task.spawn(() => { … }))`. Prefer `onTick` for per-frame work.
 6. **No `_G` or `shared`:** constructor injection, or `persist`.

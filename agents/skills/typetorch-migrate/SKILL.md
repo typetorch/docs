@@ -75,8 +75,8 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    - **Flamework projects are mostly a swap:** same decorator and lifecycle names, imports from
      `@typetorch/framework` (also `Modding`, `Reflect`, `t`; custom decorators use
      `@metadata typetorch:parameters injectable`), `extends Module` + `super()`, `@flamework/networking` →
-     `createNetwork` (`predict` → `emit`, `invokeWithTimeout` in seconds), components → observers,
-     `Observers.observeCharacter` → `observeCharacters`. `Dependency<T>()` stays (from `@typetorch/framework`): the
+     `createNetwork` (`predict` → `emit`, `invokeWithTimeout` in seconds), components → observers.
+     `Dependency<T>()` stays (from `@typetorch/framework`): the
      cycle breaker (with `Lazy<T>`) and the way plain classes reach modules, from `onInit` on; move calls in
      constructors, field initializers and module top level into methods. Then `bun remove` every `@flamework/*` and
      `rbxts-transformer-flamework`, delete `flamework.build`, `flamework.json`, `include/flamework`. Type ids changed
@@ -85,8 +85,8 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
      `this.ctx.persist("key.v1", () => init)` with plain data only; per-player maps via
      `this.ctx.playerState("key.v1", init)`, removed on a real leave); players via `onPlayerAdded(player, playerTrove)` /
      `observePlayers`, idempotent (persisted set for one-time effects), real leaves via
-     `this.trove.connect(Players.PlayerRemoving, …)`; tags via `observeElement`, characters via
-     `observeCharacters` / `observeLocalCharacter`, other `@rbxts/observers` with the stop function in the trove; loops only in `onStart` or `this.trove.add(task.spawn(…))`; no `_G`/`shared`;
+     `this.trove.connect(Players.PlayerRemoving, …)`; tags/characters via `observeElement` or `@rbxts/observers`
+     (stop function in the trove); loops only in `onStart` or `this.trove.add(task.spawn(…))`; no `_G`/`shared`;
      `task.*` through the trove; `onStop` runs at shutdown (kernel 0.3.2) but not when a server closes mid-swap, so
      it is for short extras, never the only place data is saved (a `BindToClose` that must stay binds once per
      server); keep `onInit` short (a new server's boot waits about 6 s).
