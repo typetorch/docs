@@ -446,7 +446,7 @@ handles live in `persist`; load on join (re-attach after a swap), release on a r
 
 | The project uses | Do |
 |---|---|
-| ProfileStore / ProfileService | rewrite the data module as the guide's `DataService` for that library (same store names and keys, a `_dev` name for non-prod channels; loads, saves and releases as DataHost jobs); the place copy and the `DataHost` Script (with its job queue) are **user steps** (Studio) |
+| ProfileStore / ProfileService | rewrite the data module as the guide's `DataService` for that library (same store names and keys, a `_dev` name for non-prod channels; loads, saves and releases as DataHost jobs, or with `TypeTorch.runDetached` on kernel 0.3.8+: the guide's two options); the place copy and the `DataHost` Script are **user steps** (Studio) |
 | plain DataStores, small per-player values | keep them in the payload: read once per join, `UpdateAsync` on change, pending writes in `persist` (like the template's `BestService`) |
 | anything else (DataStore2, Lapis, custom sessions) | wrap it in a `@Service()` unchanged, and write in `MIGRATION_NOTES.md` that it must move to the place and follow the pattern before prod |
 

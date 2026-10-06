@@ -20,8 +20,10 @@ old generation, and the new one would load every profile again while the old ses
    again.
 3. **Load on join, release on a real leave.** `onPlayerAdded` replays everyone after a swap, so it reuses a live
    session. Release only on `Players.PlayerRemoving`, never on a swap.
-4. **Library calls that write run in `DataHost`:** starting or loading a session, `Save()`, ending or releasing it. Your
-   code hands them to DataHost as jobs, and a job puts its result into `persist` itself.
+4. **Library calls that write run where a deploy can't stop them:** starting or loading a session, `Save()`, ending or
+   releasing it. Your code hands them off as jobs, to DataHost's queue (any kernel) or to `TypeTorch.runDetached`
+   (kernel 0.3.8+), see [Two ways to run the jobs](#two-ways-to-run-the-jobs). A job puts its result into `persist`
+   itself.
 5. **`onSwapOut` flushes only what the new code needs** (for example values you keep outside `profile.Data`). The
    profiles stay open.
 
@@ -40,11 +42,45 @@ against both libraries' real code):
 - a `Save()` cut off: with ProfileStore, every later save of that profile waits forever, so the rest of the session is
   lost; ProfileService does the same when the save was waiting out its 7 s write cooldown.
 
-A job runs on DataHost's thread, which no deploy stops. A job may finish after the generation that queued it has
-stopped, so it uses only the library, `persist` tables and Roblox APIs (never a module's trove or `this`).
+A job runs on a thread no deploy stops (DataHost's, or the kernel's). A job may finish after the generation that
+queued it has stopped, so it uses only the library, `persist` tables and Roblox APIs (never a module's trove or
+`this`).
 
 `persist` normally takes plain data only. Handles from a library in the place are the exception: they don't belong to
 a generation. Never store your own functions in them, and connect to their signals through a trove.
+
+## Two ways to run the jobs
+
+Both keep a library call running through a deploy. The examples below use **A**; switching to **B** changes two small
+pieces of each example (shown after it).
+
+| | A: DataHost's job queue | B: `TypeTorch.runDetached` |
+|---|---|---|
+| Kernel | any | 0.3.8+ |
+| DataHost | requires the library **and** runs the queue (`library.TypeTorchJobs`) | only requires the library (no queue) |
+| The job runs on | DataHost's thread, from the next frame | a kernel thread, at once |
+| Errors | DataHost's script errors in the output | the dev menu's Logs, with the build that queued the job; the Promise rejects |
+| Limits | none | 256 jobs at once per server; one past 60 s is logged and flagged in Server > Status |
+| Costs | changing the queue is a place publish | a job keeps the old build's code in memory until it ends |
+
+**Pick A** when your place may run a kernel before 0.3.8, or you already have DataHost's queue. **Pick B** when the
+place runs kernel 0.3.8 or newer and you'd rather keep DataHost to its one `require`: no queue to maintain, and
+failures show up next to the build that caused them. Either way DataHost still requires the library first (its
+autosave loop and shutdown hook must belong to the place).
+
+With B, the job is the same function, handed to the kernel instead of the queue:
+
+```ts
+/** Runs a library call that writes on a kernel thread: a deploy can't cut it off (kernel 0.3.8+). */
+private onHost(job: () => void) {
+	TypeTorch.runDetached(job).catch((err) => warn(`[data] a data job failed: ${err}`));
+}
+```
+
+`runDetached` returns a Promise that settles while this build runs; after a swap the result is dropped, which is why a
+job writes what matters into `persist` itself (the examples' jobs already do). On a kernel before 0.3.8 it throws
+"needs kernel 0.3.8; use the DataHost job queue". To support both, check `TypeTorch.features.runDetached` and fall
+back to the queue.
 
 ## The DataHost script
 
@@ -70,6 +106,17 @@ module:SetAttribute("Warm", true)
 
 A job starts on the next frame. The payload finds the queue as `TypeTorchJobs` on the same library table (a module is
 required once per server, so DataHost and every generation share it).
+
+With [option B](#two-ways-to-run-the-jobs) (`TypeTorch.runDetached`, kernel 0.3.8+), DataHost only requires the
+library:
+
+```lua
+-- ServerScriptService.DataHost (option B: the payload runs its library calls with TypeTorch.runDetached)
+-- Requires the data library once at server start, so its autosave loop and shutdown hook belong to this script.
+local module = game:GetService("ServerStorage"):WaitForChild("Packages"):WaitForChild("ProfileStore")
+require(module)
+module:SetAttribute("Warm", true)
+```
 
 ## Example: ProfileStore
 
@@ -263,6 +310,22 @@ generation, so a change made just before a swap is not lost.
   roblox-ts emits `ProfileStore:New(...)`, and ProfileStore fails with `Invalid or missing "store_name"`.
 - **Changing what you keep in `persist`:** keep the key while sessions are open under it (a new key would load every
   profile again). Fill new fields in when they're missing, like `starting` and `library` above.
+
+**With option B** ([`TypeTorch.runDetached`](#two-ways-to-run-the-jobs), kernel 0.3.8+), two changes: DataHost without
+the queue (above), and in the service:
+
+```ts
+// profileStore(): drop the TypeTorchJobs check (the queue doesn't exist)
+const library = require(module) as ProfileStoreModule;
+return library;
+
+// DataService: the jobs go to the kernel instead of DataHost's queue
+private onHost(job: () => void) {
+	TypeTorch.runDetached(job).catch((err) => warn(`[data] a data job failed: ${err}`));
+}
+```
+
+Everything else stays: the jobs, `starting`, `grantOnce` (its `Save()` request is a job too) and `release`.
 
 ### The cloud test
 
@@ -511,7 +574,9 @@ export class DataService extends Module implements OnInit, OnPlayerAdded {
 
 The [ProfileStore notes](#in-the-payload) apply here too (`loadOrder`, `import type`, `this: void`, the cloud test).
 `profileService()` is the same getter as `profileStore()` with the other name: the module path, the `Warm` wait and
-the `TypeTorchTest` line.
+the `TypeTorchTest` line. **Option B** is the same two changes as for ProfileStore: DataHost without the queue (with
+`ProfileService` on the `WaitForChild` line), no `TypeTorchJobs` check in `profileService()`, and `onHost` calling
+`TypeTorch.runDetached(job)`.
 
 ### Developer products with ProfileService
 
@@ -544,7 +609,8 @@ within 30 s.
   `RunService.IsStudio()` doesn't tell a dev branch from prod.
 - `ProfileService.GetProfileStore(...)` at module top level moves into `onInit`, kept in `persist` (a second store
   object for the same name would load profiles this server already has).
-- `Players.PlayerAdded.Connect` becomes `onPlayerAdded`; `Players.PlayerRemoving` releases through a DataHost job.
+- `Players.PlayerAdded.Connect` becomes `onPlayerAdded`; `Players.PlayerRemoving` releases through a job (DataHost or
+  `runDetached`).
 - Delete `game.BindToClose` loops that release every profile: ProfileService releases them on close by itself (it runs
   in DataHost), and a generation's `BindToClose` may not run at all.
 - Other writes on leave (ordered DataStores for leaderboards, analytics) can stay in your code: a cut-off write is just
@@ -559,8 +625,9 @@ within 30 s.
 
 - **Split store names by channel** (`PlayerData` / `PlayerData_dev`): dev branches run in the same universe.
 - **Don't wait on place scripts in the cloud test** (`workspace:GetAttribute("TypeTorchTest")`): they never run there.
-- **Run the library's writes in the place's thread** (DataHost jobs): sessions, saves, releases. A call cut off by a
-  deploy can block the library for that player on this server.
+- **Run the library's writes where a deploy can't stop them** (DataHost jobs, or `TypeTorch.runDetached` on kernel
+  0.3.8+): sessions, saves, releases. A call cut off by a deploy can block the library for that player on this
+  server.
 - **Don't rename stores or reshape saved data in a hot deploy** without a migration. Write migrations as code that
   upgrades `Data` in place, keyed by a version field you store in it, and keep old fields readable: a rollback runs the
   older code against data the newer code may already have touched.

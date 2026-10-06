@@ -145,6 +145,30 @@ TypeTorch.setServerInfo({ mode: "ranked" }); // public fields of this server, in
 
 Kernel 0.3.8+. See [Cross-server messages and the server list](messaging.md).
 
+## Detached jobs (server only)
+
+```ts
+// A library call a deploy must not cut off halfway (a ProfileStore load, save or release).
+const sessions = this.ctx.persist("data.sessions.v1", () => ({ profiles: new Map<number, Profile>() }));
+TypeTorch.runDetached(() => {
+	const profile = store.StartSessionAsync(`Player_${userId}`);
+	if (profile) sessions.profiles.set(userId, profile); // in persist: the next build finds it after a swap
+	return profile;
+}).catch((err) => warn(`load failed: ${err}`));
+```
+
+- `fn` runs on a thread the kernel owns: this build's stop, and its hard stop, can't kill it. Kernel 0.3.8+
+  (`TypeTorch.features.runDetached`); older kernels throw "needs kernel 0.3.8; use the DataHost job queue".
+- The Promise settles while this build runs. After a swap the result is dropped, so a job whose result must survive
+  writes it into `persist` itself.
+- A job keeps this build's code and whatever its closures reference in memory until it ends. Keep jobs short; don't
+  use `this` or a trove inside them.
+- Errors reject the Promise and appear in the dev menu's Logs with the build that started the job; they never count
+  toward the build's health window. At most 256 jobs run at once per server (then it throws); a job past 60 s is
+  logged and flagged in Server > Status ("Detached jobs").
+
+See [Player data: two ways to run the jobs](player-data.md#two-ways-to-run-the-jobs).
+
 ## Live settings (server only)
 
 ```ts
