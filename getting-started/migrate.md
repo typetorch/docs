@@ -559,6 +559,23 @@ Use `onStop` for short extras.
 On older kernels, `game.BindToClose` can't be unbound, so bind it at most once per server (guard it with a persisted
 flag).
 
+### Rule 9: packages and libraries follow the same rules
+
+It doesn't matter who wrote the code: a package from npm or a vendored library that runs inside a generation is
+stopped and loaded again on every swap, like your own modules. The same two rules apply to it:
+
+- what must survive a swap goes in `persist`;
+- everything it creates (Instances, ScreenGuis, RenderStep bindings, connections, loops) is destroyed through a trove
+  when the generation stops.
+
+Examples:
+
+- **TopbarPlus:** destroy your icons in the trove: `const icon = new Icon(); this.trove.add(() => icon.destroy());`.
+- **CameraShaker:** it binds a fixed RenderStep name, so stop it on stop: `this.trove.add(() => shaker.Stop());`
+  (or `this.trove.add(() => RunService.UnbindFromRenderStep("CameraShaker"))`).
+- **A library with its own registry** (zones, hitboxes): destroy what you registered through the trove, and keep only
+  what must outlive the swap (plain data such as ids or settings) in `persist`, then hand it back in `onInit`.
+
 ## 6. Networking
 
 Replace every RemoteEvent and RemoteFunction with one typed network. The kernel owns the only two remotes; a generation
