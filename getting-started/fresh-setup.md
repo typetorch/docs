@@ -128,9 +128,15 @@ In Studio, with the place open: **File > Game Settings > Security**.
 | Allow Mesh / Image APIs | optional | only for images Claude shows in the chat; the owner must be 13+ and ID-verified |
 | Allow Loading Third Party Assets | optional | only for remote-claude Toolbox inserts. It applies to every server of the experience |
 
-`ServerScriptService.LoadStringEnabled` is not in Game Settings. The kernel place file sets it, because remote-claude's
-`run_luau` needs it on dev servers (prod servers never run it). If you won't use remote-claude, you may turn it off in
-Studio's Properties after step 8; a later `kernel deploy --replace-place` turns it on again.
+`ServerScriptService.LoadStringEnabled` (not in Game Settings, in Studio's Properties) turns `loadstring` on for the
+whole place. Only remote-claude's `run_luau` needs it, on dev servers. **Turn it on only in a place where you want
+`run_luau` (a test place); keep it off in a live game.**
+
+- `kernel deploy` patches (`--place-file`, CLI after 0.7.2) leave your place's value as it is.
+- `kernel deploy --replace-place` (step 8) publishes what the kernel's place file says: on, up to kernel 0.3.5. Turn
+  it off in Studio afterwards if this place won't use `run_luau`.
+- A `--loadstring` flag to turn it on on purpose is **planned** (with kernel 0.3.6).
+- `bun run typetorch doctor` reports it (`loadstring`).
 
 **Check:** the settings stay on after you reopen Game Settings.
 
@@ -164,7 +170,7 @@ Remove the template's `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey`:
 | `defaultBranch` | the branch public servers run (`prod`) |
 | `branches` | git branch → TypeTorch branch. Unlisted git branches map to their own name, lowercased, `/` → `-` |
 | `channels` | TypeTorch branch → `prod` or `dev`. Unlisted: `prod` for `defaultBranch`, `dev` for everything else |
-| `members` | Roblox user id → `owner` or `dev` (who gets the dev menu; see step 11). The old role `admin` counts as `dev` |
+| `members` | Roblox user id → `owner` or `dev` (who gets the dev menu; see step 11). The old role `admin` counts as `dev`. Servers see it after `typetorch access push` |
 | `revoked` | optional: user ids that lose dev access |
 | `devBadgeId` | optional badge id; its holders are devs |
 | `approval` | `all` (default): every deploy waits for your y/N; `prod`: only prod-channel deploys do; `none` |
@@ -192,17 +198,17 @@ Add these permissions and select your experience where asked:
 | CLI job | Commands | Scopes |
 |---|---|---|
 | assets | `deploy`, `upload`, `promote` (of an unfinished upload), `test --cloud`, `keys init` / `rotate` (the key asset), `assets sync` / `status`, `doctor` | `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (the cloud test that runs before every prod deploy, hot assets, doctor's place check) |
-| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `fleet setup` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number, below); `universe:write` only for `fleet setup` and the analytics settings |
+| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `fleet setup`, `access push` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number, below); `universe:write` only for `fleet setup`, `access push` and the analytics settings |
 | place | `kernel deploy` only | place publishing (`universe-places` write; the CLI calls it `universe.place:write`), and `asset:read` to record the place version |
 
 - **The shared deploy number.** Every machine that deploys (your PC, a second PC, remote-claude) takes the next
   deploy number (`#seq`) from the game's DataStore: the kernel's records of past deploys, and a counter the CLI claims
   atomically. That's what the DataStore scopes are for. Without them a deploy uses only your PC's log (fine while you
   deploy from one machine), and `--require-shared-seq` stops instead.
-- **Not available to API keys today:** `universe:read` (it reads the ConfigService registry, where `config push` would
-  put `members`) and `legacy-asset:manage` (`kernel deploy` downloading the place; pass a copy instead, see step 8).
-  Creator Hub doesn't offer them for API keys. Deploys don't need them: game servers keep the branch heads from the
-  deploy messages themselves.
+- **Not available to API keys today:** `universe:read` (it reads the ConfigService registry; `members` go through
+  `access push` instead, which needs only `universe:write`) and `legacy-asset:manage` (`kernel deploy` downloading the
+  place; pass a copy instead, see step 8). Creator Hub doesn't offer them for API keys. Deploys don't need them: game
+  servers keep the branch heads from the deploy messages themselves.
 - Set an expiry date, and add your IP under accepted IP addresses if you can.
 - Everything runs from your machine. TypeTorch never uses GitHub Actions or other hosted CI, so the key never has to
   leave your PC.
@@ -342,16 +348,29 @@ play. More in [Branches and channels](../guides/branches-and-channels.md).
 Devs open the dev menu with the **DEV** button, `Ctrl+Shift+D` or `/tt dev`. A player is a dev when they are:
 
 - the experience owner (the user creator, or rank 255 in the owning group): always;
-- in `members` (`owner` or `dev`; an old `admin` counts as `dev`), once you ran `bun run typetorch config push` (needs `universe:read` and
-  `universe:write`; `universe:read` can't be granted to API keys today, so this waits until Roblox offers it);
-- a holder of the `devBadgeId` badge (also through `config push`; awarding the badge in game is **planned**);
+- in `members` (`owner` or `dev`; an old `admin` counts as `dev`), once you published the lists (below);
+- a holder of the `devBadgeId` badge (published the same way; awarding the badge in game is **planned**);
 - anyone in a Studio playtest;
 
 and not in `revoked`. **Owners** are the experience's creator (or the owning group's owner) and `members` with the role
 `owner`: they also get the Manage tab and can switch any server in place. Prod-channel servers (every public server)
 show the menu read-only. Tabs: [The dev menu](../guides/dev-menu.md).
 
-**Check:** as the owner you see the DEV button in game. After `config push`, a member sees it too.
+**Publish the lists** after every change to `members`, `revoked` or `devBadgeId`:
+
+```sh
+bun run typetorch access push
+```
+
+- It writes the server-only ConfigService key `TypeTorchAccess` (the deploy key needs `universe:write`). Game code
+  can't write ConfigService, so nothing in your game can make itself a dev. `--dry-run` shows the value first.
+- Servers need **kernel 0.3.6+** to read it. Running servers pick a push up within about a minute of ConfigService
+  delivering it.
+- Before the first push, only the experience owner is a dev. After a change, servers keep the old lists until the
+  next push (a revoked dev stays a dev). `deploy` and `doctor` (`dev access`) warn about both;
+  `bun run typetorch access status` compares `typetorch.json` with the last push.
+
+**Check:** as the owner you see the DEV button in game. After `access push`, a member sees it too.
 
 ## 12. `/tt` chat commands
 

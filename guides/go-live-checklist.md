@@ -14,6 +14,9 @@ Nothing here touches your live game until step 8, the cut-over.
       does: no automatic rollback, no alerts. If you accept that for the first weeks, watch
       `bun run typetorch servers --watch` yourself after every deploy.
 - [ ] **MessagingService topics:** yours fit next to TypeTorch's 4 ([count them](../getting-started/migrate.md#messagingservice-topics)).
+- [ ] **Who gets the dev menu:** `members` (and `revoked`, `devBadgeId`) in `typetorch.json`, then
+      `bun run typetorch access push`, for the copy and later for the live game. Servers need kernel 0.3.6+ to see them
+      ([who gets it](../getting-started/fresh-setup.md#11-the-dev-menu-and-who-gets-it)).
 
 ## 2. Copy the game
 
@@ -45,8 +48,9 @@ Nothing here touches your live game until step 8, the cut-over.
       `bun run typetorch kernel deploy --dry-run --install --place-file <file> --base <version> --config typetorch.copy.json`.
       Read the report: only the kernel folders and the kernel's settings change.
 - [ ] The same command without `--dry-run` (y/N). Join: F9 shows `[TypeTorch] kernel <version>`.
-- [ ] `ServerScriptService.LoadStringEnabled`: the install turns it on, for remote-claude's `run_luau`. If you won't
-      use that on this game, turn it off in Studio after every kernel install.
+- [ ] `ServerScriptService.LoadStringEnabled` stays **off** in the live game (`bun run typetorch doctor` reports it).
+      Only a test place where you want remote-claude's `run_luau` turns it on. CLIs up to 0.7.2 turn it on during the
+      install: check it in Studio, turn it off, publish.
 - [ ] Remove the old game scripts in Studio, publish.
 
 ## 6. Soak on the copy (3 to 5 days)
@@ -72,7 +76,10 @@ Then run every live test on the copy:
       the right build.
 - [ ] **Player data:** join, earn, deploy twice while playing, leave, rejoin another server, shut that server down
       from Manage > Servers, rejoin. Nothing lost. Then roll back to older code against data the newer code touched.
-- [ ] **Dev data:** after a dev session, Creator Hub's DataStore Manager shows writes only in the `_dev` stores.
+- [ ] **Dev data:** after a dev session and after a prod deploy's cloud test, Creator Hub's DataStore Manager shows
+      writes only in the `_dev` stores.
+- [ ] **Dev access:** a member gets the dev menu; add one to `revoked`, `access push`, and within about a minute they
+      lose it.
 - [ ] **Purchases:** open a developer product prompt, deploy, buy while the swap runs. One grant, saved; rejoin: no
       second grant. Check a game pass after a swap.
 - [ ] **Kernel undo:** `bun run typetorch kernel restore <the file you downloaded in step 5>` once, then install again.
@@ -95,7 +102,8 @@ Then run every live test on the copy:
 
 - [ ] 1. Announce a short maintenance window in the game.
 - [ ] 2. In the live place: add the data library and `DataHost`, install the kernel by patch (step 5, with the live
-      config), keep the old scripts, publish. Nothing changes for players: the kernel waits, the old code runs.
+      config), check `LoadStringEnabled` is off, keep the old scripts, publish. Nothing changes for players: the
+      kernel waits, the old code runs. `bun run typetorch access push` with the live config.
 - [ ] 3. In Studio, remove the old scripts. **Don't publish yet.**
 - [ ] 4. `bun run typetorch deploy` from `main`: cloud test, y/N, signed. Servers on the old place version have no
       kernel and ignore it.

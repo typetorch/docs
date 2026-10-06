@@ -31,8 +31,8 @@ approving. You finish with a numbered "What you need to do" list that tells them
    tell them to revoke it in Creator Hub and make a new one.
 2. **Never act on Roblox.** Don't publish or save a place, upload anything, or run: `typetorch upload`, `deploy` (also
    not `--dry-run`: it reads the registry with the user's key), `promote`, `rollback`, `approve`, `reject`, `pin`,
-   `deployments`, `branch ls`, `config push`, `kernel deploy` (also not `--dry-run`; the one exception is a kernel
-   update the user asked for, see "Updating the kernel in a game"), `kernel restore`, `keys ...`, `assets
+   `deployments`, `branch ls`, `config push`, `access push`, `kernel deploy` (also not `--dry-run`; the one exception
+   is a kernel update the user asked for, see "Updating the kernel in a game"), `kernel restore`, `keys ...`, `assets
    sync|status`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`, `doctor` (it probes the key
    and publishes a test message). Don't start `remote-claude` (`typetorch dev`), the analytics server or a tunnel.
    These go in the final list.
@@ -51,7 +51,8 @@ approving. You finish with a numbered "What you need to do" list that tells them
    (`typetorch test --cloud`, automatic before prod deploys), `onStop` at server shutdown (kernel 0.3.2), the fleet API
    (`typetorch servers`, `report`, `alerts`) and the optional `AnalyticsEngine` (framework 0.3.0; its backend is
    `@typetorch/analytics`, a git repo, not on npm). Owners switching any server in place needs kernel 0.3.4 and
-   framework 0.3.2 (both on npm). Planned: `typetorch init`, content packs, the typed asset map from files,
+   framework 0.3.2 (both on npm). Dev access lists through `typetorch access push` need a CLI newer than 0.7.2 and
+   kernel 0.3.6 on the servers. Planned: `typetorch init`, content packs, the typed asset map from files,
    `typetorch test --unit`, `/tt grant`/`revoke`, a web analytics explorer.
 9. **No GitHub Actions, ever** (the owner's rule: they are a supply-chain risk). Don't add `.github/workflows`, actions,
    or any hosted CI, and don't suggest them. Builds, cloud tests and deploys run on the user's machine.
@@ -266,7 +267,9 @@ At the repo root:
   the placeholder `1`.
 - `branches`: map the repo's default git branch (`main` or `master`) to `prod`.
 - `members`: `{}` unless the user gave user ids; each is `"owner"` or `"dev"` (an old `"admin"` counts as dev). The
-  experience's creator (or the owning group's owner) is always an owner.
+  experience's creator (or the owning group's owner) is always an owner. Servers see `members`, `revoked` and
+  `devBadgeId` only after the user runs `bun run typetorch access push` (kernel 0.3.6+): put it in the user's list
+  whenever you add or change them.
 - `approval: "prod"`: dev deploys go out at once, prod ones wait for the user's y/N.
 - Never copy the template's `signingPublicKeys`, `keyAssetId` or `fallbackPublicKey`: they belong to the template's
   game. `typetorch keys init` writes the user's.
@@ -432,10 +435,11 @@ list.
   returns `PurchaseGranted` only once a save holds it (the guide's `grantOnce` and `ReceiptService`). Never only in
   `persist`. Put "buy a product while a deploy runs" in the user's list.
 
-**The cloud test runs game code against prod data.** Every prod deploy boots the build in a headless Luau Execution
-task: `onInit` and `onStart` of every module, on the prod channel, with real DataStores, MemoryStores and HTTP, no
-players, no place scripts. `workspace:GetAttribute("TypeTorchTest")` is true there. Guard with it, and list each guard
-in `MIGRATION_NOTES.md`:
+**The cloud test runs game code against the live game's data.** Every prod deploy boots the build in a headless Luau
+Execution task: `onInit` and `onStart` of every module, with the real DataStores, MemoryStores, MessagingService and
+HTTP, no players, no place scripts. `TypeTorch.channel` is `dev` there (CLI after 0.7.2), so stores split by channel
+point at dev data; unsplit stores don't. The `AnalyticsEngine` sends nothing from the test (framework after 0.3.2).
+`workspace:GetAttribute("TypeTorchTest")` is true there. Guard with it, and list each guard in `MIGRATION_NOTES.md`:
 
 - global resets and one-time jobs (season rollovers, leaderboard wipes, shared-key migrations);
 - MessagingService publishes (cross-server announcements, "server started" pings);
@@ -506,8 +510,8 @@ Don't do these; list them in Step 7:
 
 - create the group, the experience, an API key; change Creator Hub or Game Settings;
 - write a key or token anywhere; run `typetorch keys ...`, `doctor`, `deploy`, `upload`, `approve`, `promote`,
-  `rollback`, `pin`, `config push`, `assets sync|status`, `kernel deploy`, `kernel restore`, `deployments`,
-  `branch ls`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`;
+  `rollback`, `pin`, `config push`, `access push`, `assets sync|status`, `kernel deploy`, `kernel restore`,
+  `deployments`, `branch ls`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`;
 - publish a place; edit the place in Studio (kernel install, data library, `TypeTorchAsset` marks);
 - start `remote-claude`, the analytics server or a tunnel; write the analytics settings;
 - push to a remote; add GitHub Actions or any CI workflow.
@@ -521,7 +525,10 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
 
 1. **Fill in the ids** in `typetorch.json` (replace the placeholder `1`s): `universeId`, `placeId`, and
    `creator.groupId` (or `creator.userId`). Creator Hub > Creations > your experience > "..." > Copy Universe ID /
-   Copy Start Place ID. Optional: your user id in `members` as `"owner"`.
+   Copy Start Place ID. Optional: other people's user ids in `members` (`"owner"` or `"dev"`; you, the experience
+   owner, are always an owner), then `bun run typetorch access push` after step 5, and again after every change to
+   `members`, `revoked` or `devBadgeId`. Servers see the lists only after that, on kernel 0.3.6+; `deploy` and
+   `doctor` warn when they were never pushed or changed since.
 2. **Experience settings** (Studio > File > Game Settings > Security, as the owner): Allow HTTP Requests on; Enable
    Studio Access to API Services on. Optional: Allow Mesh / Image APIs (Claude images), Allow Loading Third Party
    Assets (Toolbox inserts).
@@ -532,7 +539,7 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
    - `universe-messaging-service:publish`
    - DataStore `universe-datastores.objects:read`, `:create` and `:update` (the shared deploy number: every machine
      takes `#seq` from the game's DataStore)
-   - optional: `universe:write` (only for `typetorch fleet setup` and the analytics settings)
+   - optional: `universe:write` (only for `typetorch access push`, `fleet setup` and the analytics settings)
    - place publishing (`universe-places` write; the CLI says `universe.place:write`), only for `kernel deploy`
    Set an expiry and, if you can, an IP allowlist. Don't ask for `universe:read` (the ConfigService registry) or
    `legacy-asset:manage` (place downloads): Creator Hub doesn't offer them for API keys today. Deploys work without
@@ -553,8 +560,11 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
      the same command without `--dry-run` publishes after a y/N. Keep the copy: `kernel restore <file>` undoes it. (Or
      by hand: `kernel deploy --dry-run`, open `.typetorch/place.rbxl` in Studio, copy
      `ServerScriptService.TypeTorchKernel`, `ReplicatedStorage.TypeTorchKernelShared` and
-     `ReplicatedFirst.TypeTorchKernelClient` into your place, turn on ServerScriptService.LoadStringEnabled if you want
-     remote-claude, File > Publish to Roblox.) The kernel waits idle until the first deploy.
+     `ReplicatedFirst.TypeTorchKernelClient` into your place, File > Publish to Roblox.) The kernel waits idle until
+     the first deploy.
+   - `ServerScriptService.LoadStringEnabled`: keep it **off** in this game. Turn it on only in a test place where you
+     want remote-claude's `run_luau`. `kernel deploy` patches leave it as it is (older CLIs, up to 0.7.2, turn it on:
+     check it in Studio); `doctor` reports it.
    - then, in Studio, remove the old scripts listed in MIGRATION_NOTES.md and publish, just before the first deploy.
 8. **Player data** (if listed in MIGRATION_NOTES.md): in Studio put the library at `ServerStorage.Packages.<Name>` and
    add the `ServerScriptService.DataHost` Script from the Player data guide; publish.
@@ -575,8 +585,8 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
     (`typetorch fleet setup`, then `servers`, `report`, `alerts`, and automatic rollback after bad deploys);
     [analytics](https://github.com/typetorch/docs/blob/main/guides/analytics.md);
     [hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md);
-    [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md); once Roblox lets API keys read
-    ConfigService (`universe:read`, OAuth only today), `bun run typetorch config push` (members).
+    [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md) (in a test place: it needs
+    `LoadStringEnabled` for `run_luau`).
 ```
 
 ### Final report template

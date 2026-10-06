@@ -71,7 +71,9 @@ contents for each.
 6. **`studio.project.json`** from the template, for [testing in Studio](../guides/studio-testing.md).
 7. **`.gitignore`**: `out/`, `include/`, `.typetorch/`, `src/shared/build.ts`, `.payload.gen.project.json`,
    `.tsconfig.typetorch.json`, `.env`, `.env.*`.
-8. **`typetorch.json`**: see [fresh setup step 5](fresh-setup.md#5-typetorchjson).
+8. **`typetorch.json`**: see [fresh setup step 5](fresh-setup.md#5-typetorchjson). After you add or change
+   `members`, `revoked` or `devBadgeId`, run `bun run typetorch access push`: servers (kernel 0.3.6+) see the lists only
+   after that ([who gets the dev menu](fresh-setup.md#11-the-dev-menu-and-who-gets-it)).
 
 You don't need `scripts/packages.ts` or the template's `packages` and `postinstall` scripts. They are only for
 building with framework or kernel changes that aren't on npm yet; to use that, copy the script and both entries too
@@ -658,8 +660,9 @@ replaces (keep the ones listed below) in Studio and publish just before the firs
    ```
 
    It adds the kernel folders (with your trust roots `KeyAssetId`, `FallbackPublicKey` and `BootstrapHeads`) and the
-   kernel's settings (`HttpService.HttpEnabled`, `ServerScriptService.LoadStringEnabled`), checks that everything else
-   is unchanged, and writes the patched file and a report to `.typetorch/place-patches/`. Read the summary.
+   kernel's settings (`HttpService.HttpEnabled`), checks that everything else is unchanged, and writes the patched
+   file and a report to `.typetorch/place-patches/`. Read the summary. It leaves `ServerScriptService.LoadStringEnabled`
+   as your place has it (CLI after 0.7.2; older CLIs turn it on, so check it in Studio afterwards).
 3. Publish it: the same command without `--dry-run`. It asks y/N and refuses if someone published meanwhile. Keep your
    downloaded copy: `bun run typetorch kernel restore <file>` publishes it back (undo).
 4. Move players to the new version (restart servers from Creator Hub, or the dev menu's **Migrate** on servers that
@@ -675,8 +678,11 @@ An agent can run them for you, with your OK before the publish.
 2. Open it in Studio. Copy these three folders into your place, at the same spots:
    `ServerScriptService.TypeTorchKernel` (it carries the `KeyAssetId`, `FallbackPublicKey` and `BootstrapHeads`
    attributes), `ReplicatedStorage.TypeTorchKernelShared` and `ReplicatedFirst.TypeTorchKernelClient`.
-3. In your place, select ServerScriptService and turn on **LoadStringEnabled** if you will use remote-claude.
+3. Leave ServerScriptService's **LoadStringEnabled** off. Turn it on only in a place where you want remote-claude's
+   `run_luau` (a test place, never the live game): `loadstring` place-wide widens any future bug to running code.
 4. **File > Publish to Roblox**, then move players to the new version.
+
+`bun run typetorch doctor` reports what the kernel does with `LoadStringEnabled` (`loadstring`).
 
 **Check:** the F9 server log shows `[TypeTorch] kernel <version> (API 1) on a public server, branch prod, signed
 deploys only (keys: key asset)`.
@@ -708,8 +714,11 @@ service that uses tags.
 
 > **Read this before your first prod deploy.** Every prod deploy and promote first boots your build in a headless
 > Luau Execution task on your live place ([the cloud test](../guides/deploy-and-rollback.md#the-cloud-test)). Your
-> `onInit` and `onStart` run there, on the **prod** channel, against your **real DataStores, MemoryStores and HTTP
+> `onInit` and `onStart` run there against your **real DataStores, MemoryStores, MessagingService and HTTP
 > endpoints**. No player joins, and place scripts don't run.
+>
+> `TypeTorch.channel` is `dev` in the test (CLI after 0.7.2; older CLIs report the branch's channel), so stores you
+> split by channel point at dev data. Everything else is your live game's.
 
 The test sets an attribute your code can check:
 
@@ -768,7 +777,8 @@ player is in. Count again after a kernel or framework update.
 - [ ] roblox-ts project on Bun; `rokit.toml` pins Rojo 7.7.0-rc.1 and Lune
 - [ ] `package.json`, `tsconfig.json`, `default.project.json` (payload), `studio.project.json`, `.gitignore` match the
       template
-- [ ] `typetorch.json` with your ids, `approval`, and (after `keys init`) the signing fields
+- [ ] `typetorch.json` with your ids, `approval`, and (after `keys init`) the signing fields; `access push` after
+      every change to `members`, `revoked` or `devBadgeId`
 - [ ] no `*.server.ts` / `*.client.ts` left; `src/server/boot.ts` and `src/client/boot.ts`
 - [ ] every service/controller is a `@Service()` / `@Controller()` class extending `Module`
 - [ ] no game code imports `@flamework/*`; no `@flamework/*` or `rbxts-transformer-flamework` in `package.json`
@@ -806,6 +816,6 @@ player is in. Count again after a kernel or framework update.
 | Slow work in `onInit` | a new server waits only about 6 s at boot, then starts an older build and swaps yours in later | load in `onStart`; keep `onInit` short |
 | Player data saved only in `onStop` or a generation's `game.BindToClose` | a shutdown in the middle of a swap can skip it (no generation runs then) | the data library in the place saves on close; `onStop` for short extras |
 | `onInit` waits for a place script | the cloud test fails (place scripts don't run there), so every prod deploy is refused | skip the wait when `TypeTorchTest` is set ([Player data](../guides/player-data.md#the-cloud-test)) |
-| A global reset or a "server started" message in `onStart` | the cloud test runs it against prod data | guard it with `TypeTorchTest` |
+| A global reset or a "server started" message in `onStart` | the cloud test runs it against your live game's stores and topics | guard it with `TypeTorchTest` |
 | Receipt PurchaseIds kept only in `persist` | a receipt Roblox retries on another server is granted twice | record it in the profile before `PurchaseGranted` |
 | Template-literal types in a network leaf | the guard can't be generated: compile error | use `string` and check it in the handler |

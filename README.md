@@ -69,7 +69,7 @@ flowchart LR
 | [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, roles, logs |
 | [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests |
 | [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server: Live and Code modes, screenshots, Toolbox |
-| [Security model](guides/security.md) | who can do what, keys, signing, never publish secrets |
+| [Security model](guides/security.md) | who can do what, dev access (`access push`), keys, signing, never publish secrets |
 | [Troubleshooting](guides/troubleshooting.md) | real errors and their fixes |
 
 ## For agents

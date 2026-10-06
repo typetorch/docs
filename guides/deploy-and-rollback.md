@@ -91,9 +91,14 @@ stops it, and boots it a second time as a swap would. Any error fails it. It tak
   hours counts.
 - `--skip-test "<reason>"` publishes without it; the reason goes into the deploy log.
 - `bun run typetorch test --cloud [<artifact>]` runs it alone.
-- **Your code runs against real data there:** DataStores, MemoryStores and HttpService work in a task (with no
-  players). Place scripts don't run. Code that must not run in the test can check
+- **Your code runs against real data there:** DataStores, MemoryStores, MessagingService and HttpService work in a
+  task (with no players). Place scripts don't run. Code that must not run in the test can check
   `workspace:GetAttribute("TypeTorchTest")`: [what to guard](../getting-started/migrate.md#the-cloud-test-runs-your-game-code).
+- **It runs as channel `dev`** (CLI after 0.7.2): the stub kernel reports `TypeTorch.channel = "dev"` (a reserved
+  server) whatever the branch, so stores you split by channel point at dev data. The payload's own `Channel` is still
+  checked (prod branches take only prod builds).
+- **Analytics sends nothing from it** (framework after 0.3.2): the `AnalyticsEngine` collects as usual but never
+  uploads, so a prod deploy adds no fake server session.
 - Needs the Luau Execution scopes on the assets key ([fresh setup step 6](../getting-started/fresh-setup.md#6-the-open-cloud-api-key-owner)).
 
 ### The health window and the last known good build

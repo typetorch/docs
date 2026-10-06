@@ -46,7 +46,14 @@ const variant = analytics.experiment("onboarding", ["short", "long"]); // the sa
   and the next generation sends them, so a hot swap loses nothing.
 - **Server calls take the player first.** Without a player, an event is server-only (no player id).
 - **Client calls** are about the local player. They are marked `src = "client"` (a client can lie), and the server
-  checks their shape, size (props at most 4 KB) and rate.
+  checks their shape, size (props at most 4 KB) and rate (120 a minute, 5,000 a session; a client's experiment calls
+  count too).
+- **Revenue counts server-sent purchases only.** Payers and Robux in every query come from `purchase` rows the server
+  sent; a client-sent `purchase` row is kept but never counts (rows from before `src` existed still count). Call
+  `analytics.purchase` on the server, after the receipt is granted.
+- **The cloud test sends nothing** (framework after 0.3.2). In `typetorch test --cloud` (before every prod deploy)
+  the engine collects as usual but never uploads: no event rows, no identity rows, no HTTP request. A prod deploy
+  never adds a fake server session.
 - **Options** (all on by default): `sessions`, `tech`, `zones`, `screens`, `recording`, `fleet`. `settings` (server
   only) replaces the [settings key](#settings-the-typetorchanalytics-key), for tests.
 - `analytics.stats()` (server) returns the counters (queued, sent, dropped, refused); `analytics.flush()` sends soon.
@@ -218,6 +225,9 @@ Our own A/B tests, per player or per server.
 fixed per player and experiment name, so they keep it in every session, and both groups play on the same servers. The
 first call may yield briefly (until the player's id loads). Later events carry the variant in `exp`. You write the code
 for each variant.
+
+A session holds at most **32 experiments** (framework after 0.3.2). A 33rd name isn't assigned: the call returns the
+first variant (the control), isn't stamped, and logs a warning.
 
 Change it live in the settings key, no deploy:
 

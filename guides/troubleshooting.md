@@ -93,7 +93,7 @@ Run `bun run typetorch keys init` and `bun run typetorch keys init --fallback` f
 That needs `legacy-asset:manage`, which API keys can't get today. Download a copy in Studio (File > Download a Copy)
 and pass it: `--place-file <file> --base <version>` ([Kernel updates](deploy-and-rollback.md#kernel-updates)).
 
-**`fleet setup` (or writing the analytics settings) fails with 401/403.**
+**`fleet setup`, `access push` (or writing the analytics settings) fails with 401/403.**
 Writing a ConfigService key needs `universe:write` on the deploy key. Nothing is read back: API keys can't read
 configs.
 
@@ -206,8 +206,17 @@ Kernels before 0.2.1 listed DataStore keys too often. Publish a newer kernel and
 The place has a newer kernel than this server. Press **Migrate** (moves everyone on this server to a fresh one) or
 restart servers.
 
-**Dev menu: "HTTP off" or "run_luau off".**
-Turn on Allow HTTP Requests (Game Settings > Security) or `ServerScriptService.LoadStringEnabled`, then publish.
+**Dev menu: "HTTP off".**
+Turn on Allow HTTP Requests (Game Settings > Security), then publish.
+
+**Dev menu: "run_luau off".**
+`ServerScriptService.LoadStringEnabled` is off. That is right for a live game. Turn it on (Studio's Properties, then
+publish) only in a place where you want remote-claude's `run_luau`, such as a test place.
+
+**A member doesn't get the dev menu (or a revoked dev still does).**
+Servers see `members`, `revoked` and `devBadgeId` only after `bun run typetorch access push`, and only on kernel
+0.3.6+. Run it after every change; `bun run typetorch access status` says whether `typetorch.json` changed since the
+last push. Running servers pick it up within about a minute of ConfigService delivering it.
 
 **`typetorch doctor` warns that the place holds `ServerStorage.TypeTorchDev`.**
 A Studio test session was published. Delete the folder in Studio and publish again (live servers ignore it).

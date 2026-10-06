@@ -13,7 +13,13 @@
 - **Owners** are the experience's creator (or the owning group's owner) and `members` with the role `"owner"`.
   Everyone else in `members` is a dev; the old role `"admin"` counts as dev.
 - Dev status is decided on the server by the kernel: the experience owner, `members`, dev-badge holders, Studio; minus
-  `revoked`. Every dev-menu request is re-checked on the server. Revoking takes effect within about a minute.
+  `revoked`. Every dev-menu request is re-checked on the server.
+- **`members`, `revoked` and `devBadgeId` reach servers only through `bun run typetorch access push`.** It publishes
+  the server-only ConfigService key `TypeTorchAccess` (deploy key with `universe:write`; kernel 0.3.6+ reads it).
+  ConfigService, not a DataStore, because game code can't write it: a backdoored model can't make itself an owner.
+  Run it after every change. Revoking takes effect within about a minute of ConfigService delivering the push.
+  `deploy` and `doctor` warn when `typetorch.json` lists people that were never pushed, or changed since the last
+  push (until then a revoked dev stays a dev).
 - **Public servers are always effective `prod`:** read-only dev menu, and (kernel 0.3) only signed deploys and signed
   pins from outside the server.
 

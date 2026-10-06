@@ -4,7 +4,8 @@ Every TypeTorch game has an in-game developer menu. It ships in the framework, s
 
 - **Open it:** the **DEV** button (devs only), `Ctrl+Shift+D`, or `/tt dev` in chat.
 - **Who:** devs only. The server decides and re-checks every request: the experience owner, `members` from
-  `typetorch.json` (after `typetorch config push`), dev-badge holders, anyone in a Studio playtest; minus `revoked`.
+  `typetorch.json` (after `typetorch access push`; kernel 0.3.6+), dev-badge holders, anyone in a Studio playtest;
+  minus `revoked`.
 - **Two roles:** **owner** (the experience's creator or the owning group's owner, plus `members` with the role
   `"owner"`) and **dev**. A `members` entry with the old role `"admin"` counts as a dev.
 - **Prod-channel servers (every public server) are read-only:** no explorer edits, no dev cheats. Owners can still
@@ -69,7 +70,7 @@ A sidebar group with a **Server | Client** toolbar:
   | Keys changed / Fallback Key revoked / Fallback Key only / Rejected n | signing state ([Prod signing](prod-signing.md)) |
   | Hot asset failed / missing, Asset manifest | [hot assets](hot-assets.md) |
   | HTTP off | the Claude tab and the fleet API need Allow HTTP Requests |
-  | run_luau off | `LoadStringEnabled` is off (dev servers) |
+  | run_luau off | `LoadStringEnabled` is off (dev servers; right for a live game) |
   | Pinned / A/B experiment | this server holds a pinned build |
   | Studio: local payload | a Studio session runs your local code ([Testing in Studio](studio-testing.md)) |
   | Registry, High memory | the registry can't be read; the server uses a lot of memory |
