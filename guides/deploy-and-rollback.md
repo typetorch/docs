@@ -154,6 +154,57 @@ bun run typetorch servers --branch prod
 `bun run typetorch deploy --widen <1-100>` sends the same `#seq` to more. Prod servers ignore it: to try a build on some
 prod servers, use a signed [pin](#pins-ab-experiments).
 
+## Never an empty server
+
+Kernel 0.3.6+: **players never load into an empty baseplate**, even when no build can load (a Roblox asset outage,
+every recent build broken).
+
+**Players are held until a build runs.** From the kernel's first line, characters don't spawn and the kernel shows its
+own holding screen ("Starting...", a progress bar). When the first build is ready, waiting players spawn and the screen
+goes. A server joining takes about 2 s normally; the hold starts before any player can join. A swap of a running build
+never holds anybody: players keep playing.
+
+If your game spawns characters itself, set the attribute `TypeTorchHoldCharacters = false` on the `Players` service in
+Studio (or keep `CharacterAutoLoads` off in the place): the kernel then never touches characters. Turning
+`CharacterAutoLoads` off at runtime in your own code isn't enough, since the kernel turns it back on when it releases
+the hold.
+
+**When the head and the last known good build run nothing**, the server tries, in this order:
+
+1. **A build the branch's other servers run fine.** It asks the live servers of its branch which build they run
+   healthy, and runs the most common one. Prod servers still run only builds they can verify (a valid signature, a
+   verified deployment entry, or the bootstrap head): other servers can't make a prod server run an unsigned build.
+2. **The backup build baked into the place.** `typetorch kernel deploy` puts the current prod build into the place as
+   `ServerStorage.TypeTorchBackup` (below). It runs with the same checks as any build (prod channel, modules only), and
+   the server says so: "Running the backup build" in the dev menu's Attention, `h = backup` in `typetorch servers`, and
+   a critical `backup_build` alert.
+3. **Retries in the background.** Whatever runs, the server keeps trying the real build, the last known good one and
+   the other servers' build (after 15 s, 30 s, then every minute) and swaps to the real one as soon as it loads, like a
+   normal deploy. Players stay.
+4. **Moves.** If nothing runs at all after 15 s, waiting players (and anyone who joins) are moved to a healthy server
+   of the branch, else to a fresh one (private and reserved servers: a new reserved server on the same branch). A player
+   moved 3 times is kicked with "Servers are restarting. Please rejoin in a minute." instead of bouncing forever.
+   Alerts: `boot_failed_teleport` and `bounce_kick` (both critical).
+
+The same happens when a swap fails halfway (the old build stopped and nothing could replace it): players see the holding
+screen again until something runs.
+
+**A player whose game code fails to start** (after its own retry) sees the holding screen; the server sends that
+player the client code once more, and if that fails too, moves them to a healthy server of the branch (or back into
+this one). `typetorch servers` counts them (`clients`), with a `client_failed` warning alert.
+
+### The backup build
+
+- Every `typetorch deploy` and `upload` keeps the uploaded payload on your machine (`.typetorch/payloads/`), because
+  API keys can't download it back from Roblox.
+- Every `typetorch kernel deploy` bakes the current prod build's kept payload into the place, replacing the old
+  backup. Without a kept payload (prod was deployed from another machine, or before CLI support) it warns and the place
+  keeps the backup it has: deploy prod once from the machine that runs `kernel deploy`. `--no-backup` skips it.
+- `typetorch doctor` shows the backup in the place, with its age. It warns past 30 days.
+- **Player data:** the backup is an older build. If your data has a schema version, your code must refuse (or migrate)
+  data written by a newer version, so a backup that runs against newer player data can't corrupt it. Keep the backup
+  fresh by running `kernel deploy` after big prod releases.
+
 ## Promote
 
 ```sh
@@ -254,7 +305,8 @@ A new, empty place takes `kernel deploy --replace-place --yes` instead
 | load + swap on the server | about 0.25 s |
 | **command to players on the new build** | **about 7 to 9 s** (plus the cloud test on prod) |
 | **rollback** | **about 1 to 2 s** |
-| new server to a playable build | about 2 s, at most 15 s |
+| new server to a playable build | about 2 s, at most 15 s (players are held meanwhile) |
+| kernel 0.3.6, nothing loads: to another server's build / the backup / the moves | about 5 s / 5 to 10 s / 15 s (simulated) |
 
 ## No GitHub Actions
 
