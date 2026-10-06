@@ -211,7 +211,8 @@ Turn on Allow HTTP Requests (Game Settings > Security), then publish.
 
 **Dev menu: "run_luau off".**
 `ServerScriptService.LoadStringEnabled` is off. That is right for a live game. Turn it on (Studio's Properties, then
-publish) only in a place where you want remote-claude's `run_luau`, such as a test place.
+publish, or `kernel deploy --loadstring` with CLI 0.7.4+) only in a place where you want remote-claude's `run_luau`,
+such as a test place.
 
 **A member doesn't get the dev menu (or a revoked dev still does).**
 Servers see `members`, `revoked` and `devBadgeId` only after `bun run typetorch access push`, and only on kernel

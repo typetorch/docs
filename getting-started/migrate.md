@@ -662,7 +662,8 @@ replaces (keep the ones listed below) in Studio and publish just before the firs
    It adds the kernel folders (with your trust roots `KeyAssetId`, `FallbackPublicKey` and `BootstrapHeads`) and the
    kernel's settings (`HttpService.HttpEnabled`), checks that everything else is unchanged, and writes the patched
    file and a report to `.typetorch/place-patches/`. Read the summary. It leaves `ServerScriptService.LoadStringEnabled`
-   as your place has it (CLI 0.7.3+; older CLIs turn it on, so check it in Studio afterwards).
+   as your place has it (CLI 0.7.3+; older CLIs turn it on, so check it in Studio afterwards; `--loadstring` turns it
+   on, for a test place only).
 3. Publish it: the same command without `--dry-run`. It asks y/N and refuses if someone published meanwhile. Keep your
    downloaded copy: `bun run typetorch kernel restore <file>` publishes it back (undo).
 4. Move players to the new version (restart servers from Creator Hub, or the dev menu's **Migrate** on servers that
@@ -747,10 +748,13 @@ before you migrate (`git grep -n "SubscribeAsync" -- src`, and any in place scri
 | Who | Topics | When |
 |---|---|---|
 | kernel | 3: `TypeTorch/deploy`, `TypeTorch/pin`, `TypeTorch/rekey` | every server |
-| framework roll call (Manage > Servers) | 1: `TypeTorch/rollcall`, plus 1 more while a dev on that server collects the list | every server |
+| kernel 0.3.6 peers | 1 more for about 3 s: `TypeTorch/peers/<JobId>` (its question rides `TypeTorch/deploy`) | only while the server asks other servers for a build: nothing else runs (at boot, or while the backup build runs), or it is moving players |
+| framework roll call (Manage > Servers) | 1: `TypeTorch/rollcall`, plus 1 more while a dev on that server collects the list | every server running a build |
 | framework remote-claude | 2 | dev-channel servers only |
 
-So a prod server uses 4, briefly 5. A game with 2 topics of its own goes over the limit on an empty server, and the
+So a prod server uses 4, briefly 5. With kernel 0.3.6, a server that asks other servers for a build runs nothing
+(3 + 1 = 4) or runs the backup build (3 + 1 + 1 = 5): still within 5 on an empty server, as long as your game adds
+none. A game with 2 topics of its own goes over the limit on an empty server, and the
 extra subscription fails. Merge your topics into one (with a `kind` field in the message), or subscribe once the first
 player is in. Count again after a kernel or framework update.
 

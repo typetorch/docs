@@ -26,8 +26,8 @@ Claude can act on your running server ("jump me", "give me 100 coins") or change
   ```
 
 - Experience settings: **Allow HTTP Requests** on. `ServerScriptService.LoadStringEnabled` on for `run_luau`, only in
-  a place where you want it (a test place); keep it off in a live game. `kernel deploy` patches leave it as it is;
-  `doctor` reports it. Optional: **Allow Mesh / Image APIs** (and an ID-verified 13+ owner) for images Claude shows
+  a place where you want it (a test place: `kernel deploy --loadstring`, CLI 0.7.4+); keep it off in a live game.
+  `kernel deploy` patches leave it as it is; `doctor` reports it. Optional: **Allow Mesh / Image APIs** (and an ID-verified 13+ owner) for images Claude shows
   in the chat; **Allow Loading Third Party Assets** for Toolbox inserts.
 
 Nothing else to set up in Roblox: no secrets.

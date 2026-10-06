@@ -563,8 +563,8 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
      `ReplicatedFirst.TypeTorchKernelClient` into your place, File > Publish to Roblox.) The kernel waits idle until
      the first deploy.
    - `ServerScriptService.LoadStringEnabled`: keep it **off** in this game. Turn it on only in a test place where you
-     want remote-claude's `run_luau`. `kernel deploy` patches leave it as it is (older CLIs, up to 0.7.2, turn it on:
-     check it in Studio); `doctor` reports it.
+     want remote-claude's `run_luau` (`kernel deploy --loadstring`, CLI 0.7.4+). `kernel deploy` patches leave it as it
+     is (older CLIs, up to 0.7.2, turn it on: check it in Studio); `doctor` reports it.
    - then, in Studio, remove the old scripts listed in MIGRATION_NOTES.md and publish, just before the first deploy.
 8. **Player data** (if listed in MIGRATION_NOTES.md): in Studio put the library at `ServerStorage.Packages.<Name>` and
    add the `ServerScriptService.DataHost` Script from the Player data guide; publish.
