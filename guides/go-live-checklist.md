@@ -58,8 +58,11 @@ Nothing here touches your live game until step 8, the cut-over.
 - [ ] Deploy `dev` (`--branch dev`), open it with `/tt new dev`, and invite 5 to 10 real testers. Deploy every day while
       they play. Deploy `prod` on the copy too (`--branch prod`).
 - [ ] Keep `bun run typetorch servers --watch` and `alerts --follow` open.
-- [ ] After each deploy, count your game's errors in the first 30 s (dev menu > Logs). A server rolls back a new build
-      at 3 errors from it within 30 s, so fix noisy errors before the cut-over.
+- [ ] After each deploy, count your game's errors in the first 30 s (dev menu > Server > Status: "Health window:
+      n/3 errors"; Logs shows them). A server rolls back a new build at 3 errors from it within 30 s, so fix noisy
+      errors before the cut-over, or set `typetorch.json` `"health"` above your count (kernel 0.3.7+,
+      [Set the health window](deploy-and-rollback.md#set-the-health-window)). `doctor` shows the values.
+- [ ] Optional: `"autoRollback": { "failedPct": ... }` if 20% failed servers is too eager or too slow for your fleet.
 
 Then run every live test on the copy:
 

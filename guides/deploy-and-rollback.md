@@ -109,13 +109,43 @@ On every server (kernel 0.3.2+):
   every 60 s, so a server that missed a message catches up.
 - **Health window:** a new build is rolled back on that server when an `onStart` fails, or when its own scripts throw 3
   errors within 30 s of starting. Errors from place scripts or the kernel never count. Later errors only mark the
-  server `degraded`.
+  server `degraded`. With kernel 0.3.7+ you can change both numbers, or turn the rollback off
+  ([below](#set-the-health-window)).
 - **Last known good:** the server then runs the newest build that worked: its own history first, then the branch's
   deployments (on prod, only verified ones), skipping builds that already failed there. A failed build isn't retried on
   that server; the next deploy is.
 - **Boot budget:** a new server runs a playable build within **15 s** of starting, whatever fails (about 2 s
   normally). Slow reads don't stack up; a head that runs out of boot time is skipped for the next good one, retried in
   the background and swapped in when it works.
+
+### Set the health window
+
+Some games throw harmless errors all the time: a `WaitForChild` timeout, a nil index in a UI handler. With 40 players,
+every server can hit 3 errors in the first 30 s. Then every server rolls the new build back, and `--wait` rolls the
+branch back too. Every deploy fails.
+
+Fix the errors if you can. If not, set the window in `typetorch.json` (CLI 0.7.5+, kernel 0.3.7+):
+
+```json
+"health": { "errors": 10, "window": 30 }
+```
+
+- `errors`: how many errors from the new build roll a server back. 1 to 100, default 3.
+- `window`: seconds after the build starts. 5 to 300, default 30.
+- `rollback`: `false` keeps a failing build running. The server only reports `degraded` (a `health_degraded`
+  warning). A failed `onStart` doesn't roll back either. Load and start failures still do.
+- `prod` and `dev` change any of these for builds of that channel, for example
+  `"health": { "errors": 10, "dev": { "rollback": false } }`.
+
+How it works:
+
+- Every build carries its own values: `typetorch build` stamps them on the payload (`HealthErrors`, `HealthWindow`,
+  `HealthRollback`). A change needs a new build. `build` and `deploy` print them, `doctor` shows them.
+- Values out of range stop the build. Kernels before 0.3.7 ignore them (3 errors, 30 s).
+- In the dev menu, **Server > Status** shows the open window under Attention ("Health window: 1/10 errors, 24 s
+  left") and the build's values in the Server block.
+
+Measure first: [count your errors on a dev soak](../getting-started/migrate.md#count-your-errors-before-you-ship).
 
 ### Wait and automatic rollback
 
@@ -129,8 +159,10 @@ After the message, `--wait` follows the servers' deploy reports through the [fle
 - **Automatic rollback:** when 20% or more of the servers that tried the build report `failed` or `rolled_back` (at
   least one), the CLI rolls the branch back to the previous build, the same way `typetorch rollback` does (signed on
   prod), raises a critical `auto_rollback` alert, waits for the rollback's own reports, and exits 1. At a terminal it
-  first shows "rolling back ... in 10 s: Ctrl+C keeps the new build". `--rollback-at <pct>` changes the threshold;
-  `--no-auto-rollback` turns it off.
+  first shows "rolling back ... in 10 s: Ctrl+C keeps the new build".
+- **Change the threshold:** `"autoRollback": { "failedPct": 30 }` in `typetorch.json` sets it for every release (1 to
+  100). `--rollback-at <pct>` changes it for one command; `--no-auto-rollback` turns it off. The output says which
+  one it uses ("auto-rollback at 30% ... (typetorch.json autoRollback.failedPct)").
 - Failures below the threshold: a red summary, the rollback command, exit 1.
 - **Servers that only stall never cause a rollback** (the build isn't proven bad): they are listed, a `server_stuck`
   warning is raised, and the command exits 0 with a warning.

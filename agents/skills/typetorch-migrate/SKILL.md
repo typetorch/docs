@@ -125,7 +125,9 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    live game (on only in a test place for remote-claude's `run_luau`; `doctor` reports it); remove the old scripts in
    Studio just before the first deploy; data
    library + `DataHost` in the place; test in Studio (`bun run watch` + `bun run studio`, Play); check F9 `[TypeTorch]
-   kernel ...`; dev branch deploy + `/tt new dev` + two deploys while playing (+ a product bought during a deploy);
+   kernel ...`; dev branch deploy + `/tt new dev` + two deploys while playing (+ a product bought during a deploy;
+   after each deploy read Server > Status "Health window: n/3 errors": 3 errors in 30 s roll every server back, so fix
+   them or set `typetorch.json` `"health": { "errors": ... }` above the count, kernel 0.3.7+);
    a game with live players: the go-live checklist (docs `guides/go-live-checklist.md`) before the first prod deploy;
    first prod deploy from `main` (cloud test, y/N, signed); rollback drill; optional: the fleet API and analytics.
    Then post the report (template in AGENTS.md).

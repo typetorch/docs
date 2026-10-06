@@ -72,8 +72,8 @@ A sidebar group with a **Server | Client** toolbar:
 
 ### Server
 
-- **Status:** JobId, server type, uptimes, place version, players, memory, the last deploy message and how long it took
-  to arrive, recent swaps. **Attention** lists what needs a look, and the tab shows a **badge** (red for errors, yellow
+- **Status:** JobId, server type, uptimes, the build's health window ("3 errors / 30 s"), place version, players,
+  memory, the last deploy message and how long it took to arrive, recent swaps. **Attention** lists what needs a look, and the tab shows a **badge** (red for errors, yellow
   for warnings):
 
   | Attention item | Meaning |
@@ -82,6 +82,8 @@ A sidebar group with a **Server | Client** toolbar:
   | No game running | no build is mounted on this server |
   | Failed health check | a new build failed its health window here in the last 15 minutes and the server went back to the last good one ([safe deploys](deploy-and-rollback.md#the-health-window-and-the-last-known-good-build)) |
   | Errors n | the running build keeps erroring after its health window |
+  | Health window | the new build's window is open: its errors against its limit and the time left, e.g. "1/3 errors, 24 s left" (yellow once an error counted; "no rollback" when [`health`](deploy-and-rollback.md#set-the-health-window) turns it off) |
+  | Health settings / No health window | the build's health values were out of range (defaults used) / the place doesn't map the kernel's Health module |
   | Rolled back | an automatic or server rollback happened in the last 15 minutes |
   | Clients failed n | some players' client side of the build failed to start |
   | No fleet API / Fleet settings / Fleet API failing | the kernel can't send to the [fleet API](fleet-and-alerts.md#in-the-dev-menu) |

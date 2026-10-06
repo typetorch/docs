@@ -124,8 +124,13 @@ times out). Fix and deploy again. Game code that must not run in the test (it ru
 `--skip-test "<reason>"`.
 
 **`deploy --wait` rolled the branch back by itself (`auto_rollback`).**
-20% or more of the servers that tried the build failed or rolled back. `bun run typetorch report "#<seq>"` shows the
-errors and the servers. Fix, then deploy again. `--no-auto-rollback` keeps a build that fails on some servers.
+20% or more of the servers that tried the build failed or rolled back (`"autoRollback": { "failedPct" }` in
+`typetorch.json` changes the 20). `bun run typetorch report "#<seq>"` shows the errors and the servers. Fix, then deploy
+again. `--no-auto-rollback` keeps a build that fails on some servers.
+
+**Every server rolls back every new build ("3 errors within 30 s of ready").**
+The game throws a few errors right after it starts, on every server. Fix them, or raise the limit in `typetorch.json`
+(kernel 0.3.7+): `"health": { "errors": 10 }`. See [Set the health window](deploy-and-rollback.md#set-the-health-window).
 
 **`deploy --wait` warns about stuck servers (`server_stuck`).**
 Some servers didn't pick up the deploy in time and sent nothing. Nothing is rolled back. They poll the head every 60 s;

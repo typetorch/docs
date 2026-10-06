@@ -776,6 +776,24 @@ player is in. Count again after a kernel or framework update.
 5. Deploy `prod` from `main` ([fresh setup step 9](fresh-setup.md#9-first-deploy)). A game with live players goes
    through the [go-live checklist](../guides/go-live-checklist.md) first.
 
+### Count your errors before you ship
+
+By default a server rolls a new build back when the build throws 3 errors in its first 30 s. An older game often
+throws a few harmless ones. Then every server rolls back at once, and every deploy fails.
+
+1. Deploy a dev branch and play it with a few people (a dev soak).
+2. After each deploy, open the dev menu: **Server > Status** shows "Health window: 2/3 errors, 18 s left". Logs shows
+   the errors.
+3. Fix what you can.
+4. Still noisy? Set the limit a bit above what you saw, in `typetorch.json`:
+
+   ```json
+   "health": { "errors": 10 }
+   ```
+
+   Kernel 0.3.7+ reads it from each build. `bun run typetorch doctor` shows the values.
+   [More options](../guides/deploy-and-rollback.md#set-the-health-window).
+
 ## Checklist
 
 - [ ] roblox-ts project on Bun; `rokit.toml` pins Rojo 7.7.0-rc.1 and Lune
@@ -800,6 +818,7 @@ player is in. Count again after a kernel or framework update.
 - [ ] kernel installed in the place; old game scripts removed
 - [ ] `bun run build` and `bun run typetorch build` pass; a committed tree builds a clean id (no `-dirty`)
 - [ ] a dev branch survived two deploys while you played
+- [ ] errors in the first 30 s after a deploy counted; fixed, or `typetorch.json` `"health"` set above them
 
 ## Common pitfalls
 
@@ -823,3 +842,4 @@ player is in. Count again after a kernel or framework update.
 | A global reset or a "server started" message in `onStart` | the cloud test runs it against your live game's stores and topics | guard it with `TypeTorchTest` |
 | Receipt PurchaseIds kept only in `persist` | a receipt Roblox retries on another server is granted twice | record it in the profile before `PurchaseGranted` |
 | Template-literal types in a network leaf | the guard can't be generated: compile error | use `string` and check it in the handler |
+| Harmless errors right after start (a `WaitForChild` timeout) | every server rolls the new build back; `--wait` rolls the branch back | fix them, or set `"health"` ([count your errors](#count-your-errors-before-you-ship)) |

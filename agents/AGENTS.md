@@ -271,6 +271,12 @@ At the repo root:
   `devBadgeId` only after the user runs `bun run typetorch access push` (kernel 0.3.6+): put it in the user's list
   whenever you add or change them.
 - `approval: "prod"`: dev deploys go out at once, prod ones wait for the user's y/N.
+- Optional (kernel 0.3.7+), only after the dev soak in step 11 shows a need:
+  - `"health": { "errors": 3, "window": 30 }`: a server rolls a new build back at `errors` (1-100) errors from it
+    within `window` seconds (5-300) of start. `"rollback": false` turns that off; `"prod"` / `"dev"` override per
+    channel.
+  - `"autoRollback": { "failedPct": 20 }`: `deploy --wait` rolls the branch back at this % of failed servers (1-100).
+  - Raise them only to match errors the user can't fix yet; say so in MIGRATION_NOTES.md.
 - Never copy the template's `signingPublicKeys`, `keyAssetId` or `fallbackPublicKey`: they belong to the template's
   game. `typetorch keys init` writes the user's.
 
@@ -575,6 +581,9 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
 11. **Dev branch:** `git switch -c dev`, `bun run typetorch deploy`, then `/tt new dev` in game. Earn some data, deploy
     again twice while playing, rejoin: nothing lost. Developer products: buy one while a deploy runs; one grant, also
     after a rejoin. `bun run typetorch test --cloud` passes on the dev build (prod deploys run the same test).
+    After each deploy, ask the user for the dev menu's Server > Status line "Health window: n/3 errors" (errors from
+    the new build in its first 30 s). 3 rolls every server back: fix those errors, or set `typetorch.json` `"health"`
+    above the count (3.7) and rebuild.
 12. **First prod deploy:** a game with live players goes through the
     [go-live checklist](https://github.com/typetorch/docs/blob/main/guides/go-live-checklist.md) first (a copy of the
     game, a dev-branch soak, a planned cut-over). Merge into `main`, stay in the game, `bun run typetorch deploy` (the
