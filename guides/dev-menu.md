@@ -11,9 +11,30 @@ Every TypeTorch game has an in-game developer menu. It ships in the framework, s
 - **Prod-channel servers (every public server) are read-only:** no explorer edits, no dev cheats. Owners can still
   switch the server they are in ([Server > Branch](#server)).
 - The window can be dragged by its header and resized from its corner (double-tap the header to reset). It remembers
-  the open tab across swaps.
+  its panes and windows across swaps.
 - Roblox games can't write to the clipboard, so every **Copy** opens a small box with the text selected: press
   `Ctrl+C`, or long-press > Copy on touch.
+
+## Panes and windows
+
+Show two pages at once, for example **Network > Packets** next to **Modules > State** (framework after 0.3.2).
+
+- **Every page sits in a pane** with a small header: the page's name (tap it to pick another page) and four buttons:
+  **Split right**, **Split down**, **Open in new window** and **Close**.
+- **Split** adds a pane beside or under this one, on the same page. Drag the line between two panes to resize them.
+- **The sidebar opens pages in the focused pane.** Tap a pane to focus it; with several panes, the focused one has an
+  orange outline.
+- **Windows** float over the game. Drag one by its title bar and resize it from its corner; double-tap the title bar
+  to maximise it. The title bar has **Minimise**, **Dock** (back into the main panel, next to the focused pane) and
+  **Close**. A window can be split too. Tap a window to bring it to the front. Windows show and hide with the menu.
+- **Some pages open once:** Claude, Server > Branch and the Manage pages. Picking one again focuses its pane. Every
+  other page can be open in several panes, each with its own settings (two State panes can show two modules).
+- **The layout survives swaps:** panes, windows and each pane's settings come back after a hot swap. A fresh join
+  starts with one pane.
+- **Panes you can't see don't refresh:** closing the menu or minimising a window stops their requests. Panes on the
+  same data share one request, so two panes don't hit the server's limits.
+- **Limits:** 6 panes in the main panel, 4 per window, 6 windows. On phones and small screens panes only stack (two at
+  most), and windows open maximised with one pane each.
 
 ## Tabs
 
