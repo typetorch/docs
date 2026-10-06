@@ -102,6 +102,12 @@ TypeTorch doesn't use Flamework any more: its own `@typetorch/transformer` gener
   (`Flamework.id<T>()`) won't match.
 - Then the swap-safety rules (section 5). That part is the real work.
 
+**Let the CLI do the mechanical part.** Once the toolchain builds, `bun run typetorch migrate --from flamework`
+(`--dry-run` first) makes the changes above, turns the ignite files into boot modules, keeps every
+`@flamework/networking` call site through the framework's `createFlameworkCompat`, and writes
+`typetorch-migrate-report.md` listing each swap-safety item with its file and line. Details and the full mapping:
+[Coming from Flamework](../guides/from-flamework.md).
+
 ## 3. Entry points become boot modules
 
 The payload holds **only ModuleScripts**: a Script or LocalScript fails `typetorch build`. The kernel calls two

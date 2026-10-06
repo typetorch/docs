@@ -319,6 +319,12 @@ export function boot(kernel: ClientKernel) {
 One sub-step per commit. After each: `bun run build` must pass, then log it in `MIGRATION_NOTES.md`. (Flamework
 projects: do 4.1 and 4.2 together; the build passes once no `@flamework/*` import is left.)
 
+**Flamework projects: run the codemod first.** On a clean tree after Step 3, `bun run typetorch migrate --from
+flamework --dry-run`, then without `--dry-run`: it makes 4.1, 4.2 and the networking part of 4.4 (call sites stay,
+through `createFlameworkCompat`) and writes `typetorch-migrate-report.md`. Commit that as one step, then work through
+the report's flagged items with 4.3 and the rest of this step; keep the report's counts in `MIGRATION_NOTES.md`. Local
+only, no keys. See [Coming from Flamework](../guides/from-flamework.md).
+
 ### 4.1 Entry points
 
 Move what each `*.server.ts` / `*.client.ts` does into modules, then delete the script (`git rm`). Delete
@@ -418,6 +424,8 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
   `on` handlers, no traffic), `invokeWithTimeout(seconds, …)` keeps its name; check the unit (seconds, 0.5 to 120: a
   Flamework call with `5000` meant milliseconds by mistake). A leaf's default timeout: `setNetworkLimits({ "x.y": {
   timeout: 30 } })` in `src/shared/net.ts` (the client reads it).
+- A big Flamework network can stay on `createFlameworkCompat` (the codemod's default) and move to `createNetwork`
+  later (`typetorch migrate --from flamework --net native`); `typetorch build` reminds you while it is in use.
 
 ### 4.5 UI
 
