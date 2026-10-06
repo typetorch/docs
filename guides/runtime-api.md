@@ -6,7 +6,30 @@ dropped when the generation stops, so a swap never leaves one behind. Each `on*`
 to a trove.
 
 Inside a module, `this.ctx` has the basics too: `realm`, `artifact`, `branch`, `channel`, `generation`, `build` (the
-compiled-in git info) and `persist`.
+compiled-in git info), `persist` and `playerState`.
+
+## Modules: `TypeTorch.module` and `Dependency`
+
+```ts
+import { Dependency, TypeTorch } from "@typetorch/framework";
+
+Dependency<ShopService>().open(player); // the running ShopService
+TypeTorch.module<ShopService>().open(player); // the same
+TypeTorch.tryModule<ShopService>()?.open(player); // undefined instead of an error
+```
+
+The running module of type T (a `@Service` on the server, a `@Controller` on the client), for code that isn't a
+constructor: methods, plain classes a module built, command handlers. `@typetorch/transformer` fills in T's id; an
+`import type` of the class is enough.
+
+- From `onInit` on (and in `onStart`, `onStop` and later code). In a constructor, a field initializer or at the top level
+  of a module it throws "ShopService isn't constructed yet: ...". `tryModule` returns `undefined` then.
+- The other realm's modules throw ("ShopService is a @Service: it runs on the server, not on the client").
+- Per generation: after a swap they return the new generation's module, and code left over from the old generation
+  gets an error ("the generation that ran ShopService has stopped").
+- To break a dependency cycle, take one side as `Lazy<T>` (a constructor parameter with `@typetorch/transformer`
+  0.2.1+, or a field `= Lazy<T>()`); `.get()` resolves on first use, and the start order ignores it. See
+  [Migrate](../getting-started/migrate.md#dependency-cycles-lazyt).
 
 ## Identity
 
@@ -66,6 +89,21 @@ It lives in memory until the server shuts down. Plain data only: tables, arrays,
 booleans, and Players. Never functions, class instances, Promises, threads, connections, charm atoms or Instances the
 generation created. Version the key when the shape changes; keys starting with `__` are reserved. (`this.ctx.persist`
 is the same.)
+
+### Per player
+
+```ts
+const cooldowns = TypeTorch.playerState("cooldowns.v1", (player) => ({ lastUse: 0 })); // or this.ctx.playerState
+cooldowns.get(player).lastUse = os.clock(); // the first get stores init(player)
+cooldowns.set(player, { lastUse: 0 });
+cooldowns.has(player);
+cooldowns.delete(player);
+```
+
+Keyed by UserId and kept in `persist`, so it survives swaps. A player's entry is removed when they really leave (after
+the game's own `PlayerRemoving` handlers ran), never on a swap; players who left between two generations are dropped
+when the next one opens its first store. Same plain-data rules as `persist`. The dev menu shows every store under
+Modules > State > persist, `__playerState`.
 
 ## Devs and roles
 

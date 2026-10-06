@@ -331,26 +331,30 @@ left in the payload fails `typetorch build` with "the payload may hold only Fold
 |---|---|
 | Flamework `@Service()` / `@Controller()` | `@Service()` / `@Controller()` from `@typetorch/framework`; the class `extends Module`; a constructor calls `super()` |
 | Flamework `OnInit`, `OnStart`, `OnTick`, `OnPhysics`, `OnRender` | the same names from `@typetorch/framework` |
-| Flamework `Dependency<T>()` | constructor injection |
+| Flamework `Dependency<T>()` | constructor injection in a module; `Dependency<T>()` from `@typetorch/framework` everywhere else (methods, plain classes, command handlers), from `onInit` on |
+| a dependency cycle (A injects B, B injects A) | `Lazy<T>` on one side (a field `= Lazy<T>()`, or a constructor parameter with transformer 0.2.1+), or `Dependency<T>()` in a method |
 | `Modding`, `Reflect`, `t` from `@flamework/core` | the same names from `@typetorch/framework` |
 | custom decorators (`Modding.createDecorator`, `@metadata flamework:parameters injectable`) | `Modding.createDecorator` from `@typetorch/framework`, `@metadata typetorch:parameters injectable` |
 | Flamework `@Component` / `@flamework/components` | a module using `observeElement(this.trove, tag, …)` or `@rbxts/observers` |
 | Flamework `Flamework.createGuard<T>()`, `Flamework.id<T>()` | `t` guards written by hand, or a user macro (transformer README "Migrating from Flamework"); note it for the user |
 | Knit `CreateService({ Name, Client, KnitInit, KnitStart })` | `@Service()` class; `KnitInit` → `onInit`, `KnitStart` → `onStart`, `Client` → network leaves |
-| Knit `Knit.GetService("X")` / `GetController` | constructor injection |
+| Knit `Knit.GetService("X")` / `GetController` | constructor injection, or `Dependency<X>()` in a method |
 | singleton module with top-level state | a `@Service()` / `@Controller()` class; state on the instance or in `persist` |
 | shutdown cleanup | `onStop` (reverse order; the kernel gives a stopping generation 5 s) and the trove |
 
 - Server modules go in `src/server/services/`, client modules in `src/client/controllers/` (subfolders are fine);
   kebab-case names (`coin.service.ts`).
 - Import only from `@typetorch/framework`: `Module`, `Service`, `Controller`, `OnInit`, `OnStart`, `OnStop`, `OnTick`,
-  `OnPhysics`, `OnRender`, `OnPlayerAdded`, `TypeTorch`, `createNetwork`, `observePlayers`, `observeElement`,
-  `isRealFrame`, `popIn`, `popOut`, `bump`, `PopupQueue`, `hotAsset`, `setNetworkLimits`, and `Modding`, `Reflect`,
-  `t` for your own macros and decorators.
-- **If the project uses Flamework,** the migration is mostly a swap: the decorators, constructor injection and
-  lifecycle interfaces keep their names, so change the imports to `@typetorch/framework`, add `extends Module` and
-  `super()`, and do the swap-safety pass (4.3). The rest is the toolchain (Step 3), `createNetwork` for
-  `@flamework/networking` (4.4) and observers for components. Then:
+  `OnPhysics`, `OnRender`, `OnPlayerAdded`, `TypeTorch`, `Dependency`, `Lazy`, `createNetwork`, `observePlayers`,
+  `observeCharacters`, `observeLocalCharacter`, `observeElement`, `isRealFrame`, `popIn`, `popOut`, `bump`,
+  `PopupQueue`, `hotAsset`, `setNetworkLimits`, and `Modding`, `Reflect`, `t` for your own macros and decorators.
+- **If the project uses Flamework,** the migration is mostly a swap: the decorators, constructor injection,
+  `Dependency<T>()` and the lifecycle interfaces keep their names, so change the imports to `@typetorch/framework`,
+  add `extends Module` and `super()`, and do the swap-safety pass (4.3). The rest is the toolchain (Step 3),
+  `createNetwork` for `@flamework/networking` (4.4) and observers for components. `Dependency<T>()` is the cycle
+  breaker (with `Lazy<T>`) and the way plain classes reach modules; it works from `onInit` on, so move every call in a
+  constructor, a field initializer or at the top level of a module (`const X = Dependency<X>()` in a command file) into
+  a method or `onInit`. Keep `import type` for the class. Then:
   - no file under `src/` imports `@flamework/*`: `git grep -n "@flamework/" -- src` prints nothing;
   - remove `@flamework/*` and `rbxts-transformer-flamework` from `package.json` (`bun remove ...`);
   - type ids changed format (`@typetorch/framework:decorators@Service`, `server/services/x@X`): anything the game
@@ -369,14 +373,16 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 2. **No module-level state or side effects.** Constants may stay. Per-generation state goes on the instance. State that
    must survive a swap goes in `this.ctx.persist("key.v1", () => init)`, plain data only (tables, Maps, Sets of
    strings, numbers, booleans, Players); never functions, class instances, Promises, threads, connections, charm atoms
-   or Instances the generation made. Version the key.
+   or Instances the generation made. Version the key. Per-player maps (cooldowns, states, sessions):
+   `this.ctx.playerState("key.v1", (player) => init)` (`get`/`set`/`has`/`delete`, persisted, removed on a real leave).
 3. **Players through `onPlayerAdded(player, playerTrove)` or `observePlayers(this.trove, …)`**, never
    `Players.PlayerAdded.Connect`. They replay everyone on every swap, so **join handlers must be idempotent**: guard
    one-time effects (join rewards, welcome popups, "joined" analytics) with a persisted set. Work for real leaves only:
    `this.trove.connect(Players.PlayerRemoving, …)` (a `playerTrove` is also cleaned on every swap).
-4. **Tags and characters through observers:** `observeElement(this.trove, tag, (instance, elementTrove) => …)`, or
-   `@rbxts/observers` with its stop function in the trove, or (characters, no extra package) `player.Character` plus
-   `playerTrove.connect(player.CharacterAdded, …)`.
+4. **Tags and characters through observers:** `observeElement(this.trove, tag, (instance, elementTrove) => …)`;
+   characters with `observeCharacters(this.trove, (player, character, characterTrove) => …)` (client:
+   `observeLocalCharacter(this.trove, (character, characterTrove) => …)`), which replace `Observers.observeCharacter`
+   / `observeLocalCharacter`; other `@rbxts/observers` with their stop function in the trove.
 5. **No global connections or loops outside troves.** A loop directly in `onStart` is fine. Elsewhere:
    `this.trove.add(task.spawn(() => { … }))`. Prefer `onTick` for per-frame work.
 6. **No `_G` or `shared`:** constructor injection, or `persist`.
@@ -408,7 +414,11 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 - Delete every RemoteEvent/RemoteFunction/UnreliableRemoteEvent the game created, in code, the Rojo project or the
   place notes. RemoteFunctions become request leaves.
 - Template literal types can't be guarded: use `string`. Keep game checks (distance, ownership, cooldowns) in handlers.
-- `@rbxts/net`, `@flamework/networking`, Zap, Blink, ByteNet: convert to `createNetwork`.
+- `@rbxts/net`, `@flamework/networking`, Zap, Blink, ByteNet: convert to `createNetwork`. Flamework names: `connect` →
+  `on`, `setCallback` → `handle`, `broadcast` → `fireAll`, `except` → `fireExcept`, `predict` → `emit` (runs the local
+  `on` handlers, no traffic), `invokeWithTimeout(seconds, …)` keeps its name; check the unit (seconds, 0.5 to 120: a
+  Flamework call with `5000` meant milliseconds by mistake). A leaf's default timeout: `setNetworkLimits({ "x.y": {
+  timeout: 30 } })` in `src/shared/net.ts` (the client reads it).
 
 ### 4.5 UI
 

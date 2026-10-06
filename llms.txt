@@ -4,7 +4,8 @@
 
 Key facts for agents:
 - Never handle secrets (Open Cloud keys, signing key files) and never act on Roblox (deploy, publish, keys, approve): those are user steps. Follow agents/AGENTS.md.
-- Every module must be stoppable and restartable: everything in this.trove, no module-level state (persist plain data with this.ctx.persist), players via onPlayerAdded/observePlayers (replays on every swap), no RemoteEvents (createNetwork), no _G.
+- Every module must be stoppable and restartable: everything in this.trove, no module-level state (persist plain data with this.ctx.persist; per-player maps with this.ctx.playerState), players via onPlayerAdded/observePlayers and characters via observeCharacters (replay on every swap), no RemoteEvents (createNetwork), no _G.
+- Modules reach each other by constructor injection; elsewhere (methods, plain classes, command handlers) with Dependency<T>() / TypeTorch.module<T>(), from onInit on (never in a constructor, field initializer or module top level). A dependency cycle is broken with Lazy<T> (a field `= Lazy<T>()`, or a constructor parameter with @typetorch/transformer 0.2.1+) or Dependency<T>() in a method.
 - The payload holds only Folders and ModuleScripts; entry points are src/server/boot.ts and src/client/boot.ts.
 - The template repo decides the toolchain (package.json, tsconfig.json, default.project.json, studio.project.json).
 - No GitHub Actions, ever (the owner's rule: supply-chain risk). Never add workflows, actions or hosted CI; builds, cloud tests and deploys run on the user's machine.
@@ -37,11 +38,11 @@ Key facts for agents:
 - [Hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md): TypeTorchAsset, typetorch assets sync, hotAsset(), updating held tools, migrating templates
 - [Testing in Studio](https://github.com/typetorch/docs/blob/main/guides/studio-testing.md): studio.project.json, bun run watch + bun run studio, local payload
 - [The dev menu](https://github.com/typetorch/docs/blob/main/guides/dev-menu.md): Artifact (uptimes, Signing), Modules (Overview, State explorer, Assets), Server (Status, Branch: Switch, Load here, Join), Manage (owners: Players, Servers, Load a build, Bans), Logs (Upload to the paired dev PC), Dex, Network, Claude; /tt commands
-- [Runtime API](https://github.com/typetorch/docs/blob/main/guides/runtime-api.md): TypeTorch.* identity, startInfo, onSwapOut, onUpdatePending, onBranchChanged, persist, roles, status, logs, asset
-- [Networking](https://github.com/typetorch/docs/blob/main/guides/networking.md): createNetwork, guards, limits, requests
+- [Runtime API](https://github.com/typetorch/docs/blob/main/guides/runtime-api.md): TypeTorch.* identity, startInfo, onSwapOut, onUpdatePending, onBranchChanged, persist, playerState, module/tryModule and Dependency<T>(), roles, status, logs, asset
+- [Networking](https://github.com/typetorch/docs/blob/main/guides/networking.md): createNetwork, guards, limits, requests, invokeWithTimeout and per-leaf timeouts (seconds), emit (Flamework predict), Flamework networking names
 - [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md): Claude Code prompted from a dev server; Live/Code modes, deploy approval, screenshots, Toolbox
 - [Security model](https://github.com/typetorch/docs/blob/main/guides/security.md): owners and devs, access push (TypeTorchAccess), what protects prod, accepted risks, keys and tokens, no GitHub Actions, never publish secrets
-- [Troubleshooting](https://github.com/typetorch/docs/blob/main/guides/troubleshooting.md): real errors and fixes (cloud test, --wait, fleet, quick tunnels, analytics)
+- [Troubleshooting](https://github.com/typetorch/docs/blob/main/guides/troubleshooting.md): real errors and fixes (cloud test, --wait, fleet, quick tunnels, analytics, dependency cycles, "isn't constructed yet")
 
 ## Optional
 

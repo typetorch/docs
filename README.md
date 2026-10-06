@@ -66,8 +66,8 @@ flowchart LR
 | [Hot assets](guides/hot-assets.md) | models and UI templates from the place, updated live with `hotAsset()` |
 | [Testing in Studio](guides/studio-testing.md) | run your local code in Studio with the real kernel |
 | [The dev menu](guides/dev-menu.md) | every tab, owners and devs, the `/tt` commands |
-| [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, roles, logs |
-| [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests |
+| [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, playerState, `Dependency<T>()`, roles, logs |
+| [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests, timeouts, `emit` |
 | [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server: Live and Code modes, screenshots, Toolbox |
 | [Security model](guides/security.md) | who can do what, dev access (`access push`), keys, signing, never publish secrets |
 | [Troubleshooting](guides/troubleshooting.md) | real errors and their fixes |
