@@ -96,9 +96,11 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    - UI: code-built in the trove; Studio-built stays in StarterGui, tagged and driven by `observeElement`; charm atoms
      per generation (persist plain values); `popIn/popOut/bump`; one `PopupQueue`.
    - Player data: the library lives in the place (`ServerStorage.Packages.<Lib>` + a `DataHost` Script, user steps),
-     handles in `persist`, load on join, release on real leave, store names split by `TypeTorch.channel`. ProfileStore:
-     use the Player data guide's `DataService` (keep its `TypeTorchTest` line: place scripts never run in the cloud
-     test, so waiting for `DataHost` there fails every prod deploy). Developer products: the PurchaseId goes into the
+     handles in `persist`, load on join, release on real leave, store names split by `TypeTorch.channel`. Library
+     loads, saves and releases run as jobs on DataHost's thread (`library.TypeTorchJobs`): a deploy stops the
+     generation's threads mid-call, which jams the library for that player. ProfileStore or ProfileService: use the
+     Player data guide's `DataService` for that library (keep its `TypeTorchTest` line: place scripts never run in the
+     cloud test, so waiting for `DataHost` there fails every prod deploy). Developer products: the PurchaseId goes into the
      profile with the grant, `PurchaseGranted` only after a save holds it (`grantOnce`), never only `persist`.
      Others: wrap unchanged and flag.
    - The cloud test runs `onInit`/`onStart` against the live game's data (real DataStores, MemoryStores,
