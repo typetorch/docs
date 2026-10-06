@@ -132,7 +132,7 @@ In Studio, with the place open: **File > Game Settings > Security**.
 whole place. Only remote-claude's `run_luau` needs it, on dev servers. **Turn it on only in a place where you want
 `run_luau` (a test place); keep it off in a live game.**
 
-- `kernel deploy` patches (`--place-file`, CLI after 0.7.2) leave your place's value as it is.
+- `kernel deploy` patches (`--place-file`, CLI 0.7.3+) leave your place's value as it is.
 - `kernel deploy --replace-place` (step 8) publishes what the kernel's place file says: on, up to kernel 0.3.5. Turn
   it off in Studio afterwards if this place won't use `run_luau`.
 - A `--loadstring` flag to turn it on on purpose is **planned** (with kernel 0.3.6).

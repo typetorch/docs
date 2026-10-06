@@ -26,7 +26,7 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 8. On npm: every `@typetorch/*` package except analytics (`bun install` in the template gets them; `npx
    @typetorch/cli` works too). Built: kernel patch deploys (`kernel deploy --place-file`), the cloud test before prod
    deploys, `onStop` at shutdown (kernel 0.3.2), the fleet API, the optional `AnalyticsEngine`, `typetorch access
-   push` (CLI after 0.7.2; servers read it from kernel 0.3.6). Planned, never promise: `typetorch init`, content
+   push` (CLI 0.7.3+; servers read it from kernel 0.3.6). Planned, never promise: `typetorch init`, content
    packs, `typetorch test --unit`, `/tt grant`, a web analytics explorer.
 9. No GitHub Actions, ever (the owner's rule): never add `.github/workflows`, actions or hosted CI, never suggest
    them.
@@ -98,7 +98,7 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
      profile with the grant, `PurchaseGranted` only after a save holds it (`grantOnce`), never only `persist`.
      Others: wrap unchanged and flag.
    - The cloud test runs `onInit`/`onStart` against the live game's data (real DataStores, MemoryStores,
-     MessagingService, HTTP; no players; `TypeTorch.channel` is `dev` there with CLIs after 0.7.2, so only
+     MessagingService, HTTP; no players; `TypeTorch.channel` is `dev` there with CLI 0.7.3 or newer, so only
      channel-split stores point at dev data; the `AnalyticsEngine` sends nothing): guard global resets,
      MessagingService publishes and "server started" rows with
      `workspace:GetAttribute("TypeTorchTest")`, and list the guards in `MIGRATION_NOTES.md`. Count MessagingService

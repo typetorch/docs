@@ -662,7 +662,7 @@ replaces (keep the ones listed below) in Studio and publish just before the firs
    It adds the kernel folders (with your trust roots `KeyAssetId`, `FallbackPublicKey` and `BootstrapHeads`) and the
    kernel's settings (`HttpService.HttpEnabled`), checks that everything else is unchanged, and writes the patched
    file and a report to `.typetorch/place-patches/`. Read the summary. It leaves `ServerScriptService.LoadStringEnabled`
-   as your place has it (CLI after 0.7.2; older CLIs turn it on, so check it in Studio afterwards).
+   as your place has it (CLI 0.7.3+; older CLIs turn it on, so check it in Studio afterwards).
 3. Publish it: the same command without `--dry-run`. It asks y/N and refuses if someone published meanwhile. Keep your
    downloaded copy: `bun run typetorch kernel restore <file>` publishes it back (undo).
 4. Move players to the new version (restart servers from Creator Hub, or the dev menu's **Migrate** on servers that
@@ -717,7 +717,7 @@ service that uses tags.
 > `onInit` and `onStart` run there against your **real DataStores, MemoryStores, MessagingService and HTTP
 > endpoints**. No player joins, and place scripts don't run.
 >
-> `TypeTorch.channel` is `dev` in the test (CLI after 0.7.2; older CLIs report the branch's channel), so stores you
+> `TypeTorch.channel` is `dev` in the test (CLI 0.7.3+; older CLIs report the branch's channel), so stores you
 > split by channel point at dev data. Everything else is your live game's.
 
 The test sets an attribute your code can check:

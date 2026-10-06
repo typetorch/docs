@@ -94,7 +94,7 @@ stops it, and boots it a second time as a swap would. Any error fails it. It tak
 - **Your code runs against real data there:** DataStores, MemoryStores, MessagingService and HttpService work in a
   task (with no players). Place scripts don't run. Code that must not run in the test can check
   `workspace:GetAttribute("TypeTorchTest")`: [what to guard](../getting-started/migrate.md#the-cloud-test-runs-your-game-code).
-- **It runs as channel `dev`** (CLI after 0.7.2): the stub kernel reports `TypeTorch.channel = "dev"` (a reserved
+- **It runs as channel `dev`** (CLI 0.7.3+): the stub kernel reports `TypeTorch.channel = "dev"` (a reserved
   server) whatever the branch, so stores you split by channel point at dev data. The payload's own `Channel` is still
   checked (prod branches take only prod builds).
 - **Analytics sends nothing from it** (framework after 0.3.2): the `AnalyticsEngine` collects as usual but never

@@ -51,7 +51,7 @@ approving. You finish with a numbered "What you need to do" list that tells them
    (`typetorch test --cloud`, automatic before prod deploys), `onStop` at server shutdown (kernel 0.3.2), the fleet API
    (`typetorch servers`, `report`, `alerts`) and the optional `AnalyticsEngine` (framework 0.3.0; its backend is
    `@typetorch/analytics`, a git repo, not on npm). Owners switching any server in place needs kernel 0.3.4 and
-   framework 0.3.2 (both on npm). Dev access lists through `typetorch access push` need a CLI newer than 0.7.2 and
+   framework 0.3.2 (both on npm). Dev access lists through `typetorch access push` need CLI 0.7.3 or newer and
    kernel 0.3.6 on the servers. Planned: `typetorch init`, content packs, the typed asset map from files,
    `typetorch test --unit`, `/tt grant`/`revoke`, a web analytics explorer.
 9. **No GitHub Actions, ever** (the owner's rule: they are a supply-chain risk). Don't add `.github/workflows`, actions,
@@ -437,7 +437,7 @@ list.
 
 **The cloud test runs game code against the live game's data.** Every prod deploy boots the build in a headless Luau
 Execution task: `onInit` and `onStart` of every module, with the real DataStores, MemoryStores, MessagingService and
-HTTP, no players, no place scripts. `TypeTorch.channel` is `dev` there (CLI after 0.7.2), so stores split by channel
+HTTP, no players, no place scripts. `TypeTorch.channel` is `dev` there (CLI 0.7.3+), so stores split by channel
 point at dev data; unsplit stores don't. The `AnalyticsEngine` sends nothing from the test (framework after 0.3.2).
 `workspace:GetAttribute("TypeTorchTest")` is true there. Guard with it, and list each guard in `MIGRATION_NOTES.md`:
 
