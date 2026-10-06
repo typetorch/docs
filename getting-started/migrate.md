@@ -30,6 +30,8 @@ copy in the same server. Whatever a module made or connected must go away with i
 - Work on a branch: `git switch -c typetorch-migration`. Commit after every step that builds.
 - Keep a list of what you change and what's left (`MIGRATION_NOTES.md`).
 - Don't change DataStore names or the shape of saved data during the migration.
+- **A live game with players?** This page is the code part. Do it inside the
+  [go-live checklist](../guides/go-live-checklist.md): a copy of the game, a dev-branch soak, then a cut-over.
 
 ## 1. Take inventory
 
@@ -494,8 +496,12 @@ Replace the deprecated `spawn`, `delay` and `wait` with `task.*` while you are t
 ### Rule 8: shutdown
 
 On kernel 0.3.2+, a server shutdown runs every module's `onStop` (the kernel's own `BindToClose` calls the running
-generation, for at most 20 s). Put shutdown saves in `onStop` and keep them short. `TypeTorch.onSwapOut` runs before a
-swap, never on shutdown.
+generation, for at most 20 s). Keep `onStop` short. `TypeTorch.onSwapOut` runs before a swap, never on shutdown.
+
+**Don't rely on `onStop` for saves.** A server that shuts down in the middle of a swap (the old build stopped, the new
+one not running yet) has no running generation, so no `onStop` runs at all. Player data goes through a library in the
+place that saves on close by itself ([Player data](../guides/player-data.md#shutdown)), or is written as it changes.
+Use `onStop` for short extras.
 
 On older kernels, `game.BindToClose` can't be unbound, so bind it at most once per server (guard it with a persisted
 flag).
@@ -619,7 +625,11 @@ Saving is game code; you pick the library. On TypeTorch the library must outlive
 place, its session handles live in `persist`, sessions load on join and are released on a real leave. Read
 [Player data](../guides/player-data.md) before you migrate any data code, and test it on a dev branch first.
 
-Don't change store names, keys or the data format in the same step.
+- Don't change store names, keys or the data format in the same step.
+- The data code must not wait for place scripts in the cloud test ([why](../guides/player-data.md#the-cloud-test)).
+- Developer products: record the PurchaseId in the player's profile with the grant, and return `PurchaseGranted`
+  only after a save holds it ([Developer products](../guides/player-data.md#developer-products)). `persist` alone
+  grants twice when Roblox retries on another server.
 
 ### Analytics (optional)
 
@@ -694,6 +704,47 @@ service that uses tags.
   new version). A separate Build experience with pinned content packs is **planned**.
 - The typed asset map from files (Asphalt) is **planned**.
 
+## The cloud test runs your game code
+
+> **Read this before your first prod deploy.** Every prod deploy and promote first boots your build in a headless
+> Luau Execution task on your live place ([the cloud test](../guides/deploy-and-rollback.md#the-cloud-test)). Your
+> `onInit` and `onStart` run there, on the **prod** channel, against your **real DataStores, MemoryStores and HTTP
+> endpoints**. No player joins, and place scripts don't run.
+
+The test sets an attribute your code can check:
+
+```ts
+import { MessagingService, Workspace } from "@rbxts/services";
+
+onStart() {
+	if (Workspace.GetAttribute("TypeTorchTest") === true) return; // the cloud test: no announcement from a headless task
+	MessagingService.PublishAsync("game/servers", `started ${game.JobId}`);
+}
+```
+
+Guard only the side effects, so the test still boots your real code:
+
+- **global resets and one-time jobs:** season rollovers, leaderboard wipes, migrations of shared keys;
+- **MessagingService publishes:** cross-server announcements, "a server started" pings;
+- **"server started" rows:** DataStore or MemoryStore writes, webhooks, your own HTTP APIs;
+- **waits on place scripts:** they never run there, so the wait times out and the test fails
+  ([the player data library](../guides/player-data.md#the-cloud-test)).
+
+## MessagingService topics
+
+Roblox allows a server **5 + 2 × players** subscriptions: an empty server has room for 5. Count your game's topics
+before you migrate (`git grep -n "SubscribeAsync" -- src`, and any in place scripts). TypeTorch uses these:
+
+| Who | Topics | When |
+|---|---|---|
+| kernel | 3: `TypeTorch/deploy`, `TypeTorch/pin`, `TypeTorch/rekey` | every server |
+| framework roll call (Manage > Servers) | 1: `TypeTorch/rollcall`, plus 1 more while a dev on that server collects the list | every server |
+| framework remote-claude | 2 | dev-channel servers only |
+
+So a prod server uses 4, briefly 5. A game with 2 topics of its own goes over the limit on an empty server, and the
+extra subscription fails. Merge your topics into one (with a `kind` field in the message), or subscribe once the first
+player is in. Count again after a kernel or framework update.
+
 ## 10. Verify, then ship
 
 1. Local checks:
@@ -708,7 +759,9 @@ service that uses tags.
    test a swap while you play.
 3. Deploy a dev branch (`git switch -c dev`, `bun run typetorch deploy`), open it with `/tt new dev`, play, deploy
    again while playing. Test player data across two deploys.
-4. Deploy `prod` from `main` ([fresh setup step 9](fresh-setup.md#9-first-deploy)).
+4. `bun run typetorch test --cloud` on the dev build passes: prod deploys run the same test.
+5. Deploy `prod` from `main` ([fresh setup step 9](fresh-setup.md#9-first-deploy)). A game with live players goes
+   through the [go-live checklist](../guides/go-live-checklist.md) first.
 
 ## Checklist
 
@@ -727,6 +780,9 @@ service that uses tags.
 - [ ] no RemoteEvent/RemoteFunction anywhere; one `createNetwork`
 - [ ] UI: code-built in troves, Studio-built tagged and observed
 - [ ] player data follows [the pattern](../guides/player-data.md); store names split by channel
+- [ ] developer product receipts recorded in the profile before `PurchaseGranted`; no saves only in `onStop`
+- [ ] side effects guarded from the cloud test (`TypeTorchTest`); `typetorch test --cloud` passes
+- [ ] MessagingService topics counted: yours + TypeTorch's 4 fit in 5 on an empty server
 - [ ] kernel installed in the place; old game scripts removed
 - [ ] `bun run build` and `bun run typetorch build` pass; a committed tree builds a clean id (no `-dirty`)
 - [ ] a dev branch survived two deploys while you played
@@ -748,5 +804,8 @@ service that uses tags.
 | Dev branch writes prod data | real players' data changes from a test server | split store names by `TypeTorch.channel` |
 | `kernel deploy --replace-place` on a real place | maps and Studio UI vanish from the live version | `kernel deploy --place-file <copy>` patches only the kernel (section 9) |
 | Slow work in `onInit` | a new server waits only about 6 s at boot, then starts an older build and swaps yours in later | load in `onStart`; keep `onInit` short |
-| Shutdown saves in `game.BindToClose` | on kernel 0.3.2+ `onStop` already runs at shutdown | save in `onStop` |
+| Player data saved only in `onStop` or a generation's `game.BindToClose` | a shutdown in the middle of a swap can skip it (no generation runs then) | the data library in the place saves on close; `onStop` for short extras |
+| `onInit` waits for a place script | the cloud test fails (place scripts don't run there), so every prod deploy is refused | skip the wait when `TypeTorchTest` is set ([Player data](../guides/player-data.md#the-cloud-test)) |
+| A global reset or a "server started" message in `onStart` | the cloud test runs it against prod data | guard it with `TypeTorchTest` |
+| Receipt PurchaseIds kept only in `persist` | a receipt Roblox retries on another server is granted twice | record it in the profile before `PurchaseGranted` |
 | Template-literal types in a network leaf | the guard can't be generated: compile error | use `string` and check it in the handler |

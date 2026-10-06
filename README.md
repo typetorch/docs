@@ -17,7 +17,7 @@ Pick one path:
 | You have | Start here | Time |
 |---|---|---|
 | Nothing yet: a new game | **[Fresh setup](getting-started/fresh-setup.md)**: from zero to a live hot-swap | about 1 hour |
-| A roblox-ts game | **[Migrate an existing game](getting-started/migrate.md)**: services, swap safety, networking, data, UI | a few hours to days |
+| A roblox-ts game | **[Migrate an existing game](getting-started/migrate.md)**: services, swap safety, networking, data, UI; with live players, inside the [go-live checklist](guides/go-live-checklist.md) | a few hours to days; about a week with live players |
 | An AI coding agent | **[Agent playbook](agents/AGENTS.md)**: tell your agent "migrate this project to typetorch" | |
 
 TypeTorch is **roblox-ts only**. A plain Luau game has to move to roblox-ts first.
@@ -61,7 +61,8 @@ flowchart LR
 | [Live servers and alerts](guides/fleet-and-alerts.md) | the fleet API, `typetorch servers`, `report`, `alerts`, server lost and stuck, webhooks |
 | [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, DuckDB or Basin, experiments, queries, node graphs, privacy, a local quick start |
 | [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
-| [Player data](guides/player-data.md) | the swap-safe data pattern, with a ProfileStore example |
+| [Player data](guides/player-data.md) | the swap-safe data pattern, with a ProfileStore example, the cloud test and developer product receipts |
+| [Go-live checklist](guides/go-live-checklist.md) | moving a game with live players: prepare, a copy, a dev-branch soak, live tests, cut-over, what to do if it goes wrong |
 | [Hot assets](guides/hot-assets.md) | models and UI templates from the place, updated live with `hotAsset()` |
 | [Testing in Studio](guides/studio-testing.md) | run your local code in Studio with the real kernel |
 | [The dev menu](guides/dev-menu.md) | every tab, owners and devs, the `/tt` commands |

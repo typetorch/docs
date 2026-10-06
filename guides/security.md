@@ -61,7 +61,10 @@ What stays open, by design or for now:
   redacts them from errors. Child processes (rbxtsc, rojo, lune, git) get an allowlisted environment without keys.
 - Game servers get only write-only tokens. They can send analytics and fleet data, never read it.
 - Prefer separate keys per job (`OPENCLOUD_ASSETS_KEY`, `OPENCLOUD_DEPLOY_KEY`, `OPENCLOUD_PLACE_KEY`), an expiry date
-  and an IP allowlist. An `asset:write` key that leaks is as bad as code execution on your servers.
+  and an IP allowlist. An `asset:write` key that leaks is as bad as code execution on your servers: keep `asset:write`
+  on one IP-limited key.
+- **Before a live game depends on it:** an offline backup of the key files and the env file, the separate
+  `asset:write` key, and a dated rotation drill ([Prod signing: back up and drill](prod-signing.md#back-up-and-drill)).
 - A key acts with its owner's group permissions. Give builders and contractors no Edit access on the production
   experience.
 - If a key leaks: revoke it in Creator Hub at once and create a new one. If a signing key leaks:

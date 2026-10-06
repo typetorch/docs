@@ -22,7 +22,8 @@ prod server load code. Only builds you approved on your own PC can.
 
 - The key-path variables are read from the real environment only, never from an env file.
 - No command prints a private key. A key file inside a git work tree is refused.
-- **Back up both files.** Losing the main key costs a rotate; losing the fallback key costs a kernel deploy.
+- **Back up both files** ([how](#back-up-and-drill)). Losing the main key costs a rotate; losing the fallback key
+  costs a kernel deploy.
 
 ### The rule servers follow (strict)
 
@@ -75,6 +76,30 @@ signature.
 | Main key lost or leaked | `bun run typetorch keys rotate`: a new main pair; the key asset trusts only the new key and revokes the old one; servers are told to re-read it; then every prod branch's live head is **re-signed** (same build, new `#seq`, `r = "resign"`; servers move the head without a swap). No restart |
 | A re-sign failed or was rejected | `bun run typetorch keys resign` |
 | Fallback key leaked or lost | `bun run typetorch keys init --fallback --force` (revokes the old one in the key asset first), then `bun run typetorch kernel deploy` |
+
+## Back up and drill
+
+Do these once, before players depend on the game. Losing both key files means a kernel deploy (a place publish and a
+restart) before prod takes a deploy again. Losing the env file means new Open Cloud keys.
+
+1. **An offline backup.** Copy every file in `~/.config/typetorch/keys/` and your env file
+   (`~/.config/typetorch/<game>.env`) to something offline: an encrypted USB stick, or a password manager's secure
+   notes. Not a synced cloud folder, not a repo, never a chat. Update it after every `keys rotate` and
+   `keys init --fallback --force`.
+2. **A second Open Cloud key for uploads.** Any key with `asset:write` in your group can change the key asset (the
+   trusted signing keys) and upload builds. Give that to one key only:
+   - a new key with the assets job's scopes (`asset:read`, `asset:write`, Luau Execution read and write), limited to
+     your IP address in Creator Hub (update it when your IP changes), in your env file as `OPENCLOUD_ASSETS_KEY`;
+   - remove `asset:write` from the shared key (`TYPETORCH_API_KEY`); it keeps the rest (messaging, DataStores, place
+     publishing);
+   - `bun run typetorch doctor`: `key assets` names `OPENCLOUD_ASSETS_KEY`, and every scope probe is `ok`.
+3. **A dated rotation drill.** Put it in your calendar: once before go-live, then every 3 months, and the day anyone
+   with access to your keys leaves. On that date, in a quiet hour:
+   1. `bun run typetorch keys rotate`;
+   2. on a public server, **Artifact > Signing** shows the new Root Key fingerprint, the build still has two verified
+      badges, and no swap happened (the live head was re-signed);
+   3. deploy once: servers take it;
+   4. back up the new key file (step 1) and write down the date.
 
 ## Bootstrap heads
 

@@ -117,7 +117,9 @@ The upload is recorded in `uploads.jsonl`. When Roblox approves it: `bun run typ
 **The cloud test fails.**
 Read its errors: they are your build's (an `onInit` or `onStart` that throws, a Shared module that errors, a stop that
 times out). Fix and deploy again. Game code that must not run in the test (it runs against real DataStores) can check
-`workspace:GetAttribute("TypeTorchTest")`. A missing Luau Execution scope fails it too: add
+`workspace:GetAttribute("TypeTorchTest")`. Place scripts never run there: code that waits for one (for example
+`DataHost didn't require ProfileStore` after 10 s) fails the test; see
+[Player data: the cloud test](player-data.md#the-cloud-test). A missing Luau Execution scope fails it too: add
 `universe.place.luau-execution-session:read` and `:write` to the assets key. To publish anyway, knowingly:
 `--skip-test "<reason>"`.
 

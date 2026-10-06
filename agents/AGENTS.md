@@ -51,7 +51,7 @@ approving. You finish with a numbered "What you need to do" list that tells them
    (`typetorch test --cloud`, automatic before prod deploys), `onStop` at server shutdown (kernel 0.3.2), the fleet API
    (`typetorch servers`, `report`, `alerts`) and the optional `AnalyticsEngine` (framework 0.3.0; its backend is
    `@typetorch/analytics`, a git repo, not on npm). Owners switching any server in place needs kernel 0.3.4 and
-   framework 0.3.2 (not on npm yet). Planned: `typetorch init`, content packs, the typed asset map from files,
+   framework 0.3.2 (both on npm). Planned: `typetorch init`, content packs, the typed asset map from files,
    `typetorch test --unit`, `/tt grant`/`revoke`, a web analytics explorer.
 9. **No GitHub Actions, ever** (the owner's rule: they are a supply-chain risk). Don't add `.github/workflows`, actions,
    or any hosted CI, and don't suggest them. Builds, cloud tests and deploys run on the user's machine.
@@ -101,7 +101,9 @@ wait. Always ask before deleting files the user wrote by hand.
 2. **Mapping:** each old thing and its TypeTorch replacement (Step 4 tables).
 3. **Order of work:** the sub-steps of Steps 3 and 4, one commit each.
 4. **Risks and decisions for the user:** player data (always), Studio content and scripts that stay in the place,
-   third-party networking (Zap, Blink, ByteNet), anything you can't convert.
+   third-party networking (Zap, Blink, ByteNet), MessagingService topics (count them: TypeTorch uses 4 of the 5 an
+   empty server allows, see
+   [migrate](../getting-started/migrate.md#messagingservice-topics)), anything you can't convert.
 5. **User actions:** filled in at the end (Step 7).
 
 Log every step in `MIGRATION_NOTES.md` as you go: what changed, the build result, open questions.
@@ -372,9 +374,11 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 7. **`task.spawn`/`delay`/`defer` only through the trove:** `this.trove.add(task.delay(5, fn))`. Replace deprecated
    `spawn`, `delay`, `wait` with `task.*`.
 8. **Instances in the world** that a module creates go in its trove (or an observer's cleanup).
-9. **Shutdown:** kernel 0.3.2+ runs every module's `onStop` when the server shuts down, so shutdown saves go in
-   `onStop` (short). Remove `game.BindToClose` handlers that only did that; any that must stay bind at most once per
-   server (a persisted flag).
+9. **Shutdown:** kernel 0.3.2+ runs every module's `onStop` when the server shuts down, but not when it shuts down in
+   the middle of a swap (no generation is running then). So `onStop` is for short extras, never the only place player
+   data is saved: data goes through the library in the place (4.6), or is written as it changes. Remove
+   `game.BindToClose` handlers that only did cleanup; any that must stay bind at most once per server (a persisted
+   flag).
 
 ### 4.4 Networking
 
@@ -420,6 +424,26 @@ handles live in `persist`; load on join (re-attach after a swap), release on a r
 
 Never rename stores or change the data shape. Always put "test data across two deploys on a dev branch" in the user's
 list.
+
+- **The cloud test:** keep the guide's line `if (Workspace.GetAttribute("TypeTorchTest") === true) return undefined;`
+  in `profileStore()`. The place's `DataHost` never runs in the test, so without it `onInit` waits 10 s, fails, and
+  every prod deploy is refused. Wrapped libraries follow the same rule: never wait on a place script in the test.
+- **Developer products:** `ProcessReceipt` records the PurchaseId in the player's profile together with the grant and
+  returns `PurchaseGranted` only once a save holds it (the guide's `grantOnce` and `ReceiptService`). Never only in
+  `persist`. Put "buy a product while a deploy runs" in the user's list.
+
+**The cloud test runs game code against prod data.** Every prod deploy boots the build in a headless Luau Execution
+task: `onInit` and `onStart` of every module, on the prod channel, with real DataStores, MemoryStores and HTTP, no
+players, no place scripts. `workspace:GetAttribute("TypeTorchTest")` is true there. Guard with it, and list each guard
+in `MIGRATION_NOTES.md`:
+
+- global resets and one-time jobs (season rollovers, leaderboard wipes, shared-key migrations);
+- MessagingService publishes (cross-server announcements, "server started" pings);
+- "server started" rows in DataStores or MemoryStores, webhooks, the game's own HTTP APIs;
+- waits on place scripts.
+
+Guard only side effects; the test is useful because it boots the real code. Details:
+[migrate: the cloud test runs your game code](../getting-started/migrate.md#the-cloud-test-runs-your-game-code).
 
 ### 4.7 Place content, assets and scripts that stay
 
@@ -518,7 +542,8 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
    into chat.
 5. **Check:** `bun run typetorch doctor`. Expect `ok` for the tools, `typetorch.json`, each key and the scopes you added.
 6. **Prod signing keys:** `bun run typetorch keys init`, `bun run typetorch keys init --fallback`, commit
-   `typetorch.json`. Back up `~/.config/typetorch/keys/<universeId>.key` and `.fallback.key`.
+   `typetorch.json`. Back up `~/.config/typetorch/keys/<universeId>.key`, `.fallback.key` and your env file offline,
+   and plan a rotation drill ([Prod signing: back up and drill](https://github.com/typetorch/docs/blob/main/guides/prod-signing.md#back-up-and-drill)).
 7. **Put the kernel in the place** (needs a place publish and a restart):
    - empty or new place: `bun run typetorch kernel deploy --dry-run`, then
      `bun run typetorch kernel deploy --replace-place --yes`;
@@ -538,10 +563,13 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
 10. **Check the kernel live:** join the game; F9 > Server shows `[TypeTorch] kernel <version> (API 1) on a public
     server, branch prod, signed deploys only (keys: key asset)`. `/tt status` answers.
 11. **Dev branch:** `git switch -c dev`, `bun run typetorch deploy`, then `/tt new dev` in game. Earn some data, deploy
-    again twice while playing, rejoin: nothing lost.
-12. **First prod deploy:** merge into `main`, stay in the game, `bun run typetorch deploy` (the cloud test runs, then
-    y/N, then signed). Expect `deployed #N prod@<commit> -> <artifact id>`; the dev menu's Artifact tab shows two
-    verified badges.
+    again twice while playing, rejoin: nothing lost. Developer products: buy one while a deploy runs; one grant, also
+    after a rejoin. `bun run typetorch test --cloud` passes on the dev build (prod deploys run the same test).
+12. **First prod deploy:** a game with live players goes through the
+    [go-live checklist](https://github.com/typetorch/docs/blob/main/guides/go-live-checklist.md) first (a copy of the
+    game, a dev-branch soak, a planned cut-over). Merge into `main`, stay in the game, `bun run typetorch deploy` (the
+    cloud test runs, then y/N, then signed). Expect `deployed #N prod@<commit> -> <artifact id>`; the dev menu's
+    Artifact tab shows two verified badges.
 13. **Rollback drill:** `bun run typetorch rollback --branch prod`, check `bun run typetorch deployments`, deploy again.
 14. Optional: [live servers and alerts](https://github.com/typetorch/docs/blob/main/guides/fleet-and-alerts.md)
     (`typetorch fleet setup`, then `servers`, `report`, `alerts`, and automatic rollback after bad deploys);

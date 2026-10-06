@@ -35,7 +35,16 @@ Every TypeTorch game has an in-game developer menu. It ships in the framework, s
 A sidebar group with a **Server | Client** toolbar:
 
 - **Overview:** every running module, its lifecycle hooks, dependencies and `onInit` time.
-- **State:** the `persist` tables this generation opened, with a preview.
+- **State** (framework 0.3.2): a live state explorer. The roots are every running module (services on the server,
+  controllers on the client) and the `persist` store. Tap a row to open it: a module's own fields, then tables, arrays,
+  Maps and Sets, 100 entries per page (Prev / Next).
+  - Each value has a short preview: strings, numbers, booleans, nil, datatypes, an Instance as its full path, a Player
+    as its name, `function`, `thread`, buffer sizes.
+  - Raw reads only: no metamethod, getter or function ever runs. A value that is its own ancestor shows as a cycle,
+    with its path.
+  - A key filter (open rows stay listed), Refresh, and Auto (every 2 s).
+  - Server state: devs on dev-channel servers; owners only on prod-channel servers (server state can hold player
+    data). Rate-limited and size-capped.
 - **Assets:** [hot assets](hot-assets.md): each key, its source (KEPT, BAKED, LOADED, FAILED, LOADING), version,
   load time and last error; on the client, the live copies it sees.
 
@@ -102,7 +111,12 @@ server, logged, and rate-limited.
 ### Logs
 
 The server's log, your own client's log, and **Others** (another player's client log, fetched on demand). Filter by
-level and text; errors are pinned. Dev builds carry `[file:line]` on `$print` lines.
+level and text; errors are pinned. Dev builds carry `[file:line]` on `$print` lines. Kernel notes (`[TypeTorch] ...`
+info lines) are dim.
+
+**Upload** (framework 0.3.2) sends the log shown to the dev PC paired in the [Claude tab](remote-claude.md), which
+saves it under `<repo>/.typetorch/logs/` and prints one line. No Claude run, no prompt used. Not paired: "Pair in the
+Claude tab first".
 
 ### Dex
 

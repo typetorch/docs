@@ -92,7 +92,8 @@ stops it, and boots it a second time as a swap would. Any error fails it. It tak
 - `--skip-test "<reason>"` publishes without it; the reason goes into the deploy log.
 - `bun run typetorch test --cloud [<artifact>]` runs it alone.
 - **Your code runs against real data there:** DataStores, MemoryStores and HttpService work in a task (with no
-  players). Code that must not run in the test can check `workspace:GetAttribute("TypeTorchTest")`.
+  players). Place scripts don't run. Code that must not run in the test can check
+  `workspace:GetAttribute("TypeTorchTest")`: [what to guard](../getting-started/migrate.md#the-cloud-test-runs-your-game-code).
 - Needs the Luau Execution scopes on the assets key ([fresh setup step 6](../getting-started/fresh-setup.md#6-the-open-cloud-api-key-owner)).
 
 ### The health window and the last known good build

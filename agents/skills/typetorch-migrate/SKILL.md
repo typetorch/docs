@@ -81,8 +81,9 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
      `observePlayers`, idempotent (persisted set for one-time effects), real leaves via
      `this.trove.connect(Players.PlayerRemoving, …)`; tags/characters via `observeElement` or `@rbxts/observers`
      (stop function in the trove); loops only in `onStart` or `this.trove.add(task.spawn(…))`; no `_G`/`shared`;
-     `task.*` through the trove; shutdown saves in `onStop` (kernel 0.3.2 runs it at shutdown; a `BindToClose` that
-     must stay binds once per server); keep `onInit` short (a new server's boot waits about 6 s).
+     `task.*` through the trove; `onStop` runs at shutdown (kernel 0.3.2) but not when a server closes mid-swap, so
+     it is for short extras, never the only place data is saved (a `BindToClose` that must stay binds once per
+     server); keep `onInit` short (a new server's boot waits about 6 s).
    - Networking: one `src/shared/net.ts` with `createNetwork<ClientToServer, ServerToClient>()`; server
      `.on`/`.handle` (returns `[value]` or `[false, reason]`)/`.fire...`, client `.fire`/`.invoke`/`.on`; every
      disconnect into the trove; delete all remotes; no template literal types.
@@ -90,7 +91,14 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
      per generation (persist plain values); `popIn/popOut/bump`; one `PopupQueue`.
    - Player data: the library lives in the place (`ServerStorage.Packages.<Lib>` + a `DataHost` Script, user steps),
      handles in `persist`, load on join, release on real leave, store names split by `TypeTorch.channel`. ProfileStore:
-     use the Player data guide's `DataService`. Others: wrap unchanged and flag.
+     use the Player data guide's `DataService` (keep its `TypeTorchTest` line: place scripts never run in the cloud
+     test, so waiting for `DataHost` there fails every prod deploy). Developer products: the PurchaseId goes into the
+     profile with the grant, `PurchaseGranted` only after a save holds it (`grantOnce`), never only `persist`.
+     Others: wrap unchanged and flag.
+   - The cloud test runs `onInit`/`onStart` against prod data (real DataStores, MemoryStores, HTTP; no players):
+     guard global resets, MessagingService publishes and "server started" rows with
+     `workspace:GetAttribute("TypeTorchTest")`, and list the guards in `MIGRATION_NOTES.md`. Count MessagingService
+     topics: TypeTorch uses 4 of the 5 an empty server allows.
    - Hot assets only if asked: `hotAsset(key, template)`. Analytics only if asked: `new AnalyticsEngine()` on server
      and client (its backend is a user step).
 5. **Checks:** `bun run build`; `bun run typetorch build` (prints `built <id> ... modules`); `out/shared/net.luau` has
@@ -105,14 +113,15 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    setup`; not `universe:read` or `legacy-asset:manage`, which API keys can't get today); store it in
    `~/.config/typetorch/<game>.env` as `TYPETORCH_API_KEY=` and put `TYPETORCH_ENV_FILE=~/.config/typetorch/<game>.env`
    in the repo's `.env`; `bun run typetorch doctor`; `bun run typetorch keys init` + `keys init --fallback`, commit,
-   back up the key files; kernel into the place (new place: `kernel deploy --dry-run` then `--replace-place --yes`;
-   place with content: File > Download a Copy, `kernel deploy --dry-run --install --place-file <file> --base
+   back up the key files and the env file offline; kernel into the place (new place: `kernel deploy --dry-run` then
+   `--replace-place --yes`; place with content: File > Download a Copy, `kernel deploy --dry-run --install --place-file <file> --base
    <version>`, check the summary, then the same without `--dry-run`; or copy the three kernel folders from
    `.typetorch/place.rbxl` in Studio and publish); remove the old scripts in Studio just before the first deploy; data
    library + `DataHost` in the place; test in Studio (`bun run watch` + `bun run studio`, Play); check F9 `[TypeTorch]
-   kernel ...`; dev branch deploy + `/tt new dev` + two deploys while playing; first prod deploy from `main` (cloud
-   test, y/N, signed); rollback drill; optional: the fleet API and analytics. Then post the report (template in
-   AGENTS.md).
+   kernel ...`; dev branch deploy + `/tt new dev` + two deploys while playing (+ a product bought during a deploy);
+   a game with live players: the go-live checklist (docs `guides/go-live-checklist.md`) before the first prod deploy;
+   first prod deploy from `main` (cloud test, y/N, signed); rollback drill; optional: the fleet API and analytics.
+   Then post the report (template in AGENTS.md).
 
 ## Kernel updates (only when the user asks)
 

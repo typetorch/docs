@@ -259,8 +259,9 @@ git commit -m "Prod signing keys"
   group-owned Model that lists the trusted public keys) and writes `signingPublicKeys` and `keyAssetId` into
   `typetorch.json`.
 - `keys init --fallback` writes `~/.config/typetorch/keys/<universeId>.fallback.key` and `fallbackPublicKey`.
-- **Back up both key files** (a password manager, or offline). They are plaintext and never leave your PC. Never put
-  them in a repo.
+- **Back up both key files and your env file** offline (an encrypted USB stick, or a password manager). They are
+  plaintext and never leave your PC. Never put them in a repo. Before a live game depends on them, also split off an
+  `asset:write` key and plan a rotation drill ([Prod signing: back up and drill](../guides/prod-signing.md#back-up-and-drill)).
 
 **Check:** `bun run typetorch doctor` shows both key files `ok` and matching `typetorch.json`, and the key asset as
 Approved.
