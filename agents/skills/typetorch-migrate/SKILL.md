@@ -16,7 +16,7 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 2. Never act on Roblox: no `typetorch` upload, deploy (not even `--dry-run`), promote, rollback, approve, reject, pin,
    deployments, branch ls, settings, access push, kernel deploy (not even `--dry-run`, except a kernel update the
    user asked for: see "Kernel updates"), kernel restore, keys, assets sync/status, test --cloud, servers, report,
-   alerts, fleet setup, update, doctor; no place publish; no remote-claude (`typetorch dev`), analytics server or
+   alerts, backend setup, update, doctor; no place publish; no remote-claude (`typetorch dev`), analytics server or
    tunnel. These are user steps.
 3. Never push. Commit locally on `typetorch-migration`.
 4. Don't edit `node_modules/@typetorch/*`, the reference `../template` or any TypeTorch checkout: copy from them.
@@ -121,9 +121,9 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 7. **Finish** with "What you need to do" (numbered, filled in): fill the ids; Game Settings (HTTP on, Studio API access
    on); create the Open Cloud key (`asset:read`, `asset:write`, Luau Execution read/write (the cloud test before every
    prod deploy), `universe-messaging-service:publish`, DataStore `universe-datastores.objects:read` + `:create` +
-   `:update` (the shared deploy number and the signed settings: `access push`, `fleet setup`), place publishing for
+   `:update` (the shared deploy number and the signed settings: `access push`, `backend setup`), place publishing for
    `kernel deploy`; no `universe:write` / `universe:read`; not `legacy-asset:manage`, which API keys can't get
-   today); store it in `~/.config/typetorch/<game>.env` as `TYPETORCH_API_KEY=` and put `TYPETORCH_ENV_FILE=~/.config/typetorch/<game>.env`
+   today); store it in `~/.config/typetorch/<game>.env` as `OPENCLOUD_API_KEY=` and put `TYPETORCH_ENV_FILE=~/.config/typetorch/<game>.env`
    in the repo's `.env`; `bun run typetorch doctor`; `bun run typetorch keys init` + `keys init --fallback`, commit,
    back up the key files and the env file offline; members in `typetorch.json`, then `bun run typetorch access push`
    (again after every change); kernel into the place (new place: `kernel deploy --dry-run` then

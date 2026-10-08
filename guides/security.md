@@ -64,10 +64,10 @@ What stays open, by design or for now:
 
 | Secret | Where it lives | Never |
 |---|---|---|
-| Open Cloud API key(s) | an env file outside the repo (`~/.config/typetorch/<game>.env`, named by `TYPETORCH_ENV_FILE`), or the real environment | in git, in chat, in an issue, in a screenshot, given to an agent |
+| Open Cloud API key(s) | the game repo's `.env` (gitignored; CLI 0.9), or the real environment | in git, in chat, in an issue, in a screenshot, given to an agent |
 | Signing key files | `~/.config/typetorch/keys/<universeId>.key` and `.fallback.key` | inside any git work tree (the CLI refuses), copied to another machine you don't control |
-| Fleet and analytics admin token (`TYPETORCH_FLEET_TOKEN`, the server's `TT_ANALYTICS_ADMIN_TOKEN`) | your env file and the server's env file | anywhere a game server or a client can read it |
-| Ingest and send tokens (write-only) | the signed settings record's `fleet` and `analytics` fields (server only), and `TYPETORCH_FLEET_INGEST_TOKEN` | in code, in a payload, sent to a client |
+| Fleet and analytics admin token (`TYPETORCH_ADMIN_TOKEN`, the server's `TT_ANALYTICS_ADMIN_TOKEN`) | your env file and the server's env file | anywhere a game server or a client can read it |
+| Ingest and send tokens (write-only) | the signed settings record's `fleet` and `analytics` fields (server only), and `TYPETORCH_API_KEY` | in code, in a payload, sent to a client |
 | Basin R2 token (SQL reads) | your PC only | in the game's settings |
 | Erasure webhook secret, fleet webhook URL, the analytics server's Open Cloud key | the analytics server's env file | in git |
 | remote-claude pairing codes | your terminal and clipboard | in a commit (they expire after one use or 3 hours) |
@@ -85,7 +85,7 @@ What stays open, by design or for now:
 - If a key leaks: revoke it in Creator Hub at once and create a new one. If a signing key leaks:
   `typetorch keys rotate` (main) or `typetorch keys init --fallback --force` + `kernel deploy` (fallback). If a token
   leaks: put a new one in the server's env file (ingest tokens can be a comma-separated list, for rotation), then run
-  `fleet setup` and write the analytics settings again.
+  `backend setup` and write the analytics settings again.
 
 ## No GitHub Actions
 

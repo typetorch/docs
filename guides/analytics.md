@@ -399,8 +399,8 @@ Add the same two to your game's env file (`~/.config/typetorch/<game>.env`, see
 [fresh setup step 6](../getting-started/fresh-setup.md#6-the-open-cloud-api-key-owner)), for the CLI:
 
 ```text
-TYPETORCH_FLEET_TOKEN=<admin token>
-TYPETORCH_FLEET_INGEST_TOKEN=<ingest token>
+TYPETORCH_ADMIN_TOKEN=<admin token>
+TYPETORCH_API_KEY=<ingest token>
 ```
 
 ### 3. Start the server
@@ -440,7 +440,7 @@ Both go into the game's [signed settings record](settings.md), so you need the p
 **Fleet** (live server status), from your game folder:
 
 ```sh
-bun run typetorch fleet setup --url https://<words>.trycloudflare.com
+bun run typetorch backend setup --url https://<words>.trycloudflare.com
 ```
 
 **Analytics settings.** Save this as `my-settings.ts` in the analytics folder (it holds no secret: the token comes
@@ -452,7 +452,7 @@ import { writeSettings } from "./src/index.ts";
 const url = process.argv[2];
 const result = await writeSettings({
 	gameDir: "../my-game", // your game folder
-	settings: { backend: "duckdb", events: `${url}/v1/ingest`, token: process.env.TYPETORCH_FLEET_INGEST_TOKEN! },
+	settings: { backend: "duckdb", events: `${url}/v1/ingest`, token: process.env.TYPETORCH_API_KEY! },
 });
 console.log(`settings.analytics written (settings #${result.seq})`);
 ```
@@ -464,7 +464,7 @@ bun --env-file="$HOME/.config/typetorch/my-game.env" my-settings.ts https://<wor
 (The same line works in PowerShell and bash.)
 
 **Or all of steps 3 to 5 at once:** in the analytics folder, `bun run local -- --env-file analytics.env --game
-../my-game` starts the server and a quick tunnel, then runs `fleet setup` and `settings set analytics` through your
+../my-game` starts the server and a quick tunnel, then runs `backend setup` and `settings set analytics` through your
 game's CLI. Ctrl+C stops both.
 
 ### 6. Play, then look

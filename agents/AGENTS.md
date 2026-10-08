@@ -33,7 +33,7 @@ approving. You finish with a numbered "What you need to do" list that tells them
    not `--dry-run`: it reads the game's DataStore with the user's key), `promote`, `rollback`, `approve`, `reject`,
    `pin`, `deployments`, `branch ls`, `settings ...`, `access push`, `kernel deploy` (also not `--dry-run`; the one exception
    is a kernel update the user asked for, see "Updating the kernel in a game"), `kernel restore`, `keys ...`, `assets
-   sync|status`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`, `doctor` (it probes the key
+   sync|status`, `test --cloud`, `servers`, `report`, `alerts`, `backend setup`, `update`, `doctor` (it probes the key
    and publishes a test message). Don't start `remote-claude` (`typetorch dev`), the analytics server or a tunnel.
    These go in the final list.
 3. **Never push.** Local commits on a new branch are fine. Don't rewrite history, don't force anything.
@@ -537,7 +537,7 @@ Don't do these; list them in Step 7:
 - create the group, the experience, an API key; change Creator Hub or Game Settings;
 - write a key or token anywhere; run `typetorch keys ...`, `doctor`, `deploy`, `upload`, `approve`, `promote`,
   `rollback`, `pin`, `settings ...`, `access push`, `assets sync|status`, `kernel deploy`, `kernel restore`,
-  `deployments`, `branch ls`, `test --cloud`, `servers`, `report`, `alerts`, `fleet setup`, `update`;
+  `deployments`, `branch ls`, `test --cloud`, `servers`, `report`, `alerts`, `backend setup`, `update`;
 - publish a place; edit the place in Studio (kernel install, data library, `TypeTorchAsset` marks);
 - start `remote-claude`, the analytics server or a tunnel; write the analytics settings;
 - push to a remote; add GitHub Actions or any CI workflow.
@@ -564,15 +564,15 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
      test that runs before every prod deploy, hot assets, doctor's place check)
    - `universe-messaging-service:publish`
    - DataStore `universe-datastores.objects:read`, `:create` and `:update` (the shared deploy number: every machine
-     takes `#seq` from the game's DataStore; and the signed settings record: `access push`, `fleet setup`,
+     takes `#seq` from the game's DataStore; and the signed settings record: `access push`, `backend setup`,
      `settings ...`)
    - place publishing (`universe-places` write; the CLI says `universe.place:write`), only for `kernel deploy`
    Set an expiry and, if you can, an IP allowlist. No `universe:write` / `universe:read` (TypeTorch keeps nothing in
    ConfigService since kernel 0.3.8). Don't ask for `legacy-asset:manage` (place downloads): Creator Hub doesn't offer
    it for API keys today. Deploys work without it; `kernel deploy` takes a copy of the place instead (`--place-file`,
    see "Updating the kernel in a game").
-4. **Store it outside the repo:** `~/.config/typetorch/<game>.env` with the line `TYPETORCH_API_KEY=<key>`, and in the
-   repo's `.env` (gitignored) the line `TYPETORCH_ENV_FILE=~/.config/typetorch/<game>.env`. Never commit it or paste it
+4. **Store it outside the repo:** `~/.config/typetorch/<game>.env` with the line `OPENCLOUD_API_KEY=<key>`, and in the
+   repo's `.env` (gitignored; CLI 0.9 reads the keys from there: `OPENCLOUD_API_KEY`, `TYPETORCH_API_KEY`, `TYPETORCH_ADMIN_TOKEN`). Never commit it or paste it
    into chat.
 5. **Check:** `bun run typetorch doctor`. Expect `ok` for the tools, `typetorch.json`, each key and the scopes you added.
 6. **Prod signing keys:** `bun run typetorch keys init`, `bun run typetorch keys init --fallback`, commit
@@ -612,7 +612,7 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
     Artifact tab shows two verified badges.
 13. **Rollback drill:** `bun run typetorch rollback --branch prod`, check `bun run typetorch deployments`, deploy again.
 14. Optional: [live servers and alerts](https://github.com/typetorch/docs/blob/main/guides/fleet-and-alerts.md)
-    (`typetorch fleet setup`, then `servers`, `report`, `alerts`, and automatic rollback after bad deploys);
+    (`typetorch backend setup`, then `servers`, `report`, `alerts`, and automatic rollback after bad deploys);
     [analytics](https://github.com/typetorch/docs/blob/main/guides/analytics.md);
     [hot assets](https://github.com/typetorch/docs/blob/main/guides/hot-assets.md);
     [remote-claude](https://github.com/typetorch/docs/blob/main/guides/remote-claude.md) (in a test place: it needs

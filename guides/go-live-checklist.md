@@ -91,7 +91,7 @@ Then run every live test on the copy:
       nothing.
 - [ ] **Slow phone, bad connection:** a client swap finishes, no stuck loading, `/tt status` in chat answers.
 - [ ] **Fleet API restart** (and your PC, if it runs there): servers post again within 5 minutes
-      (`bun run typetorch servers`). A quick tunnel gets a new URL: run `fleet setup` again.
+      (`bun run typetorch servers`). A quick tunnel gets a new URL: run `backend setup` again.
 - [ ] **Key rotation:** [the drill](prod-signing.md#back-up-and-drill), on the copy.
 - [ ] **2 hours of real players** on the dev branch: read the server logs (dev menu > Logs, or Logs > Upload) for
       `[net]` rejections and kernel warnings.

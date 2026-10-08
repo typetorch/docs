@@ -85,8 +85,8 @@ Uncommitted changes. Commit, then build again for a clean id. Prod-channel branc
 
 ## Keys and scopes
 
-**`no Open Cloud API key for assets: set OPENCLOUD_ASSETS_KEY ... or TYPETORCH_API_KEY ...`.**
-The CLI found no key. Check `.env` (the `TYPETORCH_ENV_FILE=` line) and the env file it names. `doctor` prints which
+**`no Open Cloud API key for assets: set OPENCLOUD_ASSETS_KEY ... or OPENCLOUD_API_KEY ...`.**
+The CLI found no key. Check the game repo's `.env` (CLI 0.9: `OPENCLOUD_API_KEY`; `TYPETORCH_API_KEY` is the backend's key now, not a Roblox key). `doctor` prints which
 files it read.
 
 **A scope probe in `doctor` fails with 401/403.**
@@ -100,23 +100,23 @@ Run `bun run typetorch keys init` and `bun run typetorch keys init --fallback` f
 That needs `legacy-asset:manage`, which API keys can't get today. Download a copy in Studio (File > Download a Copy)
 and pass it: `--place-file <file> --base <version>` ([Kernel updates](deploy-and-rollback.md#kernel-updates)).
 
-**`fleet setup`, `access push` or `settings ...` fails with 401/403.**
+**`backend setup`, `access push` or `settings ...` fails with 401/403.**
 The [settings record](settings.md) is a DataStore entry: the deploy key needs `universe-datastores.objects:read`,
 `:create` and `:update` (the ping also needs `universe-messaging-service:publish`). `universe:write` isn't used any more.
 
 **`... signed with both prod keys: run typetorch keys init`.**
-Settings writes (`settings set`, `fleet setup`, `access push`) sign the record with both prod keys. Set them up
+Settings writes (`settings set`, `backend setup`, `access push`) sign the record with both prod keys. Set them up
 ([fresh setup step 7](../getting-started/fresh-setup.md#7-prod-signing-keys)), or copy the key files from the machine
 that has them.
 
 **`the current settings record isn't signed by your keys`.**
 Someone else's keys (or game code) wrote it, or you rotated without `keys rotate` re-signing it. Check
 `bun run typetorch settings status`. `--force` replaces it: the old fields are dropped, never re-signed with your keys,
-so run `settings push`, `fleet setup` and `settings set analytics -` again afterwards.
+so run `settings push`, `access push` and `backend setup` again afterwards.
 
 **`typetorch config push` is gone.**
 Kernel 0.3.8 reads no ConfigService keys. Use `typetorch settings push` (defaultBranch, channels, dev access),
-`typetorch fleet setup` and `typetorch settings set analytics -`.
+`typetorch backend setup` (CLI 0.9 also moved `fleet setup` and `settings set analytics` there).
 
 ## Deploys
 
@@ -158,8 +158,8 @@ Some servers didn't pick up the deploy in time and sent nothing. Nothing is roll
 check again with `bun run typetorch servers --branch <b>`.
 
 **`the fleet API isn't configured` (from `servers`, `report`, `alerts`, or `--wait` skipped).**
-Set it up once: [Live servers and alerts](fleet-and-alerts.md#set-it-up). The CLI needs `TYPETORCH_FLEET_TOKEN` and
-`TYPETORCH_FLEET_INGEST_TOKEN` in your env file, and `typetorch.json` `fleet.url`.
+Set it up once: [Live servers and alerts](fleet-and-alerts.md#set-it-up). The CLI needs `TYPETORCH_ADMIN_TOKEN` and
+`TYPETORCH_API_KEY` in your env file, and `typetorch.json` `backend.url`.
 
 **Asset names show up as `####` in Creator Hub.**
 Roblox's text filter censors some hex names unpredictably. The CLI renames censored payloads to `TypeTorch payload`;
@@ -202,7 +202,7 @@ too (kernel 0.3.2+). Map it, then publish the place.
 
 **Dev menu: "Fleet API failing", or `servers` lists nothing.**
 The fleet URL doesn't answer or the token is wrong. A quick tunnel gets a new URL every time it starts: run
-`bun run typetorch fleet setup --url <new url>` again (or restart `bun run local` in the analytics folder). Running
+`bun run typetorch backend setup --url <new url>` again (or restart `bun run local` in the analytics folder). Running
 servers (kernel 0.3.8+) switch within seconds; new servers at once.
 
 **The quick tunnel answers 404 for everything.**

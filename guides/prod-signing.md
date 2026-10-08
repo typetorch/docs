@@ -90,7 +90,7 @@ restart) before prod takes a deploy again. Losing the env file means new Open Cl
    trusted signing keys) and upload builds. Give that to one key only:
    - a new key with the assets job's scopes (`asset:read`, `asset:write`, Luau Execution read and write), limited to
      your IP address in Creator Hub (update it when your IP changes), in your env file as `OPENCLOUD_ASSETS_KEY`;
-   - remove `asset:write` from the shared key (`TYPETORCH_API_KEY`); it keeps the rest (messaging, DataStores, place
+   - remove `asset:write` from the shared key (`OPENCLOUD_API_KEY`); it keeps the rest (messaging, DataStores, place
      publishing);
    - `bun run typetorch doctor`: `key assets` names `OPENCLOUD_ASSETS_KEY`, and every scope probe is `ok`.
 3. **A dated rotation drill.** Put it in your calendar: once before go-live, then every 3 months, and the day anyone

@@ -46,15 +46,15 @@ game shares. (The kernel still keeps each branch's head there: one small key.)
 2. **Give the CLI the tokens.** In your game's env file (outside the repo):
 
    ```text
-   TYPETORCH_FLEET_TOKEN=<admin token>
-   TYPETORCH_FLEET_INGEST_TOKEN=<ingest token>
+   TYPETORCH_ADMIN_TOKEN=<admin token>
+   TYPETORCH_API_KEY=<ingest token>
    ```
 
    The admin token reads; the ingest token only writes. The CLI never prints them or passes them to a child process.
 3. **Point game servers at it:**
 
    ```sh
-   bun run typetorch fleet setup --url https://fleet.example.com
+   bun run typetorch backend setup --url https://fleet.example.com
    ```
 
    It writes `fleet` = `{ url, token }` (the ingest token) into the game's [signed settings record](settings.md) and
@@ -153,7 +153,7 @@ Server > Status shows these when the kernel's sender has a problem:
 | Attention item | Fix |
 |---|---|
 | No fleet API | the place's kernel lacks its `Fleet` module: map it in your place project (kernel 0.3.2+), then publish |
-| Fleet settings | the settings record's `fleet` is invalid: run `fleet setup` again |
+| Fleet settings | the settings record's `fleet` is invalid: run `backend setup` again |
 | Settings | the [settings record](settings.md) is missing, unsigned or doesn't verify (`typetorch settings status`) |
 | Fleet API failing | the URL doesn't answer (a stopped server, a restarted quick tunnel) or the token is wrong |
 

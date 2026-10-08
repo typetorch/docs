@@ -15,7 +15,7 @@ Claude can act on your running server ("jump me", "give me 100 coins") or change
 - The [dev-server](https://github.com/typetorch/dev-server): Node 20+ or Bun 1.3+. The template has
   `@typetorch/dev-server` in its dev dependencies, so `bun install` gets it. Without it: npx (see below), or a checkout
   next to your game (`bun install` in it).
-- An Open Cloud key with `universe-messaging-service:publish`, as `TYPETORCH_API_KEY` (or `OPENCLOUD_API_KEY`,
+- An Open Cloud key with `universe-messaging-service:publish`, as `OPENCLOUD_API_KEY` (or `OPENCLOUD_API_KEY`,
   `ROBLOX_API_KEY`). The dev-server tells game servers where the session is with it. It finds the key the same way the
   CLI does: the environment, then the env file (`--env-file`, else `TYPETORCH_ENV_FILE`), then `.env` files in the game
   folder or above. A key in an env file outside the repo is the safest setup:

@@ -18,8 +18,9 @@ apply a change within seconds, with no deploy and no place publish.
 |---|---|---|
 | `access` | `members`, `revoked`, `devBadgeId` from `typetorch.json` ([who gets the dev menu](../getting-started/fresh-setup.md#11-the-dev-menu-and-who-gets-it)) | `typetorch access push` |
 | `defaultBranch`, `channels` | from `typetorch.json` | `typetorch settings push` |
-| `fleet` | `{ url, token }`: the [fleet API](fleet-and-alerts.md) and its write-only ingest token | `typetorch fleet setup` |
-| `analytics` | the [analytics sink settings](analytics.md#settings-the-analytics-field) | `typetorch settings set analytics -` |
+| `fleet` | `{ url, token }`: the [fleet API](fleet-and-alerts.md) and its write-only ingest token | `typetorch backend setup` |
+| `backend` | `{ url, key, analytics? }`: the TypeTorch backend and its game key (CLI 0.9; kernels before 0.4 read the `fleet` and `analytics` sections it derives) | `typetorch backend setup` |
+| `analytics` | the [analytics sink settings](analytics.md#settings-the-analytics-field), derived from `backend` | `typetorch backend setup` |
 | `game` | your own live values, read with `TypeTorch.liveConfig` | `typetorch settings set game.<key>` |
 
 The whole record is at most 32 KB, `game` at most 16 KB.
@@ -36,8 +37,7 @@ bun run typetorch settings set game.event '{"name":"halloween","ends":1793000000
 bun run typetorch settings unset game.event
 bun run typetorch settings push                    # defaultBranch, channels and access from typetorch.json
 bun run typetorch access push                      # access only
-bun run typetorch fleet setup --url https://fleet.example.com
-bun run typetorch settings set analytics - < my-analytics.json   # - reads the JSON from stdin (it holds a token)
+bun run typetorch backend setup --url https://fleet.example.com
 ```
 
 Every write reads the record, checks that your keys signed it, changes one field, raises `seq` by one, signs it with
@@ -107,9 +107,9 @@ Kernel 0.3.8 doesn't read the old ConfigService keys, and they can't be read bac
 kernel 0.3.8:
 
 1. `bun run typetorch settings push` (defaultBranch, channels, dev access).
-2. `bun run typetorch fleet setup --url <your fleet API>` if you use one (or `bun run local` in the analytics folder for
-   a local test: it runs `fleet setup` and `settings set analytics -` for you).
-3. Your analytics settings: `bun run typetorch settings set analytics - < my-analytics.json`.
+2. `bun run typetorch backend setup --url <your fleet API>` if you use one (or `bun run local` in the analytics folder for
+   a local test: it runs `backend setup` for you).
+3. `bun run typetorch access push`: the owners also go to the backend (only they may Sign in with Roblox there).
 4. `bun run typetorch settings status` to check. Then delete the old keys in Creator Hub (Configs) if you like.
 
 Until step 1, only the experience owner is a dev on 0.3.8 servers.

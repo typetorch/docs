@@ -177,7 +177,7 @@ Remove the template's `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey`:
 | `approval` | `all` (default): every deploy waits for your y/N; `prod`: only prod-channel deploys do; `none` |
 | `kernel` | the kernel folder for `kernel deploy` (`node_modules/@typetorch/kernel`, or a kernel checkout) |
 | `signingPublicKeys`, `revokedKeys`, `fallbackPublicKey`, `keyAssetId` | written by `typetorch keys` (step 7). Don't edit by hand |
-| `fleet` | optional, `{ "url": ... }`: written by `typetorch fleet setup` ([Live servers and alerts](../guides/fleet-and-alerts.md)) |
+| `fleet` | optional, `{ "url": ... }`: written by `typetorch backend setup` ([Live servers and alerts](../guides/fleet-and-alerts.md)) |
 
 Commit it:
 
@@ -199,7 +199,7 @@ Add these permissions and select your experience where asked:
 | CLI job | Commands | Scopes |
 |---|---|---|
 | assets | `deploy`, `upload`, `promote` (of an unfinished upload), `test --cloud`, `keys init` / `rotate` (the key asset), `assets sync` / `status`, `doctor` | `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (the cloud test that runs before every prod deploy, hot assets, doctor's place check) |
-| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `settings`, `fleet setup`, `access push` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number and the [signed settings](../guides/settings.md), below) |
+| deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `settings`, `backend setup`, `access push` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number and the [signed settings](../guides/settings.md), below) |
 | place | `kernel deploy` only | place publishing (`universe-places` write; the CLI calls it `universe.place:write`), and `asset:read` to record the place version |
 
 - **The shared deploy number.** Every machine that deploys (your PC, a second PC, remote-claude) takes the next
@@ -225,25 +225,23 @@ notepad "$HOME\.config\typetorch\my-game.env"
 
 ```bash
 # bash
-mkdir -p ~/.config/typetorch
-nano ~/.config/typetorch/my-game.env
+nano my-game/.env
 ```
 
+The game repo's `.env` (gitignored by the template) holds the secrets, `typetorch.json` everything else (CLI 0.9).
 Put one line in it, then save:
 
 ```text
-TYPETORCH_API_KEY=<your key>
+OPENCLOUD_API_KEY=<your key>
 ```
 
-Then point the game at it. In `my-game/.env` (gitignored by the template), one line:
+With the TypeTorch backend, two more lines go there: `TYPETORCH_API_KEY=<the backend's API key>` and
+`TYPETORCH_ADMIN_TOKEN=<the backend's admin token>` (then `bun run typetorch backend setup --url <backend>`).
+`--env-file <path>` or `TYPETORCH_ENV_FILE` (environment) read another file instead of `.env`.
 
-```text
-TYPETORCH_ENV_FILE=~/.config/typetorch/my-game.env
-```
-
-- One shared key (`TYPETORCH_API_KEY`) is the simple setup. You may split it per job instead:
+- One shared key (`OPENCLOUD_API_KEY`) is the simple setup. You may split it per job instead:
   `OPENCLOUD_ASSETS_KEY`, `OPENCLOUD_DEPLOY_KEY` and `OPENCLOUD_PLACE_KEY` (each falls back to the shared key).
-- remote-claude reads the key the same way (environment, `TYPETORCH_ENV_FILE`, `.env`) and needs the shared key (`TYPETORCH_API_KEY`);
+- remote-claude reads the key the same way (environment, then the game repo's `.env`) and needs the shared key (`OPENCLOUD_API_KEY`);
   see [remote-claude](../guides/remote-claude.md).
 - Never commit a key, never paste it into chat or an issue, and never give it to an agent.
 
