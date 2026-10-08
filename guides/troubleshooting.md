@@ -215,7 +215,7 @@ failing check with a `fix:` line:
 |---|---|
 | `url` | not a URL, not https (game servers and the kernel only use https), user info in it, the fleet URL isn't the base address, or the DuckDB `events` URL doesn't end in `/v1/ingest` |
 | `healthz` | `GET <url>/healthz` didn't answer `{"ok":true}` within 5 s: a dead quick tunnel (start `bun run local` again; the URL changes every run), a stopped server, a wrong host, or something else answers there |
-| `token` | the server refused the token (use one of its `TT_ANALYTICS_INGEST_TOKENS`), or it is the admin token (never put that in the record: every script in your game can read it), or that part of the server is off (`TT_SERVER_PARTS`) |
+| `token` | the server refused the token (use its API key, `TYPETORCH_API_KEY`; `TT_ANALYTICS_INGEST_TOKENS` before the backend rename), or it is the admin token (never put that in the record: every script in your game can read it), or that part of the server is off (`TYPETORCH_PARTS`; `TT_SERVER_PARTS` before the rename) |
 
 Fix it and run the command again. `--force` writes the value anyway (the failures print as warnings). `bun run local`
 prints the same message in red when the game's CLI refuses its tunnel, and keeps the tunnel running.
