@@ -60,7 +60,9 @@ game shares. (The kernel still keeps each branch's head there: one small key.)
    It writes `fleet` = `{ url, token }` (the ingest token) into the game's [signed settings record](settings.md) and
    `"fleet": { "url": ... }` into `typetorch.json`, then pings the servers. It needs both prod signing keys (the record
    is signed; servers refuse one that doesn't verify) and kernel 0.3.8+. `--dry-run` shows what it would write;
-   `bun run typetorch settings status` shows the record (the token hidden).
+   `bun run typetorch settings status` shows the record (the token hidden). Before it signs anything it
+   [checks](settings.md#checked-before-it-is-signed) the address (https, `GET /healthz` within 5 s) and the token (an
+   ingest token, not the admin one) and refuses a broken one with a fix; `--force` writes anyway.
 4. **Check:** kernels read the record at boot, about every minute, and within seconds of a ping. Join a server, then
    `bun run typetorch servers`.
 

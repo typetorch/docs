@@ -47,11 +47,29 @@ the servers.
 - `--dry-run` shows the result without writing.
 - `--no-ping`: servers still pick it up within about a minute.
 - `--force` replaces a record your keys didn't sign (you lost both keys, or game code wrote junk). Its old fields are
-  dropped, never re-signed, so write them again afterwards.
+  dropped, never re-signed, so write them again afterwards. For `fleet setup` and `settings set analytics` it also
+  writes a value whose [endpoint checks](#checked-before-it-is-signed) failed.
 - Every write needs both signing key files (else: "run `typetorch keys init`") and the deploy key's DataStore scopes
   (`universe-datastores.objects:read`, `:create`, `:update`) plus `universe-messaging-service:publish` for the ping.
 - `typetorch keys rotate` and `keys resign` re-sign the record with the new keys.
-- `typetorch doctor` reads it and checks the signature.
+- `typetorch doctor` reads it, checks the signature and tests the `fleet` and `analytics` addresses in it.
+
+### Checked before it is signed
+
+A wrong address or token in `fleet` or `analytics` isn't rejected by anything else: game servers fail every request
+(`NetFail`, HTTP 401, HTTP 530) until someone looks at the dev menu. So `fleet setup` and `settings set analytics`
+test the value first (also with `--dry-run`), and `typetorch doctor` runs the same tests against the live record:
+
+1. **url**: it parses, is https (analytics also accepts http on localhost, for Studio), has no user info; the fleet URL
+   is the server's base address; the DuckDB `events` URL ends in `/v1/ingest`.
+2. **healthz**: `GET <url>/healthz` answers `{"ok":true}` within 5 seconds.
+3. **token**: `GET <url>/v1/auth/check` (it changes nothing) says the token is a write-only *ingest* token for that part
+   (the admin token is refused). Basin streams have no such call: their URLs must answer, a 401/403 is a refused token,
+   and a wrong token otherwise only shows up on the first upload.
+
+If one fails, the command prints it in red with a fix, writes nothing and exits 1; `--force` writes anyway. The checks
+need the analytics server from `@typetorch/analytics` with `GET /v1/auth/check` (older servers fall back to `GET
+/v1/settings`, which proves the token is accepted but can't tell an ingest token from the admin one).
 
 ## Live values in game code
 
