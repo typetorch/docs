@@ -221,7 +221,8 @@ bun run typetorch settings unset analytics    # stop sending
 ```
 
 Or `writeSettings({ gameDir, settings })` from `@typetorch/analytics`, which checks the fields and runs the same
-command (see the [quick start](#5-point-the-game-at-it)). Both need your two prod signing keys: the CLI signs the
+command (see the [quick start](#5-point-the-game-at-it)). The CLI [tests the address and the token](settings.md#checked-before-it-is-signed)
+first (https, ends in `/v1/ingest`, `GET /healthz`, an ingest token) and refuses a broken value. Both need your two prod signing keys: the CLI signs the
 record, and servers refuse one that doesn't verify. Keep `my-analytics.json` out of git (it holds the token).
 
 Without settings the engine still collects, but keeps only the newest 1,000 rows until settings appear. Removing them

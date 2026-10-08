@@ -201,9 +201,35 @@ The place's kernel has no `Fleet` module: a place project that maps the kernel's
 too (kernel 0.3.2+). Map it, then publish the place.
 
 **Dev menu: "Fleet API failing", or `servers` lists nothing.**
-The fleet URL doesn't answer or the token is wrong. A quick tunnel gets a new URL every time it starts: run
-`bun run typetorch backend setup --url <new url>` again (or restart `bun run local` in the analytics folder). Running
-servers (kernel 0.3.8+) switch within seconds; new servers at once.
+The fleet URL doesn't answer or the token is wrong. Run `bun run typetorch doctor`: it tests the `fleet` and
+`analytics` addresses in the live settings record (the URL, `GET /healthz` within 5 s, and the token) and prints a fix
+for each failure. A quick tunnel gets a new URL every time it starts: run `bun run typetorch backend setup --url <new url>`
+again (or restart `bun run local` in the analytics folder). Running servers (kernel 0.3.8+) switch within seconds; new
+servers at once.
+
+**`backend setup` says "refusing to write ... nothing was signed or written".**
+Before it signs anything the CLI tests the address and the token, and one of them failed. The message lists each
+failing check with a `fix:` line:
+
+| Check | Meaning |
+|---|---|
+| `url` | not a URL, not https (game servers and the kernel only use https), user info in it, the fleet URL isn't the base address, or the DuckDB `events` URL doesn't end in `/v1/ingest` |
+| `healthz` | `GET <url>/healthz` didn't answer `{"ok":true}` within 5 s: a dead quick tunnel (start `bun run local` again; the URL changes every run), a stopped server, a wrong host, or something else answers there |
+| `token` | the server refused the token (use its API key, `TYPETORCH_API_KEY`; `TT_ANALYTICS_INGEST_TOKENS` before the backend rename), or it is the admin token (never put that in the record: every script in your game can read it), or that part of the server is off (`TYPETORCH_PARTS`; `TT_SERVER_PARTS` before the rename) |
+
+Fix it and run the command again. `--force` writes the value anyway (the failures print as warnings), except an admin token in the key's place, which is always refused. `bun run local`
+prints the same message in red when the game's CLI refuses its tunnel, and keeps the tunnel running.
+
+**Server log (or Analytics / Fleet API line in the dev menu): `HttpError: NetFail`, `DnsResolve`, `ConnectFail`, HTTP 530.**
+The game servers can't reach your analytics / fleet server. Roblox names the failure: `NetFail` means the connection
+broke mid-request (the server or the tunnel on your PC restarted, dropped it or is overloaded; quick tunnels are for
+testing only), `DnsResolve` or HTTP 530 that the quick tunnel's address is gone (it changes on every start),
+`ConnectFail` that nothing accepts connections there, `TimedOut` that it never answers (the PC is asleep?). Run
+`bun run typetorch doctor`, then `bun run local` in the analytics folder if the address is stale. The engine keeps the
+rows and retries with a growing pause (5, 10, 20 ... 300 s, spread so servers don't retry together); it logs at most
+one line a minute with the reason and the fix, and one line when uploads work again. **Server > Status** shows the
+*Analytics* and *Fleet API* lines (queued, sent, `FAILING x5: ... retry in 80 s`, the last error and its age) and
+*Attention* lists the fix.
 
 **The quick tunnel answers 404 for everything.**
 Your `~/.cloudflared/config.yml` (a named tunnel) has a catch-all ingress rule, and it overrides `--url`. Start the
