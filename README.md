@@ -49,8 +49,8 @@ flowchart LR
 - **Safe deploys:** a cloud test before every prod publish; on each server a health window that rolls a failing build
   back; `deploy --wait`, which rolls the branch back when a build fails on 20% of servers; a new server plays within
   15 s.
-- **Fleet API and analytics (optional, self-hosted):** live server status, deploy reports and alerts from the kernel,
-  and your own analytics with experiments, funnels and player journeys.
+- **Backend (optional, self-hosted):** live server status, deploy reports and alerts from the kernel, and your own
+  analytics with experiments, funnels and player journeys.
 
 ## Guides
 
@@ -103,7 +103,7 @@ flowchart LR
 | [template](https://github.com/typetorch/template) | the starter game (Target Rush), also the reference setup |
 | [transformer](https://github.com/typetorch/transformer) | `@typetorch/transformer`, the compiler plugin for guards and dependency injection |
 | [dev-server](https://github.com/typetorch/dev-server) | `remote-claude`: Claude Code on your PC, prompted from inside a dev server |
-| [analytics](https://github.com/typetorch/analytics) | the analytics server (DuckDB), the fleet API (SQLite), the queries and `bun run report` (not on npm yet) |
+| [backend](https://github.com/typetorch/backend) | the backend: analytics (DuckDB, or Basin), the fleet API (SQLite), error logs and the explorer (not on npm yet) |
 
 ## Conventions in these docs
 

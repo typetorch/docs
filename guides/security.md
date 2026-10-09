@@ -55,8 +55,8 @@ What stays open, by design or for now:
   copy (say, from before you revoked someone). Running servers refuse a lower seq; a server that starts meanwhile takes
   the old copy until the next write. If you suspect it, write again (`typetorch access push` gives a new seq) and check
   `typetorch settings status`.
-- The settings record's tokens (fleet ingest, analytics send) are readable by any server code in your universe, as
-  they were in ConfigService. They are write-only tokens; never put a read token there.
+- The game key in the settings record (`backend.key`) is readable by any server code in your universe, as the old
+  ConfigService keys were. They are write-only tokens; never put a read token there.
 - **Cross-server messages** (`TypeTorch.messaging`): the sender tags (JobId, branch, channel) are for routing, not
   proof. Anything that can publish to your universe's MessagingService can forge them; check what a message asks for.
 
@@ -66,10 +66,10 @@ What stays open, by design or for now:
 |---|---|---|
 | Open Cloud API key(s) | the game repo's `.env` (gitignored; CLI 0.9), or the real environment | in git, in chat, in an issue, in a screenshot, given to an agent |
 | Signing key files | `~/.config/typetorch/keys/<universeId>.key` and `.fallback.key` | inside any git work tree (the CLI refuses), copied to another machine you don't control |
-| Fleet and analytics admin token (`TYPETORCH_ADMIN_TOKEN`, the server's `TT_ANALYTICS_ADMIN_TOKEN`) | your env file and the server's env file | anywhere a game server or a client can read it |
-| Ingest and send tokens (write-only) | the signed settings record's `fleet` and `analytics` fields (server only), and `TYPETORCH_API_KEY` | in code, in a payload, sent to a client |
+| Backend admin token (`TYPETORCH_ADMIN_TOKEN`) | the game repo's `.env` and the backend's environment | anywhere a game server or a client can read it |
+| Backend game key (`TYPETORCH_API_KEY`, write-only) | the game repo's `.env` and the backend's environment; the signed settings record's `backend` section (server only) | in code, in a payload, sent to a client |
 | Basin R2 token (SQL reads) | your PC only | in the game's settings |
-| Erasure webhook secret, fleet webhook URL, the analytics server's Open Cloud key | the analytics server's env file | in git |
+| Erasure webhook secret (`ROBLOX_WEBHOOK_SECRET`), alert webhook URL, the backend's Open Cloud key (`OPENCLOUD_API_KEY`) | the backend's environment | in git |
 | remote-claude pairing codes | your terminal and clipboard | in a commit (they expire after one use or 3 hours) |
 
 - The CLI keeps keys and tokens in memory, gives each one only to the client for its job, never prints them, and
@@ -78,14 +78,16 @@ What stays open, by design or for now:
 - Prefer separate keys per job (`OPENCLOUD_ASSETS_KEY`, `OPENCLOUD_DEPLOY_KEY`, `OPENCLOUD_PLACE_KEY`), an expiry date
   and an IP allowlist. An `asset:write` key that leaks is as bad as code execution on your servers: keep `asset:write`
   on one IP-limited key.
-- **Before a live game depends on it:** an offline backup of the key files and the env file, the separate
+- **Before a live game depends on it:** an offline backup of the key files and the `.env`, the separate
   `asset:write` key, and a dated rotation drill ([Prod signing: back up and drill](prod-signing.md#back-up-and-drill)).
 - A key acts with its owner's group permissions. Give builders and contractors no Edit access on the production
   experience.
 - If a key leaks: revoke it in Creator Hub at once and create a new one. If a signing key leaks:
   `typetorch keys rotate` (main) or `typetorch keys init --fallback --force` + `kernel deploy` (fallback). If a token
-  leaks: put a new one in the server's env file (ingest tokens can be a comma-separated list, for rotation), then run
-  `backend setup` and write the analytics settings again.
+  leaks: rotate it. For the game key, put the new one in the backend's `TYPETORCH_API_KEY`, the old one in
+  `TYPETORCH_API_KEY_PREVIOUS` (both accepted until you remove the old one), put the new one in the game repo's `.env`, and
+  run `backend setup` again. For the admin token, change `TYPETORCH_ADMIN_TOKEN` on the backend (that ends every explorer
+  session) and in the game repo's `.env`.
 
 ## No GitHub Actions
 
@@ -95,9 +97,9 @@ your keys. Builds, cloud tests, signing and deploys run on your own machine.
 ## Never publish secrets
 
 - `.env`, `.env.*`, `.typetorch/` and the key files stay out of git (the template's `.gitignore` covers the first
-  three; key files live outside the repo). The analytics repo ignores `analytics.env` and `data/`.
+  three; key files live outside the repo). The backend repo ignores `.env` files and `data/`.
 - Ids (universe, place, group, user, asset) are not secrets, but keep examples and docs on fake ones.
-- A quick tunnel URL is public while it runs: anything behind it must check its own tokens (the analytics server does).
+- A quick tunnel URL is public while it runs: anything behind it must check its own tokens (the backend does).
 - Before you push or publish a package, search the change for anything that looks like a key.
 
 ## Agents

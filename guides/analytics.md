@@ -6,12 +6,12 @@ that was live, so you can compare builds, experiments and devices.
 
 - **Write side:** `AnalyticsEngine` in `@typetorch/framework` (0.3.0+), on the server and the client.
 - **Backend, your choice:** a self-hosted **DuckDB server** (one small VPS), or **Cloudflare Basin** (no server).
-- **Read side:** [`@typetorch/analytics`](https://github.com/typetorch/analytics) (a git repo, not on npm yet): the
-  queries, the DuckDB server, the fleet API, `bun run report`.
+- **Read side:** the [backend](https://github.com/typetorch/backend) (`@typetorch/backend`, a git repo, not on npm yet):
+  the queries, the DuckDB server, the fleet API, `bun run report`.
 - A web explorer is **coming** (in progress, not usable yet).
 
 Contents: [Using it in a game](#using-it-in-a-game) · [What is collected](#what-is-collected) ·
-[The event format](#the-event-format) · [Backends](#backends) · [Settings](#settings-the-typetorchanalytics-key) ·
+[The event format](#the-event-format) · [Backends](#backends) · [Settings](#settings-the-analytics-field) ·
 [Experiments](#experiments) · [Queries](#queries) · [Node graphs](#node-graphs) · [bun run report](#bun-run-report) ·
 [Privacy](#privacy-and-right-to-erasure) · [Quick start: a local test](#quick-start-a-local-test)
 
@@ -57,7 +57,7 @@ const variant = analytics.experiment("onboarding", ["short", "long"]); // the sa
   the engine collects as usual but never uploads: no event rows, no identity rows, no HTTP request. A prod deploy
   never adds a fake server session.
 - **Options** (all on by default): `sessions`, `tech`, `zones`, `screens`, `recording`, `fleet`. `settings` (server
-  only) replaces the [settings key](#settings-the-typetorchanalytics-key), for tests.
+  only) replaces the [settings key](#settings-the-analytics-field), for tests.
 - `analytics.stats()` (server) returns the counters (queued, sent, dropped, refused); `analytics.flush()` sends soon.
 - In edit mode (UI Labs stories) it is inert.
 - The template has a complete example: `AnalyticsService` (server) and `AnalyticsController` (client).
@@ -143,36 +143,38 @@ sink writes (`basin` or `duckdb`), and the read side's store renders each query 
 | Delay | seconds | one roll interval (60 s minimum; expect 1-2 minutes) |
 | Queries | `bun run report`, the HTTP API, `createStore` | `createStore` (Basin SQL, read-only) |
 | Deleting a player's rows | yes | no (rows become anonymous) |
-| Live server status | the fleet API runs in the same process | run the fleet API alone (`TT_SERVER_PARTS=fleet`) |
+| Live server status | the fleet API runs in the same process | run the fleet API alone (`TYPETORCH_PARTS=fleet`) |
 
 ### The DuckDB server
 
-`analytics/server` in the analytics repo: Bun or Node 20+, DuckDB inside the process (no database server).
+The backend's analytics part (`src/server/main.ts` in the [backend](https://github.com/typetorch/backend) repo): Bun or
+Node 20+, DuckDB inside the process (no database server).
 
 - **Raw files first.** Each accepted batch is appended to a raw file and answered at once. A loader moves raw files
   into DuckDB every 5 s. A spike fills files, never the database, and nothing accepted is lost on a restart.
 - **One Parquet file per day.** After midnight UTC each finished day is written as a compressed Parquet file (exact
   duplicates dropped), then rollups run. Queries read today's DuckDB file plus the day files in range. Old data goes
-  by deleting old day files (`TT_ANALYTICS_KEEP_DAYS`, 400 by default).
+  by deleting old day files (`TYPETORCH_KEEP_DAYS`, 400 by default).
 - **Fits in 1 GB:** DuckDB is capped at 400 MB and spills to disk. Measured on one core: 10,000 events/s at a p99 of
   35 ms and about 300 MB of memory. 1,000 players online is about 10 million events a day, far below that.
-- **Tokens:** game servers send with a write-only ingest token (`TT_ANALYTICS_INGEST_TOKENS`); queries need the admin
-  token (`TT_ANALYTICS_ADMIN_TOKEN`), which stays on your PC.
-- **A 1 GB VPS:** the analytics README has the full guide (swap file, firewall, a systemd service, Caddy for TLS,
-  backups): [Deploy on a 1 GB VPS](https://github.com/typetorch/analytics#deploy-on-a-1-gb-vps). Back up the day files
+- **Tokens:** game servers send with the write-only game key (`TYPETORCH_API_KEY`); queries need the admin token
+  (`TYPETORCH_ADMIN_TOKEN`), which stays on your PC.
+- **A 1 GB VPS:** the backend README has the full guide (swap file, firewall, a systemd service, Caddy for TLS,
+  backups): [Run it on a VPS without Docker](https://github.com/typetorch/backend#run-it-on-a-vps-without-docker). Back up the day files
   and the raw archives off the VPS.
 
 ### Cloudflare Basin
 
-Done once, in your own Cloudflare account (Workers Paid plan and R2). The analytics README has every prompt:
-[Cloudflare Basin setup](https://github.com/typetorch/analytics#cloudflare-basin-setup). In short:
+Done once, in your own Cloudflare account (Workers Paid plan and R2). The backend README has every prompt:
+[Cloudflare Basin setup](https://github.com/typetorch/backend#cloudflare-basin-setup). In short:
 
 1. Create two pipelines, `typetorch_events` and `typetorch_recordings`, with `npx wrangler basin pipelines setup`. Load
-   their schemas from the analytics repo's generated files, `basin/events.schema.json` and
+   their schemas from the backend repo's generated files, `basin/events.schema.json` and
    `basin/recordings.schema.json`. HTTP endpoint on, authentication on, Data Catalog (Iceberg), roll interval 60 s.
 2. Create a **send-only** API token (Basin Pipelines Send). Game servers get this one.
 3. Keep the R2 token (for Basin SQL), your account id and the bucket on your PC only.
-4. Write the [settings](#settings-the-typetorchanalytics-key) with `backend: "basin"` and both stream endpoints.
+4. The CLI can't write this sink in 0.9: `typetorch backend setup` makes the game send to the backend instead. A Basin
+   sink already in the record ([settings](#settings-the-analytics-field)) stays there until then.
 
 Know these before you start:
 
@@ -181,7 +183,7 @@ Know these before you start:
 - **Schemas are fixed when a stream is created.** A new format version means new streams.
 - **Basin SQL is read-only.** There is no DELETE, and every query needs a `LIMIT` of at most 10,000 (the queries
   handle this). It is billed by data scanned.
-- Not yet tested against a live Basin account (the analytics README lists the open points).
+- Not yet tested against a live Basin account (the backend README lists the open points).
 
 ## Settings: the `analytics` field
 
@@ -193,7 +195,7 @@ you change dials live, with no deploy or place publish.
 {
   "backend": "duckdb",
   "events": "https://analytics.example.com/v1/ingest",
-  "token": "<write-only ingest token>",
+  "token": "<the game key, write-only>",
   "flushSeconds": 15,
   "recordShare": 1,
   "techEvery": 60,
@@ -212,18 +214,19 @@ you change dials live, with no deploy or place publish.
 | `techEvery` | seconds between tech samples, 15-3600 (default 60) |
 | `experiments` | live dials per [experiment](#experiments) |
 
-**How to write it:** from your game folder, with the JSON on stdin so the token never sits in a command line:
+**How to write it:** `backend setup` writes it from the game folder, after it checks the backend's address and both keys
+([settings](settings.md#checked-before-it-is-signed)):
 
 ```sh
-bun run typetorch settings set analytics - < my-analytics.json
-bun run typetorch settings get analytics      # read it back (the token hidden)
-bun run typetorch settings unset analytics    # stop sending
+bun run typetorch backend setup --url https://backend.example.com --flush-seconds 15 --record-share 1
 ```
 
-Or `writeSettings({ gameDir, settings })` from `@typetorch/analytics`, which checks the fields and runs the same
-command (see the [quick start](#5-point-the-game-at-it)). The CLI [tests the address and the token](settings.md#checked-before-it-is-signed)
-first (https, ends in `/v1/ingest`, `GET /healthz`, an ingest token) and refuses a broken value. Both need your two prod signing keys: the CLI signs the
-record, and servers refuse one that doesn't verify. Keep `my-analytics.json` out of git (it holds the token).
+It derives this section from `backend` and keeps the other fields (`techEvery`, `experiments`). CLI 0.9 has no command that
+sets those two: `settings set analytics` only points to `backend setup`. Read it back with `bun run typetorch settings get
+analytics` (the token hidden), and stop sending with `bun run typetorch settings unset backend` (it drops `fleet` and
+`analytics` too). The CLI signs the record with both prod keys, and servers refuse one that doesn't verify.
+
+From code, `writeBackendSettings({ gameDir, url, apiKey, adminToken })` from `@typetorch/backend` runs the same command.
 
 Without settings the engine still collects, but keeps only the newest 1,000 rows until settings appear. Removing them
 stops sending, live. On a kernel before 0.3.8 the engine sends nothing and warns once (update the kernel).
@@ -278,16 +281,16 @@ Every query works on both backends, with the same filters: `from`, `to` (a date,
 
 Run them in three ways:
 
-- `bun run report` in the analytics repo: the main ones in your terminal ([below](#bun-run-report)).
+- `bun run report` in the backend repo: the main ones in your terminal ([below](#bun-run-report)).
 - **HTTP** (DuckDB server): `POST /v1/query/<name>` with `Authorization: Bearer <admin token>` and the body
   `{ "filters": { "from": "2026-09-01", "dev": "phone" }, "options": { "funnel": "onboarding" } }`. The answer is
   `{ result, ms }`.
-- **Code**, on either backend (a `.ts` file in the analytics folder, run with `bun`):
+- **Code**, on either backend (a `.ts` file in a folder with `@typetorch/backend` installed, run with `bun`):
 
   ```ts
-  import { createStore } from "./src/index.ts"; // @typetorch/analytics
+  import { createStore } from "@typetorch/backend";
 
-  const store = await createStore({ backend: "duckdb", url: "https://analytics.example.com", token: process.env.TT_ANALYTICS_ADMIN_TOKEN! });
+  const store = await createStore({ backend: "duckdb", url: "https://analytics.example.com", token: process.env.TYPETORCH_ADMIN_TOKEN! });
   // or: { backend: "basin", accountId, bucket: "typetorch-analytics", token: <R2 token> }
   const numbers = await store.query("roblox", { from: "2026-09-01", players: "new" });
   const result = await store.query("experiment", {}, { experiment: "onboarding" });
@@ -324,17 +327,18 @@ flowchart LR
 
 ## bun run report
 
-A quick look at a DuckDB server's data in your terminal. In a checkout of the analytics repo:
+A quick look at your data in your terminal, from a checkout of the [backend](https://github.com/typetorch/backend) while
+its server runs (`bun run local`, or your own server):
 
 ```sh
-bun run report -- --env-file analytics.env
-bun run report -- --env-file analytics.env --pid <pid>
+bun run report -- --game ../my-game
+bun run report -- --game ../my-game --pid <pid>
 ```
 
-It reads the host, port and admin token from the same env file the server uses, and prints the overview, the
-Roblox-style numbers, the top events, the `onboarding` funnel, experiments, the live servers, and one player's timeline
-and node graph (Mermaid). Without `--pid` it picks the player seen last. It never prints tokens.
-(`bun scripts/report.ts --env-file analytics.env` is the same.)
+It asks the running backend (`http://127.0.0.1:8787` by default, `--url` changes it) with the admin token from the game repo's
+`.env`, and prints the overview, the Roblox-style numbers, the top events, the `onboarding` funnel, experiments, the live
+servers, and one player's timeline and node graph (Mermaid). Without `--pid` it picks the player seen last. It never prints
+tokens.
 
 ## Privacy and Right to Erasure
 
@@ -344,17 +348,17 @@ and node graph (Mermaid). Without `--pid` it picks the player seen last. It neve
 - **Deleting that key makes the player's analytics anonymous**, on both backends.
 - **Your own server also keeps pid -> UserId.** Once a player's pid is known, the game server sends one identity row
   `{ pid, uid, t }` (the UserId and nothing else) per session to your analytics server: DuckDB games in the upload
-  batch, Basin games to the fleet API's `/v1/identity` (Basin rows can't be deleted, so they never go there). It lands in
+  batch, Basin games to the backend's `/v1/identity` (Basin rows can't be deleted, so they never go there). It lands in
   a deletable table next to the fleet data, never in the events, and lets you look a player up by UserId (the explorer's
   Players page, `GET /v1/identity?uid=`) and answer erasure requests without a DataStore read. Players who joined
   before this update are mapped only by a backfill from the DataStore links (`POST /v1/identity/backfill`, needs
-  `TT_ANALYTICS_OPENCLOUD_KEY` with `universe-datastores.objects:list` and `:read`). Turn it off with the framework
+  `OPENCLOUD_API_KEY` with `universe-datastores.objects:list` and `:read`). Turn it off with the framework
   option `identity: false`.
 - **The DuckDB server also deletes the rows.** In Creator Hub > Webhooks, add `https://<your host>/v1/erasure` for
-  "Right to erasure request" with a secret (`TT_ANALYTICS_WEBHOOK_SECRET`). The server checks Roblox's signature,
-  ignores other games (`TT_ANALYTICS_UNIVERSE_ID`), and maps the UserId to its pids through the identity table, and
-  through Open Cloud when `TT_ANALYTICS_OPENCLOUD_KEY` is set (a key with `universe-datastores.objects:read`; add
-  `:delete` and `TT_ANALYTICS_ERASURE_DELETE_LINK=1` to also delete the link). The pids' rows leave the live file at
+  "Right to erasure request" with a secret (`ROBLOX_WEBHOOK_SECRET`). The server checks Roblox's signature,
+  ignores other games (`TYPETORCH_UNIVERSE_ID`), and maps the UserId to its pids through the identity table, and
+  through Open Cloud when `OPENCLOUD_API_KEY` is set (a key with `universe-datastores.objects:read`; add
+  `:delete` and `TYPETORCH_ERASURE_DELETE_LINK=1` to also delete the link). The pids' rows leave the live file at
   once; day files, rollups and raw archives are rewritten in the background, and later rows of those pids are dropped.
   Then the UserId's identity rows are deleted (and refused afterwards). Its log keeps the notification id and outcome,
   never the UserId. The admin token can also erase by pid: `POST /v1/erasure` `{ "pid": "..." }`.
@@ -363,119 +367,38 @@ and node graph (Mermaid). Without `--pid` it picks the player seen last. It neve
 
 ## Quick start: a local test
 
-The DuckDB server and the fleet API on your own PC, reached by game servers through a free Cloudflare quick tunnel. For
-trying it out: the tunnel URL changes every time you start it. Needs Bun, git and
+The backend on your own PC, reached by game servers through a free Cloudflare quick tunnel. For trying it out: the tunnel
+URL changes every time it starts. Needs Bun, git and
 [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
 
-### 1. Get the server
+The steps are the backend's [Quick start (local)](https://github.com/typetorch/backend#quick-start-local). In short:
 
-Next to your game:
+1. **Get the backend** next to your game: `git clone https://github.com/typetorch/backend`, then in that folder `bun install`,
+   `bun run web:install` and `bun run web:build` (the explorer, once).
+2. **Make two keys**, 32+ random characters each and different (`openssl rand -hex 32` makes one), and put them in the game
+   repo's `.env` (gitignored): `TYPETORCH_API_KEY` (the game servers' write-only key) and `TYPETORCH_ADMIN_TOKEN` (yours,
+   for the CLI and the explorer).
+3. **Run it**, from the backend folder, pointing at the game repo:
 
-```sh
-git clone https://github.com/typetorch/analytics
-cd analytics
-bun install
-```
+   ```sh
+   bun run local -- --game ../my-game
+   ```
 
-### 2. Make two tokens
+   It starts the backend, opens a quick tunnel and runs `typetorch backend setup` in the game. That writes the settings
+   record (it needs the prod signing keys, [fresh setup step 7](../getting-started/fresh-setup.md#7-prod-signing-keys), and
+   kernel 0.3.8+ in the place) with the backend's URL, and sets `backend.url` in `typetorch.json`. That local edit changes
+   with every tunnel, so don't commit it.
+4. **Check it:** open `https://<words>.trycloudflare.com/healthz` in a browser; it answers `{"ok":true}`.
 
-Run this twice: once for the admin token, once for the ingest token.
+### Play, then look
 
-```sh
-bun -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-```
-
-Create `analytics.env` in the analytics folder (git ignores it):
-
-```text
-TT_ANALYTICS_DATA=data
-TT_ANALYTICS_HOST=127.0.0.1
-TT_ANALYTICS_PORT=8787
-TT_SERVER_PARTS=analytics,fleet
-TT_ANALYTICS_ADMIN_TOKEN=<admin token>
-TT_ANALYTICS_INGEST_TOKENS=<ingest token>
-```
-
-Add the same two to your game's env file (`~/.config/typetorch/<game>.env`, see
-[fresh setup step 6](../getting-started/fresh-setup.md#6-the-open-cloud-api-key-owner)), for the CLI:
-
-```text
-TYPETORCH_ADMIN_TOKEN=<admin token>
-TYPETORCH_API_KEY=<ingest token>
-```
-
-### 3. Start the server
-
-```sh
-bun src/server/main.ts --env-file analytics.env
-```
-
-Leave it running. It listens on 127.0.0.1:8787 only.
-
-### 4. Start a quick tunnel
-
-In a second terminal, in the analytics folder. If you have a `~/.cloudflared/config.yml` (a named tunnel), its ingress
-rules win over `--url`, and a catch-all rule answers 404 for everything. Pass an empty config file to get a plain quick
-tunnel:
-
-```powershell
-# PowerShell
-Set-Content -Encoding ascii cloudflared-empty.yml "# empty"
-cloudflared tunnel --config cloudflared-empty.yml --no-autoupdate --url http://127.0.0.1:8787
-```
-
-```bash
-# bash
-echo "# empty" > cloudflared-empty.yml
-cloudflared tunnel --config cloudflared-empty.yml --no-autoupdate --url http://127.0.0.1:8787
-```
-
-It prints a URL like `https://<words>.trycloudflare.com`. Check it: open `https://<words>.trycloudflare.com/healthz` in
-a browser; it answers `{"ok":true}`.
-
-### 5. Point the game at it
-
-Both go into the game's [signed settings record](settings.md), so you need the prod signing keys
-([fresh setup step 7](../getting-started/fresh-setup.md#7-prod-signing-keys)) and kernel 0.3.8+ in the place.
-
-**Fleet** (live server status), from your game folder:
-
-```sh
-bun run typetorch backend setup --url https://<words>.trycloudflare.com
-```
-
-**Analytics settings.** Save this as `my-settings.ts` in the analytics folder (it holds no secret: the token comes
-from your env file, and your game's CLI signs and writes the record):
-
-```ts
-import { writeSettings } from "./src/index.ts";
-
-const url = process.argv[2];
-const result = await writeSettings({
-	gameDir: "../my-game", // your game folder
-	settings: { backend: "duckdb", events: `${url}/v1/ingest`, token: process.env.TYPETORCH_API_KEY! },
-});
-console.log(`settings.analytics written (settings #${result.seq})`);
-```
-
-```sh
-bun --env-file="$HOME/.config/typetorch/my-game.env" my-settings.ts https://<words>.trycloudflare.com
-```
-
-(The same line works in PowerShell and bash.)
-
-**Or all of steps 3 to 5 at once:** in the analytics folder, `bun run local -- --env-file analytics.env --game
-../my-game` starts the server and a quick tunnel, then runs `backend setup` and `settings set analytics` through your
-game's CLI. Ctrl+C stops both.
-
-### 6. Play, then look
-
-1. Make sure the game creates an `AnalyticsEngine` on the server and the client (the template does), and deploy it,
-   for example to `dev`.
-2. Join a server and play for a minute. Running servers switch to the new fleet URL and analytics settings within
-   seconds of the write (new servers at once).
+1. Make sure the game creates an `AnalyticsEngine` on the server and the client (the template does), and deploy it, for
+   example to `dev`.
+2. Join a server and play for a minute. Running servers switch to the new backend URL and analytics settings within seconds
+   of the write (new servers at once).
 3. `bun run typetorch servers` lists your server.
-4. In the analytics folder: `bun run report -- --env-file analytics.env`.
+4. In the backend folder: `bun run report -- --game ../my-game`.
 
-**When the tunnel restarts,** its URL changes: run step 5 again. For a real game, use a VPS with your own domain
-instead.
+**When the tunnel restarts,** its URL changes: run `bun run local -- --game ../my-game` again (it runs `backend setup` for the
+new URL). For a real game, use a VPS with your own domain instead ([Deploy on Coolify](https://github.com/typetorch/backend#deploy-on-coolify)
+or [run it on a VPS without Docker](https://github.com/typetorch/backend#run-it-on-a-vps-without-docker)).

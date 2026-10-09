@@ -177,7 +177,7 @@ Remove the template's `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey`:
 | `approval` | `all` (default): every deploy waits for your y/N; `prod`: only prod-channel deploys do; `none` |
 | `kernel` | the kernel folder for `kernel deploy` (`node_modules/@typetorch/kernel`, or a kernel checkout) |
 | `signingPublicKeys`, `revokedKeys`, `fallbackPublicKey`, `keyAssetId` | written by `typetorch keys` (step 7). Don't edit by hand |
-| `fleet` | optional, `{ "url": ... }`: written by `typetorch backend setup` ([Live servers and alerts](../guides/fleet-and-alerts.md)) |
+| `backend` | optional, `{ "url": ... }`: written by `typetorch backend setup` ([Live servers and alerts](../guides/fleet-and-alerts.md)); CLI 0.8's `fleet` key is read once, with a warning |
 
 Commit it:
 
@@ -200,44 +200,32 @@ Add these permissions and select your experience where asked:
 |---|---|---|
 | assets | `deploy`, `upload`, `promote` (of an unfinished upload), `test --cloud`, `keys init` / `rotate` (the key asset), `assets sync` / `status`, `doctor` | `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (the cloud test that runs before every prod deploy, hot assets, doctor's place check) |
 | deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `settings`, `backend setup`, `access push` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number and the [signed settings](../guides/settings.md), below) |
-| place | `kernel deploy` only | place publishing (`universe-places` write; the CLI calls it `universe.place:write`), and `asset:read` to record the place version |
+| place | `kernel deploy` only | Luau Execution (`universe.place.luau-execution-session:read` and `:write`: the place is patched in a task, no download), and `asset:read` to record the place version; `universe.place:write` only to publish a `--place-file` copy |
 
 - **The shared deploy number.** Every machine that deploys (your PC, a second PC, remote-claude) takes the next
   deploy number (`#seq`) from the game's DataStore: the kernel's records of past deploys, and a counter the CLI claims
   atomically. That's what the DataStore scopes are for. Without them a deploy uses only your PC's log (fine while you
-  deploy from one machine), and `--require-shared-seq` stops instead.
+  deploy from one machine), and the deploy warns and uses this machine's log only.
 - **Not needed:** `universe:write` and `universe:read` (ConfigService). Since kernel 0.3.8 TypeTorch keeps no
   ConfigService keys: dev access, the fleet API and the analytics settings live in one
   [signed settings record](../guides/settings.md) in the game's DataStore.
-- **Not available to API keys today:** `legacy-asset:manage` (`kernel deploy` downloading the place; pass a copy
-  instead, see step 8). Creator Hub doesn't offer it for API keys.
+- **Not available to API keys today:** `legacy-asset:manage`, the download of a place file. `kernel deploy` doesn't need it:
+  the default engine patches the place through Luau Execution. A copy (`--place-file`) is the fallback, see step 8. Creator
+  Hub doesn't offer it for API keys.
 - Set an expiry date, and add your IP under accepted IP addresses if you can.
 - Everything runs from your machine. TypeTorch never uses GitHub Actions or other hosted CI, so the key never has to
   leave your PC.
 
-**Store the key outside the repo.** Make a folder and an env file for this game:
-
-```powershell
-# PowerShell
-New-Item -ItemType Directory -Force "$HOME\.config\typetorch" | Out-Null
-notepad "$HOME\.config\typetorch\my-game.env"
-```
-
-```bash
-# bash
-nano my-game/.env
-```
-
-The game repo's `.env` (gitignored by the template) holds the secrets, `typetorch.json` everything else (CLI 0.9).
-Put one line in it, then save:
+**Put the keys in the game repo's `.env`.** It's gitignored by the template, and it's where the CLI reads secrets
+(`typetorch.json` holds everything else, CLI 0.9). Add one line, then save:
 
 ```text
 OPENCLOUD_API_KEY=<your key>
 ```
 
-With the TypeTorch backend, two more lines go there: `TYPETORCH_API_KEY=<the backend's API key>` and
+With the TypeTorch backend, two more lines go there: `TYPETORCH_API_KEY=<the backend's game key>` and
 `TYPETORCH_ADMIN_TOKEN=<the backend's admin token>` (then `bun run typetorch backend setup --url <backend>`).
-`--env-file <path>` or `TYPETORCH_ENV_FILE` (environment) read another file instead of `.env`.
+`--env-file <path>` or `TYPETORCH_ENV_FILE` (real environment) read another file instead of `.env`.
 
 - One shared key (`OPENCLOUD_API_KEY`) is the simple setup. You may split it per job instead:
   `OPENCLOUD_ASSETS_KEY`, `OPENCLOUD_DEPLOY_KEY` and `OPENCLOUD_PLACE_KEY` (each falls back to the shared key).
@@ -265,7 +253,7 @@ git commit -m "Prod signing keys"
   group-owned Model that lists the trusted public keys) and writes `signingPublicKeys` and `keyAssetId` into
   `typetorch.json`.
 - `keys init --fallback` writes `~/.config/typetorch/keys/<universeId>.fallback.key` and `fallbackPublicKey`.
-- **Back up both key files and your env file** offline (an encrypted USB stick, or a password manager). They are
+- **Back up both key files and the game repo's `.env`** offline (an encrypted USB stick, or a password manager). They are
   plaintext and never leave your PC. Never put them in a repo. Before a live game depends on them, also split off an
   `asset:write` key and plan a rotation drill ([Prod signing: back up and drill](../guides/prod-signing.md#back-up-and-drill)).
 
@@ -287,7 +275,8 @@ bun run typetorch kernel deploy --replace-place --yes
   the `keys` line shows your key asset id.
 - `--replace-place --yes` publishes it. It refuses without the keys from step 7.
 - **Never use `--replace-place` on a place with Studio-built content**: it wipes it (it stays in the place's version
-  history). For such places `kernel deploy` patches only the kernel into a copy of the place: see
+  history). For such places `kernel deploy` patches only the kernel into the live place, with no download, when the place allows saving
+  through the API (Creator Hub > Permissions); otherwise into a Studio copy. See
   [migrate: install the kernel](migrate.md#9-install-the-kernel-in-your-place).
 - Studio must not have the place open in Team Create while you publish: that returns 409.
 

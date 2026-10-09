@@ -6,8 +6,7 @@ seconds. The **kernel** sends it, so it keeps working when a build is broken and
 - Needs kernel 0.3.2+ in the place (a place project that maps the kernel's files one by one must map `Fleet` too; the
   template's `studio.project.json` does).
 - Backend: the **fleet API**, a small server you host (SQLite inside). It is part of the
-  [analytics repo](https://github.com/typetorch/analytics) and runs in the same process as the analytics server, or
-  alone.
+  [backend](https://github.com/typetorch/backend) and runs in the same process as its DuckDB analytics part, or alone.
 - Without it everything else still works: `servers`, `report` and `alerts` say "not configured" in one line, and
   deploys skip their wait with a note.
 
@@ -38,31 +37,32 @@ game shares. (The kernel still keeps each branch's head there: one small key.)
 
 ## Set it up
 
-1. **Run the fleet API.** On a VPS with a domain (the analytics README:
-   [Deploy on a 1 GB VPS](https://github.com/typetorch/analytics#deploy-on-a-1-gb-vps)), or on your PC behind a quick
-   tunnel for a test ([analytics quick start](analytics.md#quick-start-a-local-test)). For a game on Cloudflare Basin,
-   run only this part: `TT_SERVER_PARTS=fleet`. It needs two random tokens: an admin token (`TT_ANALYTICS_ADMIN_TOKEN`)
-   and an ingest token (`TT_ANALYTICS_INGEST_TOKENS`).
-2. **Give the CLI the tokens.** In your game's env file (outside the repo):
+1. **Run the backend.** On a VPS with a domain ([Deploy on Coolify](https://github.com/typetorch/backend#deploy-on-coolify)
+   or [run it on a VPS without Docker](https://github.com/typetorch/backend#run-it-on-a-vps-without-docker)), or on your PC
+   behind a quick tunnel for a test ([analytics quick start](analytics.md#quick-start-a-local-test)). For a game on
+   Cloudflare Basin, run only its fleet part: `TYPETORCH_PARTS=fleet`. It needs two random values, 32+ characters each
+   and different: the game key `TYPETORCH_API_KEY` and the admin token `TYPETORCH_ADMIN_TOKEN`.
+2. **Give the CLI the keys.** In the game repo's `.env` (gitignored):
 
    ```text
    TYPETORCH_ADMIN_TOKEN=<admin token>
-   TYPETORCH_API_KEY=<ingest token>
+   TYPETORCH_API_KEY=<game key>
    ```
 
-   The admin token reads; the ingest token only writes. The CLI never prints them or passes them to a child process.
+   The game key only writes; the admin token reads and manages. The CLI never prints them or passes them to a child process.
 3. **Point game servers at it:**
 
    ```sh
-   bun run typetorch backend setup --url https://fleet.example.com
+   bun run typetorch backend setup --url https://backend.example.com
    ```
 
-   It writes `fleet` = `{ url, token }` (the ingest token) into the game's [signed settings record](settings.md) and
-   `"fleet": { "url": ... }` into `typetorch.json`, then pings the servers. It needs both prod signing keys (the record
+   It writes `backend` = `{ url, key }` (the game key) into the game's [signed settings record](settings.md), with the
+   `fleet` and `analytics` sections that kernels before 0.4 read derived from it, and `"backend": { "url": ... }` into
+   `typetorch.json`, then pings the servers and sends the owner list to the backend. It needs both prod signing keys (the record
    is signed; servers refuse one that doesn't verify) and kernel 0.3.8+. `--dry-run` shows what it would write;
    `bun run typetorch settings status` shows the record (the token hidden). Before it signs anything it
-   [checks](settings.md#checked-before-it-is-signed) the address (https, `GET /healthz` within 5 s) and the token (an
-   ingest token, not the admin one) and refuses a broken one with a fix; `--force` writes anyway.
+   [checks](settings.md#checked-before-it-is-signed) the address (https, `GET /healthz` within 5 s) and the game key (not
+   the admin token) and refuses a broken one with a fix; `--force` writes anyway.
 4. **Check:** kernels read the record at boot, about every minute, and within seconds of a ping. Join a server, then
    `bun run typetorch servers`.
 
@@ -119,22 +119,22 @@ The kernel sends each code at most once a minute per server (`error_spike` every
 - **Fleet flood:** the fleet API admits at most 2,000 JobIds it has never seen per minute (enough for a 1,250-server
   fleet restarting at once). Past that, new ones get a 429 until the minute ends (they get in on their next
   heartbeat), known servers keep working, and one `fleet_flood` alert is raised per minute. The cause is a huge fleet
-  restart or someone with the ingest token sending made-up JobIds. Raise `TT_FLEET_NEW_JOBS_PER_MINUTE` for a bigger
+  restart or someone with the ingest token sending made-up JobIds. Raise `TYPETORCH_NEW_JOBS_PER_MINUTE` for a bigger
   fleet.
 
 Reports are kept 30 days and alerts 90 days.
 
 ## Webhooks
 
-The fleet API can post alerts to Discord, Slack or any URL that takes JSON. In its env file:
+The fleet API can post alerts to Discord, Slack or any URL that takes JSON. In the backend's environment (Coolify's environment variables, or its env file):
 
 ```text
-TT_FLEET_WEBHOOK_URL=<your webhook URL>
-TT_FLEET_WEBHOOK_LEVELS=critical
+TYPETORCH_ALERT_WEBHOOK_URL=<your webhook URL>
+TYPETORCH_ALERT_WEBHOOK_LEVELS=critical
 ```
 
-- The format is detected from the URL (or set `TT_FLEET_WEBHOOK_FORMAT` to `discord`, `slack` or `json`).
-- Critical only by default (`TT_FLEET_WEBHOOK_LEVELS=critical,warning` adds warnings).
+- The format is detected from the URL (or set `TYPETORCH_ALERT_WEBHOOK_FORMAT` to `discord`, `slack` or `json`).
+- Critical only by default (`TYPETORCH_ALERT_WEBHOOK_LEVELS=critical,warning` adds warnings).
 - The same alert (code, branch, build) at most once per 10 minutes; at most 20 posts a minute.
 - A webhook URL is a secret: keep it in the server's env file only.
 
@@ -155,7 +155,7 @@ Server > Status shows these when the kernel's sender has a problem:
 | Attention item | Fix |
 |---|---|
 | No fleet API | the place's kernel lacks its `Fleet` module: map it in your place project (kernel 0.3.2+), then publish |
-| Fleet settings | the settings record's `fleet` is invalid: run `backend setup` again |
+| Fleet settings | the settings record's `backend` is invalid: run `backend setup` again |
 | Settings | the [settings record](settings.md) is missing, unsigned or doesn't verify (`typetorch settings status`) |
 | Fleet API failing | the URL doesn't answer (a stopped server, a restarted quick tunnel) or the token is wrong |
 

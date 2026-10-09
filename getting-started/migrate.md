@@ -745,25 +745,25 @@ First do [fresh setup](fresh-setup.md) steps 4, 6 and 7 (settings, API key, sign
 until your first deploy, so your old scripts keep running meanwhile. Remove the old game scripts that the payload
 replaces (keep the ones listed below) in Studio and publish just before the first deploy.
 
-**With the CLI (patches only the kernel):**
+**With the CLI (patches only the kernel):** when the place allows saving through the API, nothing is downloaded: the CLI
+patches the live place in a Luau Execution task. The place needs **Allow place to be updated using Save Place API** on
+(Creator Hub > Creations > the experience > Places > the place > Permissions; off by default for places made in Studio) and no
+Team Create session open.
 
-1. In Studio, **File > Download a Copy** of the live place as a binary `.rbxl` file, and note its place version. (The
-   CLI can't download it: the scope for that, `legacy-asset:manage`, can't be given to API keys today.)
-2. Patch the copy without publishing:
+1. Patch without publishing: `bun run typetorch kernel deploy --dry-run --install`. It adds the kernel folders (with your
+   trust roots `KeyAssetId`, `FallbackPublicKey` and `BootstrapHeads`) and the kernel's settings (`HttpService.HttpEnabled`),
+   checks that everything else is unchanged, and writes a report to `.typetorch/place-patches/`. Read the summary. It leaves
+   `ServerScriptService.LoadStringEnabled` as your place has it (`--loadstring` turns it on, for a test place only).
+2. Publish it: the same command without `--dry-run`. It asks y/N and refuses if someone published meanwhile. Undo:
+   `bun run typetorch kernel restore --version <the version before>`.
+3. Move players to the new version (restart servers from Creator Hub, or the dev menu's **Migrate** on servers that still
+   run the old kernel).
 
-   ```sh
-   bun run typetorch kernel deploy --dry-run --install --place-file <file> --base <version>
-   ```
-
-   It adds the kernel folders (with your trust roots `KeyAssetId`, `FallbackPublicKey` and `BootstrapHeads`) and the
-   kernel's settings (`HttpService.HttpEnabled`), checks that everything else is unchanged, and writes the patched
-   file and a report to `.typetorch/place-patches/`. Read the summary. It leaves `ServerScriptService.LoadStringEnabled`
-   as your place has it (CLI 0.7.3+; older CLIs turn it on, so check it in Studio afterwards; `--loadstring` turns it
-   on, for a test place only).
-3. Publish it: the same command without `--dry-run`. It asks y/N and refuses if someone published meanwhile. Keep your
-   downloaded copy: `bun run typetorch kernel restore <file>` publishes it back (undo).
-4. Move players to the new version (restart servers from Creator Hub, or the dev menu's **Migrate** on servers that
-   still run the old kernel).
+If the place doesn't allow saving through the API (a Studio-made place with that setting off), use a copy: in Studio,
+**File > Download a Copy** of the live place as a binary `.rbxl` file, and note its place version. Then
+`bun run typetorch kernel deploy --dry-run --install --place-file <file> --base <version>`; the same command without
+`--dry-run` publishes after a y/N, and `bun run typetorch kernel restore <file>` undoes it. The CLI can't download the copy
+itself (`legacy-asset:manage` can't be given to API keys).
 
 Later kernel updates work the same way, without `--install` ([Kernel updates](../guides/deploy-and-rollback.md#kernel-updates)).
 An agent can run them for you, with your OK before the publish.
@@ -940,7 +940,7 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 | A per-player Map in `persist` with no leave cleanup | it grows with every player who ever joined the server | `this.ctx.playerState` (rule 2) |
 | `npx rbxtsc` in a Bun project on Windows | runs an unrelated placeholder package | `bun run build` or `bunx rbxtsc` |
 | Dev branch writes prod data | real players' data changes from a test server | split store names by `TypeTorch.channel` |
-| `kernel deploy --replace-place` on a real place | maps and Studio UI vanish from the live version | `kernel deploy --place-file <copy>` patches only the kernel (section 9) |
+| `kernel deploy --replace-place` on a real place | maps and Studio UI vanish from the live version | `kernel deploy --install` patches only the kernel (section 9) |
 | Slow work in `onInit` | a new server waits only about 6 s at boot, then starts an older build and swaps yours in later | load in `onStart`; keep `onInit` short |
 | Player data saved only in `onStop` or a generation's `game.BindToClose` | a shutdown in the middle of a swap can skip it (no generation runs then) | the data library in the place saves on close; `onStop` for short extras |
 | `onInit` waits for a place script | the cloud test fails (place scripts don't run there), so every prod deploy is refused | skip the wait when `TypeTorchTest` is set ([Player data](../guides/player-data.md#the-cloud-test)) |

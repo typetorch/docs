@@ -18,7 +18,7 @@ apply a change within seconds, with no deploy and no place publish.
 |---|---|---|
 | `access` | `members`, `revoked`, `devBadgeId` from `typetorch.json` ([who gets the dev menu](../getting-started/fresh-setup.md#11-the-dev-menu-and-who-gets-it)) | `typetorch access push` |
 | `defaultBranch`, `channels` | from `typetorch.json` | `typetorch settings push` |
-| `fleet` | `{ url, token }`: the [fleet API](fleet-and-alerts.md) and its write-only ingest token | `typetorch backend setup` |
+| `fleet` | derived from `backend` for kernels before 0.4: `{ url, token }`, the [fleet API](fleet-and-alerts.md) and its write-only ingest token | `typetorch backend setup` |
 | `backend` | `{ url, key, analytics? }`: the TypeTorch backend and its game key (CLI 0.9; kernels before 0.4 read the `fleet` and `analytics` sections it derives) | `typetorch backend setup` |
 | `analytics` | the [analytics sink settings](analytics.md#settings-the-analytics-field), derived from `backend` | `typetorch backend setup` |
 | `game` | your own live values, read with `TypeTorch.liveConfig` | `typetorch settings set game.<key>` |
@@ -37,7 +37,7 @@ bun run typetorch settings set game.event '{"name":"halloween","ends":1793000000
 bun run typetorch settings unset game.event
 bun run typetorch settings push                    # defaultBranch, channels and access from typetorch.json
 bun run typetorch access push                      # access only
-bun run typetorch backend setup --url https://fleet.example.com
+bun run typetorch backend setup --url https://backend.example.com
 ```
 
 Every write reads the record, checks that your keys signed it, changes one field, raises `seq` by one, signs it with
@@ -47,29 +47,27 @@ the servers.
 - `--dry-run` shows the result without writing.
 - `--no-ping`: servers still pick it up within about a minute.
 - `--force` replaces a record your keys didn't sign (you lost both keys, or game code wrote junk). Its old fields are
-  dropped, never re-signed, so write them again afterwards. For `fleet setup` and `settings set analytics` it also
+  dropped, never re-signed, so write them again afterwards. For `backend setup` it also
   writes a value whose [endpoint checks](#checked-before-it-is-signed) failed.
 - Every write needs both signing key files (else: "run `typetorch keys init`") and the deploy key's DataStore scopes
   (`universe-datastores.objects:read`, `:create`, `:update`) plus `universe-messaging-service:publish` for the ping.
 - `typetorch keys rotate` and `keys resign` re-sign the record with the new keys.
-- `typetorch doctor` reads it, checks the signature and tests the `fleet` and `analytics` addresses in it.
+- `typetorch doctor` reads it, checks the signature and tests the `backend` address and keys in it.
 
 ### Checked before it is signed
 
-A wrong address or token in `fleet` or `analytics` isn't rejected by anything else: game servers fail every request
-(`NetFail`, HTTP 401, HTTP 530) until someone looks at the dev menu. So `fleet setup` and `settings set analytics`
-test the value first (also with `--dry-run`), and `typetorch doctor` runs the same tests against the live record:
+A wrong address or key in `backend` isn't rejected by anything else: game servers fail every request
+(`NetFail`, HTTP 401, HTTP 530) until someone looks at the dev menu. So `backend setup` tests the value first (also with
+`--dry-run`), and `typetorch doctor` runs the same tests against the live record:
 
-1. **url**: it parses, is https (analytics also accepts http on localhost, for Studio), has no user info; the fleet URL
-   is the server's base address; the DuckDB `events` URL ends in `/v1/ingest`.
+1. **url**: it parses, is https (http only for localhost, on this PC), has no user info, and is the server's base address.
 2. **healthz**: `GET <url>/healthz` answers `{"ok":true}` within 5 seconds.
-3. **token**: `GET <url>/v1/auth/check` (it changes nothing) says the token is a write-only *ingest* token for that part
-   (the admin token is refused). Basin streams have no such call: their URLs must answer, a 401/403 is a refused token,
-   and a wrong token otherwise only shows up on the first upload.
+3. **key and admin token**: `GET <url>/v1/auth/check` (it changes nothing) says the game key has role `game` (write-only)
+   and that the fleet and analytics parts run, and the admin token has role `admin`. Refused even with `--force`: the admin
+   token in the game key's place, or the same value for both.
 
-If one fails, the command prints it in red with a fix, writes nothing and exits 1; `--force` writes anyway. The checks
-need the analytics server from `@typetorch/analytics` with `GET /v1/auth/check` (older servers fall back to `GET
-/v1/settings`, which proves the token is accepted but can't tell an ingest token from the admin one).
+If one fails, the command prints it in red with a fix, writes nothing and exits 1; `--force` writes anyway. The checks need
+a backend with `GET /v1/auth/check` (`@typetorch/backend`).
 
 ## Live values in game code
 
@@ -125,8 +123,8 @@ Kernel 0.3.8 doesn't read the old ConfigService keys, and they can't be read bac
 kernel 0.3.8:
 
 1. `bun run typetorch settings push` (defaultBranch, channels, dev access).
-2. `bun run typetorch backend setup --url <your fleet API>` if you use one (or `bun run local` in the analytics folder for
-   a local test: it runs `backend setup` for you).
+2. `bun run typetorch backend setup --url <your backend>` if you use one (or `bun run local -- --game <game repo>` in the
+   backend folder for a local test: it runs `backend setup` for you).
 3. `bun run typetorch access push`: the owners also go to the backend (only they may Sign in with Roblox there).
 4. `bun run typetorch settings status` to check. Then delete the old keys in Creator Hub (Configs) if you like.
 

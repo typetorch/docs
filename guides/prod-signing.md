@@ -80,16 +80,15 @@ signature.
 ## Back up and drill
 
 Do these once, before players depend on the game. Losing both key files means a kernel deploy (a place publish and a
-restart) before prod takes a deploy again. Losing the env file means new Open Cloud keys.
+restart) before prod takes a deploy again. Losing the `.env` means new Open Cloud keys.
 
-1. **An offline backup.** Copy every file in `~/.config/typetorch/keys/` and your env file
-   (`~/.config/typetorch/<game>.env`) to something offline: an encrypted USB stick, or a password manager's secure
+1. **An offline backup.** Copy every file in `~/.config/typetorch/keys/` and the game repo's `.env` to something offline: an encrypted USB stick, or a password manager's secure
    notes. Not a synced cloud folder, not a repo, never a chat. Update it after every `keys rotate` and
    `keys init --fallback --force`.
 2. **A second Open Cloud key for uploads.** Any key with `asset:write` in your group can change the key asset (the
    trusted signing keys) and upload builds. Give that to one key only:
    - a new key with the assets job's scopes (`asset:read`, `asset:write`, Luau Execution read and write), limited to
-     your IP address in Creator Hub (update it when your IP changes), in your env file as `OPENCLOUD_ASSETS_KEY`;
+     your IP address in Creator Hub (update it when your IP changes), in the game repo's `.env` as `OPENCLOUD_ASSETS_KEY`;
    - remove `asset:write` from the shared key (`OPENCLOUD_API_KEY`); it keeps the rest (messaging, DataStores, place
      publishing);
    - `bun run typetorch doctor`: `key assets` names `OPENCLOUD_ASSETS_KEY`, and every scope probe is `ok`.

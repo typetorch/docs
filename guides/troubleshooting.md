@@ -96,9 +96,11 @@ Edit the key in Creator Hub and add the missing permission for this experience.
 Run `bun run typetorch keys init` and `bun run typetorch keys init --fallback` first, commit `typetorch.json`, then
 `kernel deploy`.
 
-**`kernel deploy` can't download the place (a 401/403 on the place download).**
-That needs `legacy-asset:manage`, which API keys can't get today. Download a copy in Studio (File > Download a Copy)
-and pass it: `--place-file <file> --base <version>` ([Kernel updates](deploy-and-rollback.md#kernel-updates)).
+**`kernel deploy` says the place can't be patched through the API.**
+The default engine saves the place in a Luau Execution task. That needs the place setting "Allow place to be updated using Save
+Place API" (Creator Hub > Creations > the experience > Places > the place > Permissions; off by default for places made in
+Studio), no active Team Create session, and the place key's Luau Execution scopes. Without the setting, download a copy in
+Studio (File > Download a Copy) and pass it: `--place-file <file> --base <version>` ([Kernel updates](deploy-and-rollback.md#kernel-updates)).
 
 **`backend setup`, `access push` or `settings ...` fails with 401/403.**
 The [settings record](settings.md) is a DataStore entry: the deploy key needs `universe-datastores.objects:read`,
@@ -159,7 +161,7 @@ check again with `bun run typetorch servers --branch <b>`.
 
 **`the fleet API isn't configured` (from `servers`, `report`, `alerts`, or `--wait` skipped).**
 Set it up once: [Live servers and alerts](fleet-and-alerts.md#set-it-up). The CLI needs `TYPETORCH_ADMIN_TOKEN` and
-`TYPETORCH_API_KEY` in your env file, and `typetorch.json` `backend.url`.
+`TYPETORCH_API_KEY` in the game repo's `.env`, and `typetorch.json` `backend.url`.
 
 **Asset names show up as `####` in Creator Hub.**
 Roblox's text filter censors some hex names unpredictably. The CLI renames censored payloads to `TypeTorch payload`;
@@ -201,10 +203,10 @@ The place's kernel has no `Fleet` module: a place project that maps the kernel's
 too (kernel 0.3.2+). Map it, then publish the place.
 
 **Dev menu: "Fleet API failing", or `servers` lists nothing.**
-The fleet URL doesn't answer or the token is wrong. Run `bun run typetorch doctor`: it tests the `fleet` and
-`analytics` addresses in the live settings record (the URL, `GET /healthz` within 5 s, and the token) and prints a fix
+The fleet URL doesn't answer or the token is wrong. Run `bun run typetorch doctor`: it tests the `backend` address and
+keys in the live settings record (the URL, `GET /healthz` within 5 s, and the keys) and prints a fix
 for each failure. A quick tunnel gets a new URL every time it starts: run `bun run typetorch backend setup --url <new url>`
-again (or restart `bun run local` in the analytics folder). Running servers (kernel 0.3.8+) switch within seconds; new
+again (or restart `bun run local -- --game <game repo>` in the backend folder). Running servers (kernel 0.3.8+) switch within seconds; new
 servers at once.
 
 **`backend setup` says "refusing to write ... nothing was signed or written".**
@@ -213,9 +215,10 @@ failing check with a `fix:` line:
 
 | Check | Meaning |
 |---|---|
-| `url` | not a URL, not https (game servers and the kernel only use https), user info in it, the fleet URL isn't the base address, or the DuckDB `events` URL doesn't end in `/v1/ingest` |
+| `url` | not a URL, not https (game servers and the kernel only use https; http only on localhost, for this PC), user info in it, or not the server's base address |
 | `healthz` | `GET <url>/healthz` didn't answer `{"ok":true}` within 5 s: a dead quick tunnel (start `bun run local` again; the URL changes every run), a stopped server, a wrong host, or something else answers there |
-| `token` | the server refused the token (use its API key, `TYPETORCH_API_KEY`; `TT_ANALYTICS_INGEST_TOKENS` before the backend rename), or it is the admin token (never put that in the record: every script in your game can read it), or that part of the server is off (`TYPETORCH_PARTS`; `TT_SERVER_PARTS` before the rename) |
+| `key` | the server refused the game key (`TYPETORCH_API_KEY` in the game repo's `.env`), or that part of the server is off (`TYPETORCH_PARTS`), or it is the admin token (never put that in the record: every script in your game can read it) |
+| `admin` | `TYPETORCH_ADMIN_TOKEN` isn't the admin token (the server answers role `admin` for it), or it is the same value as the game key |
 
 Fix it and run the command again. `--force` writes the value anyway (the failures print as warnings), except an admin token in the key's place, which is always refused. `bun run local`
 prints the same message in red when the game's CLI refuses its tunnel, and keeps the tunnel running.
@@ -225,16 +228,15 @@ The game servers can't reach your analytics / fleet server. Roblox names the fai
 broke mid-request (the server or the tunnel on your PC restarted, dropped it or is overloaded; quick tunnels are for
 testing only), `DnsResolve` or HTTP 530 that the quick tunnel's address is gone (it changes on every start),
 `ConnectFail` that nothing accepts connections there, `TimedOut` that it never answers (the PC is asleep?). Run
-`bun run typetorch doctor`, then `bun run local` in the analytics folder if the address is stale. The engine keeps the
+`bun run typetorch doctor`, then `bun run local -- --game <game repo>` in the backend folder if the address is stale. The engine keeps the
 rows and retries with a growing pause (5, 10, 20 ... 300 s, spread so servers don't retry together); it logs at most
 one line a minute with the reason and the fix, and one line when uploads work again. **Server > Status** shows the
 *Analytics* and *Fleet API* lines (queued, sent, `FAILING x5: ... retry in 80 s`, the last error and its age) and
 *Attention* lists the fix.
 
 **The quick tunnel answers 404 for everything.**
-Your `~/.cloudflared/config.yml` (a named tunnel) has a catch-all ingress rule, and it overrides `--url`. Start the
-quick tunnel with an empty config file: `cloudflared tunnel --config cloudflared-empty.yml --url http://127.0.0.1:8787`
-([analytics quick start](analytics.md#4-start-a-quick-tunnel)).
+Your `~/.cloudflared/config.yml` (a named tunnel) has a catch-all ingress rule, and it overrides `--url`. `bun run local` passes
+an empty config, so this happens only with a cloudflared you start yourself: give it an empty `--config` file.
 
 **Analytics: no rows arrive.**
 Check, in order: an `AnalyticsEngine` is created on the server (the client alone sends nothing); Allow HTTP Requests is
@@ -244,7 +246,7 @@ send every 15 s (`flushSeconds`); a DuckDB server loads them a few seconds later
 minutes).
 
 **Basin: rows are sent (2xx) but never show up.**
-Basin drops rows that don't match the stream's schema, silently. Create the streams from the analytics repo's
+Basin drops rows that don't match the stream's schema, silently. Create the streams from the backend repo's
 `basin/*.schema.json` exactly; a schema can't be changed after the stream exists.
 
 **Kernel updates fail with HTTP 409 when publishing the place.**

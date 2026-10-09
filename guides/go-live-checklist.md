@@ -45,9 +45,10 @@ Nothing here touches your live game until step 8, the cut-over.
 
 ## 5. Install the kernel in the copy
 
-- [ ] Download a copy of the copy place (note its version), then
-      `bun run typetorch kernel deploy --dry-run --install --place-file <file> --base <version> --config typetorch.copy.json`.
-      Read the report: only the kernel folders and the kernel's settings change.
+- [ ] `bun run typetorch kernel deploy --dry-run --install --config typetorch.copy.json`. Read the report: only the kernel
+      folders and the kernel's settings change. With the copy place's "Allow place to be updated using Save Place API" setting
+      on (Creator Hub > Permissions; off by default for places made in Studio) it patches through Luau Execution, with no
+      download. Otherwise: File > Download a Copy, note its version, and add `--place-file <file> --base <version>`.
 - [ ] The same command without `--dry-run` (y/N). Join: F9 shows `[TypeTorch] kernel <version>`.
 - [ ] `ServerScriptService.LoadStringEnabled` stays **off** in the live game (`bun run typetorch doctor` reports it).
       Only a test place where you want remote-claude's `run_luau` turns it on. CLIs up to 0.7.2 turn it on during the
@@ -86,7 +87,7 @@ Then run every live test on the copy:
       lose it.
 - [ ] **Purchases:** open a developer product prompt, deploy, buy while the swap runs. One grant, saved; rejoin: no
       second grant. Check a game pass after a swap.
-- [ ] **Kernel undo:** `bun run typetorch kernel restore <the file you downloaded in step 5>` once, then install again.
+- [ ] **Kernel undo:** `bun run typetorch kernel restore --version <the version before the install>` once, then install again.
 - [ ] **Team Create:** with the copy open in Studio by someone else, `kernel deploy` stops with a 409 and publishes
       nothing.
 - [ ] **Slow phone, bad connection:** a client swap finishes, no stuck loading, `/tt status` in chat answers.

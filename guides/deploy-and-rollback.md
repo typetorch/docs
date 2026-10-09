@@ -314,15 +314,24 @@ Code and framework fixes never need a restart. A new **kernel** does: it lives i
 publish, and only new servers run it. Kernel updates are manual (an agent can do them for you, with your OK:
 [agent playbook](../agents/AGENTS.md#updating-the-kernel-in-a-game-agents)):
 
-1. In Studio, **File > Download a Copy** of the live place (a binary `.rbxl`), and note its place version.
-2. `bun run typetorch kernel deploy --dry-run --place-file <file> --base <version>` replaces only the kernel folders in
-   that copy, checks that everything else is unchanged, and writes the patched file and a report. Read its summary.
-3. `bun run typetorch kernel deploy --place-file <file> --base <version>` publishes it after a y/N. It refuses if someone
-   published meanwhile. Keep the downloaded copy: `bun run typetorch kernel restore <file>` publishes it back (undo).
-4. Move players to new servers. The dev menu shows "Kernel update" on old servers, with a **Migrate** button that moves
+1. `bun run typetorch kernel deploy --dry-run` patches the kernel folders and the kernel's settings into the place's newest
+   version (it must be published) and shows the summary: kernel old -> new, scripts changed per folder, settings, references.
+   Nothing is saved or published.
+2. `bun run typetorch kernel deploy --yes` (or the y/N prompt) saves and publishes it through a Luau Execution task, with no
+   download. It needs the place setting **Allow place to be updated using Save Place API** (Creator Hub > Creations > the
+   experience > Places > the place > Permissions; off by default for places made in Studio) and no active Team Create session.
+   It refuses if someone published meanwhile. Undo: `bun run typetorch kernel restore --version <the version before>`.
+3. Move players to new servers. The dev menu shows "Kernel update" on old servers, with a **Migrate** button that moves
    everyone on that server to a fresh one.
 
-The CLI can't download the place itself: the scope for that (`legacy-asset:manage`) can't be given to API keys today.
+If the place doesn't allow saving through the API (a Studio-made place with the setting off), use a copy instead. In Studio,
+**File > Download a Copy** of the live place (a binary `.rbxl`), and note its place version. Then
+`bun run typetorch kernel deploy --dry-run --place-file <file> --base <version>` replaces only the kernel folders in that copy,
+checks that everything else is unchanged, and writes the patched file and a report. The same command with `--yes` (or the
+y/N prompt) publishes it, and refuses if someone published meanwhile. Keep the downloaded copy:
+`bun run typetorch kernel restore <file>` publishes it back (undo). The CLI can't download the copy itself:
+`legacy-asset:manage` can't be given to API keys.
+
 A new, empty place takes `kernel deploy --replace-place --yes` instead
 ([fresh setup step 8](../getting-started/fresh-setup.md#8-publish-the-kernel-place-owner)).
 
@@ -343,5 +352,5 @@ A new, empty place takes `kernel deploy --replace-place --yes` instead
 ## No GitHub Actions
 
 TypeTorch doesn't use or ship GitHub Actions or any other hosted CI: they are a common supply-chain risk. Builds, cloud
-tests and deploys run from your own machine. `--require-shared-seq` and `approve --import <dir>` exist for automation
+tests and deploys run from your own machine. `approve --import <dir>` exists for automation
 you choose to run yourself.
