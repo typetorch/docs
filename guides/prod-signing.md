@@ -91,7 +91,7 @@ restart) before prod takes a deploy again. Losing the `.env` means new Open Clou
      your IP address in Creator Hub (update it when your IP changes), in the game repo's `.env` as `OPENCLOUD_ASSETS_KEY`;
    - remove `asset:write` from the shared key (`OPENCLOUD_API_KEY`); it keeps the rest (messaging, DataStores, place
      publishing);
-   - `bun run typetorch doctor`: `key assets` names `OPENCLOUD_ASSETS_KEY`, and every scope probe is `ok`.
+   - `bun run typetorch doctor --show-ok`: `key assets` names `OPENCLOUD_ASSETS_KEY`, and every scope probe is `ok`.
 3. **A dated rotation drill.** Put it in your calendar: once before go-live, then every 3 months, and the day anyone
    with access to your keys leaves. On that date, in a quiet hour:
    1. `bun run typetorch keys rotate`;

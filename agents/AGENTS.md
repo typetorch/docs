@@ -575,29 +575,40 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
 4. **Put it in the game repo's `.env`:** the line `OPENCLOUD_API_KEY=<key>` (gitignored; CLI 0.9 reads the keys from there:
    `OPENCLOUD_API_KEY`, and `TYPETORCH_API_KEY` and `TYPETORCH_ADMIN_TOKEN` for the backend). Never commit it or paste it
    into chat.
-5. **Check:** `bun run typetorch doctor`. Expect `ok` for the tools, `typetorch.json`, each key and the scopes you added.
+5. **Check:** `bun run typetorch doctor --show-ok` (without `--show-ok` it lists only problems). Expect `ok` for the tools, `typetorch.json`, each key and the scopes you added.
 6. **Prod signing keys:** `bun run typetorch keys init`, `bun run typetorch keys init --fallback`, commit
    `typetorch.json`. Back up `~/.config/typetorch/keys/<universeId>.key`, `.fallback.key` and the game repo's `.env` offline,
    and plan a rotation drill ([Prod signing: back up and drill](https://github.com/typetorch/docs/blob/main/guides/prod-signing.md#back-up-and-drill)).
-7. **Put the kernel in the place** (needs a place publish and a restart):
-   - empty or new place: `bun run typetorch kernel deploy --dry-run`, then
+7. **Put the kernel in the place, after prod has a deploy** (needs a place publish and a restart). Since kernel 0.3.6 a
+   public server that has nothing to run (no verified prod head, no backup build `ServerStorage.TypeTorchBackup`) moves
+   every player to another server after 15 s and kicks them after 3 bounces ("Servers are restarting. Please rejoin in
+   a minute."). A kernel published before the first prod deploy kicks every player of the live game. The safe order:
+   1. **Deploy prod first:** `bun run typetorch deploy` from the git branch `typetorch.json` `"branches"` maps to the
+      default branch (`main` -> `prod`; `deploy --dry-run` names the branch it will go to: from `typetorch-migration`
+      it is a dev branch, not prod). Servers without the kernel ignore it; it is stored as the prod head.
+   2. **Then publish the place with the kernel and without the old scripts**, in one publish (two games in one
+      server fight over player data session locks). `kernel deploy` refuses (y/N, or `--force`) while prod has no
+      verified head and no backup is baked; `bun run typetorch doctor` fails "live servers" in that state and warns
+      "old game build" while a roblox-ts build (`ServerScriptService.TS`, `ReplicatedStorage.rbxts_include`) still
+      runs next to the kernel.
+   - empty or new place (no players): `bun run typetorch kernel deploy --dry-run`, then
      `bun run typetorch kernel deploy --replace-place --yes`;
-   - place with Studio content (never `--replace-place`, it wipes the place): `bun run typetorch kernel deploy --dry-run
-     --install` patches the live place through Luau Execution, with no download, when the place allows saving through the API
-     (Creator Hub > Permissions: "Allow place to be updated using Save Place API"; off by default for places made in Studio).
-     Read the summary (only the kernel folders and the kernel's settings may change), then the same command without
-     `--dry-run` publishes after a y/N. Undo: `kernel restore --version <the version before>`. Otherwise: File > Download a
-     Copy (a binary `.rbxl`), note its place version, and run `bun run typetorch kernel deploy --dry-run --install
-     --place-file <file> --base <version>`; the same command without `--dry-run` publishes after a y/N, and
-     `kernel restore <file>` undoes it. (Or
-     by hand: `kernel deploy --dry-run`, open `.typetorch/place.rbxl` in Studio, copy
+   - place with Studio content (never `--replace-place`, it wipes the place); with live players, follow the
+     [go-live checklist](https://github.com/typetorch/docs/blob/main/guides/go-live-checklist.md) step 8. In Studio,
+     remove the old scripts listed in MIGRATION_NOTES.md (don't publish), File > Download a Copy (a binary `.rbxl`),
+     note its place version, and run `bun run typetorch kernel deploy --dry-run --install --place-file <file> --base
+     <version>`; read the summary (only the kernel folders and the kernel's settings may change), then the same command
+     without `--dry-run` publishes after a y/N, and `kernel restore <file>` undoes it. A place with no old scripts left
+     can also be patched in place through Luau Execution, with no download: `bun run typetorch kernel deploy --dry-run
+     --install`, then without `--dry-run` (the place needs Creator Hub > Permissions: "Allow place to be updated using
+     Save Place API"; off by default for places made in Studio). Undo: `kernel restore --version <the version before>`.
+     (Or by hand: `kernel deploy --dry-run`, open `.typetorch/place.rbxl` in Studio, copy
      `ServerScriptService.TypeTorchKernel`, `ReplicatedStorage.TypeTorchKernelShared` and
-     `ReplicatedFirst.TypeTorchKernelClient` into your place, File > Publish to Roblox.) The kernel waits idle until
-     the first deploy.
+     `ReplicatedFirst.TypeTorchKernelClient` into your place, File > Publish to Roblox.)
    - `ServerScriptService.LoadStringEnabled`: keep it **off** in this game. Turn it on only in a test place where you
      want remote-claude's `run_luau` (`kernel deploy --loadstring`, CLI 0.7.5+). `kernel deploy` patches leave it as it
      is (older CLIs, up to 0.7.2, turn it on: check it in Studio); `doctor` reports it.
-   - then, in Studio, remove the old scripts listed in MIGRATION_NOTES.md and publish, just before the first deploy.
+   - check: `bun run typetorch doctor` shows no FAIL for "live servers" and no "old game build" warning.
 8. **Player data** (if listed in MIGRATION_NOTES.md): in Studio put the library at `ServerStorage.Packages.<Name>` and
    add the `ServerScriptService.DataHost` Script from the Player data guide; publish.
 9. **Test locally in Studio:** `bun run watch` and `bun run studio` (two terminals), connect the Rojo plugin, Play.

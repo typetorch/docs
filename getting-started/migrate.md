@@ -741,9 +741,13 @@ already use can stay; if it logs "joined" from a join handler, guard it like any
 The place keeps your Studio content and gains the kernel. **Never run `kernel deploy --replace-place` on it:** that
 publishes the whole place from the kernel's place file and wipes your maps and Studio UI.
 
-First do [fresh setup](fresh-setup.md) steps 4, 6 and 7 (settings, API key, signing keys). The kernel waits idle
-until your first deploy, so your old scripts keep running meanwhile. Remove the old game scripts that the payload
-replaces (keep the ones listed below) in Studio and publish just before the first deploy.
+First do [fresh setup](fresh-setup.md) steps 4, 6 and 7 (settings, API key, signing keys). **Deploy prod before the
+kernel goes in:** since kernel 0.3.6 a server with nothing to run (no verified prod head, no backup build) moves every
+player out after 15 s and kicks them after 3 bounces. `bun run typetorch deploy` from the git branch `typetorch.json`
+maps to prod (servers without the kernel ignore it), then publish the place with the kernel and without the old game
+scripts that the payload replaces (keep the ones listed below), in one publish. A game with live players follows the
+[go-live checklist](../guides/go-live-checklist.md). `kernel deploy` refuses (y/N, or `--force`) while prod has no
+verified head, and `bun run typetorch doctor` fails "live servers" in that state.
 
 **With the CLI (patches only the kernel):** when the place allows saving through the API, nothing is downloaded: the CLI
 patches the live place in a Luau Execution task. The place needs **Allow place to be updated using Save Place API** on

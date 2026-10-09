@@ -106,14 +106,23 @@ Then run every live test on the copy:
 ## 8. Cut-over (a quiet hour)
 
 - [ ] 1. Announce a short maintenance window in the game.
-- [ ] 2. In the live place: add the data library and `DataHost`, install the kernel by patch (step 5, with the live
-      config), check `LoadStringEnabled` is off, keep the old scripts, publish. Nothing changes for players: the
-      kernel waits, the old code runs. `bun run typetorch access push` with the live config.
-- [ ] 3. In Studio, remove the old scripts. **Don't publish yet.**
-- [ ] 4. `bun run typetorch deploy` from `main`: cloud test, y/N, signed. Servers on the old place version have no
-      kernel and ignore it.
-- [ ] 5. Publish the place without the old scripts. New servers boot the kernel and the prod build. Move players off
-      the old servers from Creator Hub (migrate to the latest update).
+Since kernel 0.3.6 a server that has nothing to run (no verified prod head, no backup build) moves every player out
+after 15 s and kicks them after 3 bounces. So prod is deployed **before** the place gets the kernel, and the kernel
+goes in with the old scripts gone, in one publish.
+
+- [ ] 2. `bun run typetorch access push` with the live config. Then `bun run typetorch deploy` from the git branch that
+      `typetorch.json` `"branches"` maps to prod (`main`; `deploy --dry-run` names the branch: an unmapped git branch
+      such as `typetorch-migration` deploys to a dev branch of that name, which public servers never run): cloud test,
+      y/N, signed. The live place has no kernel yet: its servers ignore the deploy, which is stored as the prod head.
+- [ ] 3. In Studio, on the live place: add the data library and `DataHost`, remove the old scripts, check
+      `LoadStringEnabled` is off. **Don't publish.** File > Download a Copy, note its version.
+- [ ] 4. `bun run typetorch kernel deploy --dry-run --install --place-file <file> --base <version>` (step 5, with the
+      live config), read the summary, then the same command without `--dry-run`: one publish with the kernel, the prod
+      build's backup and no old scripts. `kernel deploy` refuses (y/N, or `--force`) while prod has no verified head
+      and no backup is baked. New servers boot the kernel and the prod build. Move players off the old servers from
+      Creator Hub (migrate to the latest update).
+- [ ] 5. `bun run typetorch doctor`: no FAIL for "live servers" (the kernel with nothing to run) and no "old game
+      build" warning (a roblox-ts build such as `ServerScriptService.TS` running next to the kernel).
 - [ ] 6. Watch for 30 minutes: `servers --watch`, `report latest`, the webhook channel, the game. Keep the old place
       file and its version number.
 

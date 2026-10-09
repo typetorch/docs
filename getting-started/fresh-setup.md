@@ -186,7 +186,7 @@ git add typetorch.json
 git commit -m "My game"
 ```
 
-**Check:** `bun run typetorch doctor` lists `typetorch.json` as `ok` with your universe and place (key checks fail
+**Check:** `bun run typetorch doctor --show-ok` lists `typetorch.json` as `ok` with your universe and place (key checks fail
 until step 6).
 
 ## 6. The Open Cloud API key (owner)
@@ -233,7 +233,7 @@ With the TypeTorch backend, two more lines go there: `TYPETORCH_API_KEY=<the bac
   see [remote-claude](../guides/remote-claude.md).
 - Never commit a key, never paste it into chat or an issue, and never give it to an agent.
 
-**Check:** `bun run typetorch doctor`. The `key assets`, `key deploy` and `key place` lines are `ok` (or `warn` with
+**Check:** `bun run typetorch doctor --show-ok` (plain `doctor` lists only problems). The `key assets`, `key deploy` and `key place` lines are `ok` (or `warn` with
 "shared"), and each `scope ...` probe is `ok` for the scopes you added. The messaging probe publishes one harmless
 message to the topic `TypeTorch/doctor`.
 
@@ -257,7 +257,7 @@ git commit -m "Prod signing keys"
   plaintext and never leave your PC. Never put them in a repo. Before a live game depends on them, also split off an
   `asset:write` key and plan a rotation drill ([Prod signing: back up and drill](../guides/prod-signing.md#back-up-and-drill)).
 
-**Check:** `bun run typetorch doctor` shows both key files `ok` and matching `typetorch.json`, and the key asset as
+**Check:** `bun run typetorch doctor --show-ok` shows both key files `ok` and matching `typetorch.json`, and the key asset as
 Approved.
 
 ## 8. Publish the kernel place (owner)
