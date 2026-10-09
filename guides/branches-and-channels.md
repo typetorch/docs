@@ -68,7 +68,23 @@ bun run typetorch deploy            # branch feature-shop, dev channel
 ```
 
 In game: `/tt new feature-shop`, test, then merge into `main` and deploy `prod` from there. Each deploy is logged with
-its commit; `bun run typetorch branch ls` lists branches, their channels and live heads.
+its commit; `bun run typetorch branch ls` lists branches, their channels, live heads and live servers.
+
+## Removing a dev branch
+
+Servers keep every branch's head in one key and record at most 32 branches; past that, a deploy to a new branch isn't
+recorded by servers. Every git branch you deployed once stays there (`deploy` from a git branch `typetorch.json`
+doesn't map makes a dev branch of its name), so remove the ones you are done with:
+
+```sh
+bun run typetorch branch rm feature-shop --dry-run
+bun run typetorch branch rm feature-shop
+```
+
+It removes the branch's head from the DataStore copy and refuses the default branch, any prod-channel branch, and a
+branch live servers still run (checked through the [fleet API](fleet-and-alerts.md); without it, only with `--force`).
+Servers' fast MemoryStore copy keeps the branch until it expires (up to 45 days), and deploying it again brings it back.
+`doctor` and `deploy` warn from 28 stored branches.
 
 ## Data on dev branches
 

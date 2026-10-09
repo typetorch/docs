@@ -14,7 +14,7 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 1. Never create, ask for, read, print or store secrets: Open Cloud keys, signing key files
    (`~/.config/typetorch/keys/*`), pairing codes. Don't open `.env` or the file named by `TYPETORCH_ENV_FILE`.
 2. Never act on Roblox: no `typetorch` upload, deploy (not even `--dry-run`), promote, rollback, approve, reject, pin,
-   deployments, branch ls, settings, access push, kernel deploy (not even `--dry-run`, except a kernel update the
+   deployments, branch ls, branch rm, settings, access push, kernel deploy (not even `--dry-run`, except a kernel update the
    user asked for: see "Kernel updates"), kernel restore, keys, assets sync/status, test --cloud, servers, report,
    alerts, backend setup, update, doctor; no place publish; no remote-claude (`typetorch dev`), analytics server or
    tunnel. These are user steps.

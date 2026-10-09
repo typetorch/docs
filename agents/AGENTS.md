@@ -31,7 +31,7 @@ approving. You finish with a numbered "What you need to do" list that tells them
    tell them to revoke it in Creator Hub and make a new one.
 2. **Never act on Roblox.** Don't publish or save a place, upload anything, or run: `typetorch upload`, `deploy` (also
    not `--dry-run`: it reads the game's DataStore with the user's key), `promote`, `rollback`, `approve`, `reject`,
-   `pin`, `deployments`, `branch ls`, `settings ...`, `access push`, `kernel deploy` (also not `--dry-run`; the one exception
+   `pin`, `deployments`, `branch ls`, `branch rm`, `settings ...`, `access push`, `kernel deploy` (also not `--dry-run`; the one exception
    is a kernel update the user asked for, see "Updating the kernel in a game"), `kernel restore`, `keys ...`, `assets
    sync|status`, `test --cloud`, `servers`, `report`, `alerts`, `backend setup`, `update`, `doctor` (it probes the key
    and publishes a test message). Don't start `remote-claude` (`typetorch dev`), the analytics server or a tunnel.
@@ -538,7 +538,7 @@ Don't do these; list them in Step 7:
 - create the group, the experience, an API key; change Creator Hub or Game Settings;
 - write a key or token anywhere; run `typetorch keys ...`, `doctor`, `deploy`, `upload`, `approve`, `promote`,
   `rollback`, `pin`, `settings ...`, `access push`, `assets sync|status`, `kernel deploy`, `kernel restore`,
-  `deployments`, `branch ls`, `test --cloud`, `servers`, `report`, `alerts`, `backend setup`, `update`;
+  `deployments`, `branch ls`, `branch rm`, `test --cloud`, `servers`, `report`, `alerts`, `backend setup`, `update`;
 - publish a place; edit the place in Studio (kernel install, data library, `TypeTorchAsset` marks);
 - start `remote-claude`, the analytics server or a tunnel; write the analytics settings;
 - push to a remote; add GitHub Actions or any CI workflow.
