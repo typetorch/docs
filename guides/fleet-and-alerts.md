@@ -145,6 +145,29 @@ TYPETORCH_ALERT_WEBHOOK_LEVELS=critical
 The API also streams changes live (Server-Sent Events, `GET /v1/fleet/stream`, admin token) for your own tools; the
 CLI polls for now.
 
+## Debugging endpoints
+
+Two backend routes answer most "what is going on?" questions in seconds. Both take the admin token as
+`Authorization: Bearer <admin token>` (never the game key).
+
+```sh
+curl -s -H "Authorization: Bearer $TYPETORCH_ADMIN_TOKEN" "$URL/v1/fleet/servers?branch=prod"
+curl -s -X POST -H "Authorization: Bearer $TYPETORCH_ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT count(*) FROM events WHERE t > epoch_ms(now()) - 600000"}' "$URL/v1/sql"
+```
+
+- **`GET /v1/fleet/servers?branch=&maxAge=`:** `{ servers, players, byArtifact, byHealth }`. Each server has `job`,
+  `serverType`, `branch`, `channel`, `artifact`, `players`, `appliedSeq`, `generation`, `health`, `lastError`,
+  `kernel`, `budget`, `tps`, `tpsMin`, `memMb`, `luaMb`, `startedAt` and `ageSeconds` (since the last heartbeat). It is
+  what `typetorch servers` prints, with more fields. `GET /v1/fleet/servers/<job>/metrics?since=<unix ms>` is one
+  server's TPS and memory history.
+- **`POST /v1/sql`** (DuckDB server, analytics part): `{ "sql": "...", "limit"?: n }`, one read-only `SELECT` or `WITH`
+  over the views `events` and `recordings` (every day file plus today's live rows), at most 10,000 rows. The answer is
+  `{ columns, rows, truncated, ms }`. `TYPETORCH_SQL=0` turns it off (404). It answers "is anything arriving?" long
+  before a chart does.
+- There is no `/v1/branches` or `/v1/registry` (404). Branch heads and the deployment history are in the CLI:
+  `typetorch branch ls` and `typetorch deployments` ([the deployment log](deploy-and-rollback.md#the-deployment-log)).
+
 ## In game: Manage > Servers
 
 The dev menu's server list (owners) doesn't use the fleet API or any storage. When you open it, your server asks every

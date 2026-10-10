@@ -378,12 +378,20 @@ left in the payload fails `typetorch build` with "the payload may hold only Fold
 Every module must be stoppable and restartable: a deploy stops it and starts a fresh copy in the same server.
 
 1. **Everything in the trove:** `this.trove.connect(signal, fn)`, `this.trove.add(instance)`,
-   `this.trove.add(network.server.x.y.on(...))`, `this.trove.add(TypeTorch.onSwapOut(...))`.
+   `this.trove.add(network.server.x.y.on(...))`, `this.trove.add(TypeTorch.onSwapOut(...))`. **No cleanup touches a
+   trove:** a function added to a trove must never call `trove.remove`, `add` or `extend` (Trove throws "Cannot call
+   trove.remove() while cleaning"; before framework 0.5.2 that aborts the whole generation stop and leaves the old
+   generation alive). Delete lines like `this.trove.add(() => this.trove.remove(child))`: a child from
+   `trove.extend()` is cleaned by its parent anyway. Audit:
+   `git grep -nE "trove\.add\(\(\) =>.*\.(remove|add|extend)\(" -- src`, then read every cleanup function by hand.
 2. **No module-level state or side effects.** Constants may stay. Per-generation state goes on the instance. State that
    must survive a swap goes in `this.ctx.persist("key.v1", () => init)`, plain data only (tables, Maps, Sets of
    strings, numbers, booleans, Players); never functions, class instances, Promises, threads, connections, charm atoms
    or Instances the generation made. Version the key. Per-player maps (cooldowns, states, sessions):
    `this.ctx.playerState("key.v1", (player) => init)` (`get`/`set`/`has`/`delete`, persisted, removed on a real leave).
+   **`this.ctx` and `Dependency<T>()` only from `onInit` on:** a field initializer
+   (`private state = this.ctx.persist(...)`) or a constructor fails, because `ctx` is attached after construction.
+   Declare the field and assign it in `onInit`.
 3. **Players through `onPlayerAdded(player, playerTrove)` or `observePlayers(this.trove, …)`**, never
    `Players.PlayerAdded.Connect`. They replay everyone on every swap, so **join handlers must be idempotent**: guard
    one-time effects (join rewards, welcome popups, "joined" analytics) with a persisted set. Work for real leaves only:
@@ -397,11 +405,20 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 7. **`task.spawn`/`delay`/`defer` only through the trove:** `this.trove.add(task.delay(5, fn))`. Replace deprecated
    `spawn`, `delay`, `wait` with `task.*`.
 8. **Instances in the world** that a module creates go in its trove (or an observer's cleanup).
-9. **Shutdown:** kernel 0.3.2+ runs every module's `onStop` when the server shuts down, but not when it shuts down in
-   the middle of a swap (no generation is running then). So `onStop` is for short extras, never the only place player
-   data is saved: data goes through the library in the place (4.6), or is written as it changes. Remove
-   `game.BindToClose` handlers that only did cleanup; any that must stay bind at most once per server (a persisted
-   flag).
+   **Libraries with module-level setup** (connections, ScreenGuis, steppers, pending Promise chains created when the
+   module is required; Vide's Heartbeat stepper and TopbarPlus are known ones) leak one copy per swap. Check each
+   package's top level. Fix: drive it from the trove
+   (`this.trove.connect(RunService.Heartbeat, (dt) => vide.step(dt))`), or load it once outside the payload (a place script requires it from `ReplicatedStorage.lib`, or the first
+   generation clones it there). See migrate rule 9.
+9. **Looped animations and cutscenes** stop on every client swap. Persist plain data (`{ id, animationId, startedAt }`,
+   `{ startedAt, endsAt }`) and resume in the next generation (`track.TimePosition = elapsed`); derive idles from synced
+   state. Flag minigames for the user: persist their inputs, restart the rest. See migrate section 7.
+10. **Shutdown:** kernel 0.3.2+ runs every module's `onStop` when the server shuts down, but not when it shuts down in
+    the middle of a swap (no generation is running then). So `onStop` is for short extras, never the only place player
+    data is saved: data goes through the library in the place (4.6), or is written as it changes. Remove
+    `game.BindToClose` handlers that only did cleanup; any that must stay bind at most once per server (a persisted
+    flag). On a swap, `TypeTorch.onSwapOut` runs first, before any `onStop` or trove cleanup: last-resort work (save
+    into `persist`, flush) goes there.
 
 ### 4.4 Networking
 
@@ -425,8 +442,9 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
 - `@rbxts/net`, `@flamework/networking`, Zap, Blink, ByteNet: convert to `createNetwork`. Flamework names: `connect` →
   `on`, `setCallback` → `handle`, `broadcast` → `fireAll`, `except` → `fireExcept`, `predict` → `emit` (runs the local
   `on` handlers, no traffic), `invokeWithTimeout(seconds, …)` keeps its name; check the unit (seconds, 0.5 to 120: a
-  Flamework call with `5000` meant milliseconds by mistake). A leaf's default timeout: `setNetworkLimits({ "x.y": {
-  timeout: 30 } })` in `src/shared/net.ts` (the client reads it).
+  Flamework call with `5000` meant milliseconds by mistake). The codemod doesn't change the arguments: audit every call
+  with `git grep -n "invokeWithTimeout(" -- src` and turn values above 120 into seconds. A leaf's default timeout:
+  `setNetworkLimits({ "x.y": { timeout: 30 } })` in `src/shared/net.ts` (the client reads it).
 - A big Flamework network can stay on `createFlameworkCompat` (the codemod's default) and move to `createNetwork`
   later (`typetorch migrate --from flamework --net native`); `typetorch build` reminds you while it is in use.
 
@@ -439,6 +457,9 @@ Every module must be stoppable and restartable: a deploy stops it and starts a f
   [State with charm](../guides/state.md) (server atoms from persist, a `createNetwork` leaf, hydrate request in onStart).
 - React/Roact/Vide: mount in a controller, `this.trove.add(() => root.unmount())`.
 - `popIn`/`popOut`/`bump` (UIScale, never tweened `Size`); one `PopupQueue` for modals.
+- Update notices: `TypeTorch.onUpdatePending` fires before every hot swap, and players stay in the server. Never show
+  "migrating server" there; show "updating in N s" or nothing, and announce the result from `TypeTorch.startInfo` in
+  `onStart` ([Runtime API](../guides/runtime-api.md#what-to-tell-players)).
 
 ### 4.6 Player data (always flag it)
 
@@ -493,9 +514,10 @@ Guard only side effects; the test is useful because it boots the real code. Deta
 
 TypeTorch's own analytics ([Analytics](../guides/analytics.md)) is optional: an `AnalyticsEngine` created on the server
 and the client logs sessions, devices, tech health, zones and new players' first sessions; game code adds `step`,
-`purchase`, `currency`, `state` and `track`. Add it only if the user asks (or mention it in the report). Keep an
-existing analytics SDK as it is. Its backend (a DuckDB server or Cloudflare Basin, tokens, the settings key) is a user
-step.
+`purchase`, `currency`, `state` and `track`. The engine starts on the first `new AnalyticsEngine()`: create it in a
+low-`loadOrder` module's `onInit`, not in a helper that first runs on a game event (an idle server would send
+nothing). Add it only if the user asks (or mention it in the report). Keep an existing analytics SDK as it is. Its
+backend (a DuckDB server or Cloudflare Basin, tokens, the settings key) is a user step.
 
 ### 4.9 Logging (optional)
 

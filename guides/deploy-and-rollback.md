@@ -38,6 +38,8 @@ the last build), `--force` (a dev-channel or dirty build to a prod-channel branc
 - **Deployment number:** `#seq`, one counter for the whole game. It's the handle to paste when something goes wrong.
   Every machine takes it from the game's DataStore (a counter claimed atomically), so two machines never share one;
   the deploy key needs the DataStore scopes for that ([fresh setup step 6](../getting-started/fresh-setup.md#6-the-open-cloud-api-key-owner)).
+  Every release on every branch takes the next one (deploys, promotes, rollbacks, automatic rollbacks, `keys`
+  re-signs), so one branch's numbers jump: `#41` then `#47` is normal.
 - The asset is named `tt-<branch>-<artifact id>`. If Roblox's text filter censors the name to `####`, the CLI renames
   it `TypeTorch payload`. The notes (your `--message`, the commits since the last deploy, and framework and kernel
   changes: a new npm version, or the new commits when you build with the
@@ -67,6 +69,13 @@ bun run typetorch approve
 bun run typetorch approve 1a2b3c4d
 bun run typetorch reject 1a2b3c4d --reason "wrong branch"
 ```
+
+- **A proposal is a whole build, not a diff.** Each one is the full tree at its commit, so the newest proposal for a
+  branch already holds everything in the older ones. Approve the newest; approving an older one after a newer one went
+  out is a downgrade. Reject the older ones (`reject` works on pending proposals only: one already approved or
+  rejected says "already approved").
+- With `"approval": "prod"`, dev-channel branches need no approval at all: a deploy from an agent or a script publishes
+  at once, with no proposal.
 
 `approve` refuses unless it runs in an interactive terminal. It lists pending proposals, shows the branch, artifact,
 notes, size, who proposed it and what it replaces, asks y/N, then publishes it like a deploy (and signs it for prod).
@@ -248,6 +257,13 @@ Points a branch at a build that was already uploaded and approved (from the depl
 new `#seq`. No rebuild. It finishes a deploy that stopped after the upload, or ships something you uploaded with
 `typetorch upload`. A prod-channel branch only takes prod-channel builds, even with `--force` ("rebuild for prod").
 
+**A promoted build keeps its own channel.** Promoting a prod-channel build to a dev branch is allowed, and the deploy is
+recorded with `channel: "prod"`. Private and reserved servers on that branch then run prod rules (a server applies prod
+rules when its branch **or** its running build is prod-channel): `TypeTorch.channel` is `"prod"` there, the dev menu is
+read-only, and stores you split by channel point at prod data. That lasts until a dev-channel build replaces it (the
+next `deploy --branch <b>` from a dev git branch). To test a prod build on a dev branch without that, deploy it with
+`--channel dev`.
+
 In PowerShell, quote `#42`: an unquoted `#` starts a comment.
 
 ## Roll back
@@ -287,6 +303,8 @@ marks each branch's live head. Uploads that never went out are listed with their
   take a lock there, and the DataStore counter keeps `#seq` unique across machines.
 - Every command takes `--json`.
 - With a readable registry the log also includes deploys made on other machines.
+- `deployments.jsonl` in the state dir is the full record, one JSON row per `#seq`, with `action`, `channel`, `branch`,
+  the artifact and `by`. It shows what `deployments` and the dev menu leave out, such as the channel a promote kept.
 
 ## Pins (A/B experiments)
 

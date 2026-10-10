@@ -126,6 +126,20 @@ Kernel 0.3.8 reads no ConfigService keys. Use `typetorch settings push` (default
 You built on a dev branch. Deploy prod from the git branch mapped to it (`main`), or pass `--force` knowingly.
 `promote` refuses it even with `--force`: "rebuild for prod".
 
+**`refusing to deploy a dirty build to prod-channel branch "prod"` with nothing to commit.**
+Untracked files count as changes, editor swap and backup files included (`.typetorch.json.swp`, `*~`, `4913`). Close
+the editor or delete them; `git status --porcelain --untracked-files=all` lists what the CLI sees. The next CLI release
+ignores untracked editor swap and backup files (`*.swp`, `*.swo`, `*~`, `.#*`, `4913`).
+
+**`typetorch reject` says `proposal ... is already approved`.**
+`reject` drops pending proposals only. An approved one has gone out: roll back or deploy again instead. Proposals are
+whole builds, so reject the older ones once a newer one is approved
+([Approval and proposals](deploy-and-rollback.md#approval-and-proposals)).
+
+**The cloud test prints `liveConfig("x") needs kernel 0.3.8 ... using the default` for every key.**
+Harmless: the cloud test has no signed settings record, so `liveConfig` gives its defaults there. Framework 0.5.2+
+doesn't print it in `typetorch test --cloud`.
+
 **`approve` refuses to run.**
 It needs an interactive terminal (stdin and stderr). Run it yourself in a terminal, not through an agent or a pipe.
 
@@ -177,6 +191,36 @@ permission to upload for that group.
 `nothing loaded (no verified, bootstrap or usable stored head); waiting for a signed deploy`.**
 Nothing was deployed to that branch yet, or no running server stored the head. Keep a server running (join the game)
 and deploy again.
+
+**After a swap, the old dev menu stays on screen, dead, over the new one** (its header names an older
+`<artifact> #<generation>`), memory grows by several MB per swap, or something the old build made keeps acting.
+A cleanup threw while the old generation stopped, and before framework 0.5.2 that aborted the rest of the stop: later
+modules' troves, the network and the dev menu's own cleanup never ran, and the dead generation stayed in memory. The
+usual cause is `trove.remove(x)` inside a cleanup ("Cannot call trove.remove() while cleaning" in the client or server
+log); see [rule 1](../getting-started/migrate.md#rule-1-everything-goes-in-the-modules-trove). Framework 0.5.2+
+cleans every object in its own pcall (a throwing cleanup warns `<Module> cleanup threw: ...`), stamps the `TypeTorchDev`
+ScreenGui with a `TypeTorchGeneration` attribute and destroys any menu from an older generation when it starts. On an
+older framework, fix the cleanup and add a sweeper to a client module:
+
+```ts
+onInit() {
+	const gui = Players.LocalPlayer.WaitForChild("PlayerGui");
+	for (const child of gui.GetChildren()) {
+		if (child.Name === "TypeTorchDev" && child.GetAttribute("SweepMe") === true) child.Destroy();
+	}
+	this.trove.add(
+		TypeTorch.onSwapOut(() => {
+			// Runs before any cleanup, so it happens even if one throws later.
+			for (const child of gui.GetChildren()) if (child.Name === "TypeTorchDev") child.SetAttribute("SweepMe", true);
+		}),
+	);
+}
+```
+
+**LuauHeap shows old generations' `RuntimeLib` (about 10 to 26 KB each).**
+Each past server generation's `include.RuntimeLib` stays referenced through a pending `TS.import` Promise. It is small
+and harmless (one per past generation, so a few dozen after a day of deploys). A whole generation kept in memory
+(MBs per swap) is the entry above.
 
 **A deploy doesn't reach Studio.**
 Deploy messages never reach Studio playtests. Use [the Studio local payload](studio-testing.md).
@@ -239,11 +283,13 @@ Your `~/.cloudflared/config.yml` (a named tunnel) has a catch-all ingress rule, 
 an empty config, so this happens only with a cloudflared you start yourself: give it an empty `--config` file.
 
 **Analytics: no rows arrive.**
-Check, in order: an `AnalyticsEngine` is created on the server (the client alone sends nothing); Allow HTTP Requests is
+Check, in order: an `AnalyticsEngine` is created on the server (the client alone sends nothing), in a module's
+`onInit` (an engine first created on some game event never starts on an idle server); Allow HTTP Requests is
 on; the settings record has a valid `analytics` field (`bun run typetorch settings get analytics`; kernel 0.3.8+;
 without it the engine keeps only the newest 1,000 rows); `analytics.stats()` on the server shows what was sent, dropped or refused. Game servers
 send every 15 s (`flushSeconds`); a DuckDB server loads them a few seconds later, Basin after its roll interval (1-2
-minutes).
+minutes). To see the raw rows without waiting for a chart: `POST /v1/sql`
+([Debugging endpoints](fleet-and-alerts.md#debugging-endpoints)).
 
 **Basin: rows are sent (2xx) but never show up.**
 Basin drops rows that don't match the stream's schema, silently. Create the streams from the backend repo's
