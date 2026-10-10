@@ -37,6 +37,10 @@ game shares. (The kernel still keeps each branch's head there: one small key.)
 
 ## Set it up
 
+`bun run typetorch init --phase backend` (CLI 0.10+) does steps 1 to 3 for you: on a VPS with Coolify, on a VPS
+without Docker, or on your PC behind a quick tunnel. It makes the two keys, writes them to `.env`, and points the game
+at the backend. The steps below do the same by hand.
+
 1. **Run the backend.** On a VPS with a domain ([Deploy on Coolify](https://github.com/typetorch/backend#deploy-on-coolify)
    or [run it on a VPS without Docker](https://github.com/typetorch/backend#run-it-on-a-vps-without-docker)), or on your PC
    behind a quick tunnel for a test ([analytics quick start](analytics.md#quick-start-a-local-test)). For a game on

@@ -3,6 +3,39 @@
 This guide sets up a new TypeTorch game from the starter template and ends with a live server that hot-swaps while you
 play. Every step ends with **Check**: what you should see when it worked.
 
+## The quick way: `typetorch init`
+
+With Bun installed, run this in an empty folder (CLI 0.10+):
+
+```sh
+bunx @typetorch/cli init
+```
+
+It asks one question at a time and walks through steps 1 to 11 below. It does the terminal work itself, and for the
+parts that happen in Creator Hub (creating the experience, the API key) it links the exact page and checks the result.
+In order, it checks your tools, clones the template, reads your experience from its Creator Hub URL, probes the
+Open Cloud key and writes `.env`, writes `typetorch.json` (it shows it to you first), makes the signing keys, publishes
+the kernel place, and deploys `main` and `dev`. Each step says why it
+exists, links the section below that it replaces, and checks its result the way `typetorch doctor` would. Every
+upload, deploy and SSH session gets its own y/N.
+
+- **Optional backend.** The backend step can set one up for you: on a VPS with Coolify, on a VPS without Docker (a
+  systemd service with Caddy in front, your domain or a free sslip.io name), or on this PC behind a free Cloudflare
+  quick tunnel. It can also point the game at a backend you already run, or skip it. `typetorch init --teardown`
+  removes what that step installed. See [Live servers and alerts](../guides/fleet-and-alerts.md).
+- **Agent prompt.** The last step writes `AGENT_PROMPT.md`: what is set up and the rules from the
+  [agent playbook](../agents/AGENTS.md), for your coding agent's first message. `typetorch init --agent` prints it again.
+- **Stopped half way?** Run it again. It continues at the first unfinished step (progress is in `.typetorch/init.json`,
+  which never holds a secret).
+- **Already set up?** In a game that already has `typetorch.json`, `bun run typetorch init` checks what each step left
+  behind (tools, dependencies, the Open Cloud key, the key files, the backend, the dev branch). It lists what is missing
+  or broken and offers to run that step again. `--phase <name>` runs one step again directly.
+
+The steps below are what `init` does, by hand. Use them as the reference when a step fails, or to set things up
+yourself.
+
+## By hand
+
 You need about an hour. Steps 3 to 9 are done once per game.
 
 **Who does what.** Some steps need the account that owns the experience. For a group-owned game that is the **group

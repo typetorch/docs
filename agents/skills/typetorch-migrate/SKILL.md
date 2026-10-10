@@ -26,8 +26,9 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 8. On npm: every `@typetorch/*` package except analytics (`bun install` in the template gets them; `npx
    @typetorch/cli` works too). Built: kernel patch deploys (`kernel deploy`, or `--place-file`), the cloud test before prod
    deploys, `onStop` at shutdown (kernel 0.3.2), the fleet API, the optional `AnalyticsEngine`, `typetorch access
-   push` (CLI 0.7.3+; servers read it from kernel 0.3.6). Planned, never promise: `typetorch init`, content
-   packs, `typetorch test --unit`, `/tt grant`.
+   push` (CLI 0.7.3+; servers read it from kernel 0.3.6), `typetorch init` (CLI 0.10; a user step that sets up a
+   new game or repairs one, never run it yourself). Planned, never promise: content packs, `typetorch test --unit`,
+   `/tt grant`.
 9. No GitHub Actions, ever (the owner's rule): never add `.github/workflows`, actions or hosted CI, never suggest
    them.
 
