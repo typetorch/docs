@@ -6,7 +6,8 @@ dropped when the generation stops, so a swap never leaves one behind. Each `on*`
 to a trove.
 
 Inside a module, `this.ctx` has the basics too: `realm`, `artifact`, `branch`, `channel`, `generation`, `build` (the
-compiled-in git info), `persist` and `playerState`.
+compiled-in git info), `persist` and `playerState`. `this.ctx` is attached right after the constructor: use it from
+`onInit` on, never in a field initializer (`private state = this.ctx.persist(...)` fails).
 
 ## Modules: `TypeTorch.module` and `Dependency`
 
@@ -39,7 +40,7 @@ TypeTorch.running; // false in edit mode (UI Labs stories): identity has default
 TypeTorch.artifact; // { id, commit, commitHash, branch, channel, builtAt, seq, assetId }
 TypeTorch.generation; // 1, 2, 3... per server (or client)
 TypeTorch.branch;
-TypeTorch.channel; // effective channel: "prod" on every public server
+TypeTorch.channel; // effective channel: "prod" on every public server, and where the branch or the build is prod
 TypeTorch.serverType; // "public" | "private" | "reserved" | "studio"
 TypeTorch.isPinned();
 TypeTorch.kernelVersion;
@@ -57,9 +58,20 @@ const start = TypeTorch.startInfo;
 if (start.reason === "auto_rollback") warn("the last deploy failed to start");
 ```
 
-Reasons: `boot`, `deploy`, `rollback`, `branch`, `pin`, `reload`, `server_rollback`, `auto_rollback`, `unknown`. A
-client's first generation is always `boot`. `requestedBy`, `loadSeconds`, `stopSeconds` and `swapSeconds` are
-server-only.
+| Reason | The generation started because |
+|---|---|
+| `boot` | the server (or client) started; a client's first generation is always `boot` |
+| `deploy` | a deploy, rollout or promote of this server's branch reached it (also when it caught up by polling) |
+| `reload` | someone reloaded this server to its branch head, or ended its pin |
+| `pin` | a pin: an A/B experiment, Load here, `/tt pin` |
+| `rollback` | a branch rollback (`typetorch rollback`) |
+| `server_rollback` | a rollback of this server only (`/tt rollback`, the dev menu) |
+| `auto_rollback` | the last build failed on this server (load, `onStart` or the health window) and it went back |
+| `branch` | the server switched branch; `branchChanged` is true |
+| `unknown` | a kernel before 0.2.2, or a reason it doesn't name |
+
+`branchChanged` is set whenever the branch moved, whatever the reason. `requestedBy`, `loadSeconds`, `stopSeconds` and
+`swapSeconds` are server-only.
 
 ## Swap events
 
@@ -75,8 +87,28 @@ this.trove.add(TypeTorch.onBranchChanged(({ from, to }) => this.resetBranchData(
 ```
 
 - `onSwapOut` gets `{ reason, branch, next }` (the build that replaces this one). It doesn't run on server shutdown.
+  It runs while every module still runs, before any `onStop` or trove cleanup: the place for last-resort work (save
+  into `persist`, flush, tag Instances) that must happen even if a later cleanup throws.
 - `onUpdatePending` fires again with `cancelled: true` when the new build failed to load. On public servers it can fire
   twice for one deploy.
+
+### What to tell players
+
+A swap is a hot swap: players stay in the same server, with their character and position. It is not a teleport and
+not a server migration.
+
+- `onUpdatePending` fires before **every** swap, plain hot swaps included. A "migrating server, please wait" message
+  there is wrong. Show "updating in N s" (`update.eta`) or nothing, and hide it again on `cancelled`.
+- Announce the result from the new generation: read `TypeTorch.startInfo` in `onStart`.
+
+```ts
+onStart() {
+	const start = TypeTorch.startInfo;
+	if (start.kind !== "swap") return;
+	if (start.reason === "deploy") this.toast("Updated to the latest version");
+	else if (start.reason === "auto_rollback") this.toast("An update didn't work; back on the previous version");
+}
+```
 
 ## State that survives swaps
 
@@ -131,7 +163,9 @@ TypeTorch.artifacts(); // known deployments, newest first: cached, yields at mos
 TypeTorch.requestReload(player); // owners only: reload this server to its branch head
 ```
 
-Don't call `branches()` or `artifacts()` per player or per frame.
+Don't call `branches()` or `artifacts()` per player or per frame. A build's `channel` in these lists is the build's
+own (a promoted build keeps it); from the next kernel release each branch also carries `branchChannel`, the branch's
+own channel.
 
 ## Cross-server (server only)
 

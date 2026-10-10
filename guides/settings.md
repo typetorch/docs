@@ -90,7 +90,8 @@ onStart() {
 - `get()` is cheap: call it whenever you need the value.
 - `onChanged` fires only when this key's value really changes; it returns a disconnect for the trove.
 - The default is used when there is no record or no such key, on kernels before 0.3.8 (with one warning), or when
-  `parse` throws (with one warning per bad value).
+  `parse` throws (with one warning per bad value). The cloud test has no record either, so `liveConfig` gives defaults
+  there (frameworks before 0.5.2 also print the "needs kernel 0.3.8" warning in it, wrongly).
 - Values are JSON. Keys are 1-64 characters of letters, digits and `_ . : / -`.
 - **Server only.** A client needs a value? Send it through your own network.
 - `TypeTorch.settings()` returns the whole verified record (server only; it holds tokens: never send it to a client).

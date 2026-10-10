@@ -12,6 +12,11 @@ Every TypeTorch game has an in-game developer menu. It ships in the framework, s
   switch the server they are in ([Server > Branch](#server)).
 - The window can be dragged by its header and resized from its corner (double-tap the header to reset). It remembers
   its panes and windows across swaps.
+- The header reads `<artifact id> #<generation>` (in a code font), so a screenshot says which build and generation it
+  came from. The menu is a ScreenGui named `TypeTorchDev` in PlayerGui. Framework 0.5.2+ stamps it with a
+  `TypeTorchGeneration` attribute and destroys any `TypeTorchDev` from an older generation when it starts; two menus
+  on screen on an older framework means the old generation didn't stop cleanly
+  ([Troubleshooting](troubleshooting.md#live-servers)).
 - Roblox games can't write to the clipboard, so every **Copy** opens a small box with the text selected: press
   `Ctrl+C`, or long-press > Copy on touch.
 
@@ -101,8 +106,12 @@ A sidebar group with a **Server | Client** toolbar:
   | No settings / Settings refused / Settings unreadable / Settings copy refused | the [settings record](settings.md) is missing, doesn't verify, can't be read, or a newer copy was refused while a good one is kept (`typetorch settings status`) |
   | Messaging offline / Messaging busy / Messages dropped | [`TypeTorch.messaging`](messaging.md): the kernel can't subscribe, the universe's topic is near its rate limit, or messages were given up |
 
-- **Branch:** this server (type, branch, channel, the running build, whether it is pinned), the known branches, and the
-  deployed builds, newest first, grouped by branch (tap a row to see what changed). A row's button says what it does:
+- **Branch:** this server (type, branch, channel, the running build, whether it is pinned, and `switched by <user>
+  <ago>` after an owner's switch), the known branches, and the deployed builds, newest first, grouped by branch (tap a
+  row to see what changed). Framework 0.5.2+ labels each group with the branch's own channel, plus `<channel> artifact`
+  when the group's newest build has another one (a promoted prod build on a dev branch); older frameworks print the
+  channel of the group's first build. The full record per `#seq` (`action`, `channel`, `by`) is `deployments.jsonl`
+  ([the deployment log](deploy-and-rollback.md#the-deployment-log)). A row's button says what it does:
   - **Switch** (a branch): this server follows that branch. **Load here** (a build): this server runs it (a pin).
     Both take two taps: a green Confirm, then a locked "Switching..." or "Loading...". Everyone stays in the game.
   - **Join:** moves only you to a reserved server on that branch or build. Devs who aren't owners get it on public

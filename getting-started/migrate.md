@@ -373,6 +373,24 @@ folder.Parent = Workspace;
 Connections, Instances you create, threads, and the disconnect functions TypeTorch returns
 (`this.trove.add(network.server.x.y.on(...))`, `this.trove.add(TypeTorch.onSwapOut(...))`) all go in the trove.
 
+**Cleanups must not touch a trove.** Never call `trove.remove`, `add` or `extend` from inside a cleanup function:
+Trove throws "Cannot call trove.remove() while cleaning". The natural line to write is the broken one:
+
+```ts
+this.trove.add(() => this.trove.remove(this.flight)); // throws when the generation stops
+```
+
+A child trove from `this.trove.extend()` is cleaned by its parent anyway, so the line isn't needed. Call
+`trove.remove(child)` only from normal code (a new character, a round that ends), as in rule 4.
+
+- **Framework 0.5.2+:** a generation stop cleans each module's trove object by object, each cleanup in its own pcall.
+  A cleanup that throws warns `<Module> cleanup threw: ...` and the rest still runs; the network stop, the unbind and
+  the generation's root trove are each guarded too.
+- **Older frameworks:** one throwing cleanup aborts the whole stop. Later modules' troves, the network stop and the
+  dev menu's cleanup never run. The old dev menu stays on screen, dead, over the new one; the dead generation stays in
+  memory (several MB per swap); Instances it made keep acting (a `LinearVelocity` that pins the player). Until you
+  upgrade, fix every such cleanup, and see [Troubleshooting](../guides/troubleshooting.md#live-servers) for a sweeper.
+
 ### Rule 2: no module-level state; persist only plain data
 
 Every generation requires fresh copies of every module, so module-level variables start over on each swap, and
@@ -405,6 +423,10 @@ strings, numbers, booleans and Players. Never store functions, class instances, 
 atoms or Instances the generation created: they keep the old code alive or get destroyed by its trove. Change the key
 (`"cooldowns.v2"`) when the shape changes. (Handles from a library that lives outside the payload are the one
 exception; see [Player data](../guides/player-data.md).)
+
+`this.ctx` and `this.trove` are attached right after the constructor, so `this.ctx.persist`, `this.ctx.playerState`
+and `Dependency<T>()` fail in a field initializer (`private state = this.ctx.persist(...)`) or a constructor. Declare
+the field, then assign it in `onInit` (or `onStart`), as above.
 
 Per-player maps (cooldowns, states, sessions) use `playerState`: persisted, keyed by UserId, and a player's entry is
 removed when they really leave (never on a swap), so nothing leaks:
@@ -571,6 +593,11 @@ Replace the deprecated `spawn`, `delay` and `wait` with `task.*` while you are t
 On kernel 0.3.2+, a server shutdown runs every module's `onStop` (the kernel's own `BindToClose` calls the running
 generation, for at most 20 s). Keep `onStop` short. `TypeTorch.onSwapOut` runs before a swap, never on shutdown.
 
+On a swap the order is: every `onSwapOut` listener (every module still runs, no trove has been cleaned), then each
+module's `onStop` and trove in reverse start order, then the network and the dev menu. So `onSwapOut` is the place for
+last-resort work that must happen even if a later cleanup throws: saving into `persist`, flushing, tagging Instances
+the next generation should find.
+
 **Don't rely on `onStop` for saves.** A server that shuts down in the middle of a swap (the old build stopped, the new
 one not running yet) has no running generation, so no `onStop` runs at all. Player data goes through a library in the
 place that saves on close by itself ([Player data](../guides/player-data.md#shutdown)), or is written as it changes.
@@ -595,6 +622,19 @@ Examples:
   (or `this.trove.add(() => RunService.UnbindFromRenderStep("CameraShaker"))`).
 - **A library with its own registry** (zones, hitboxes): destroy what you registered through the trove, and keep only
   what must outlive the swap (plain data such as ids or settings) in `persist`, then hand it back in `onInit`.
+
+**Libraries with module-level setup.** Every generation requires a fresh copy of every module in the payload,
+libraries included. Whatever a library sets up when it is required, and never tears down, is kept for the server's (or
+client's) whole life, once per swap: Vide's own `Heartbeat` stepper, TopbarPlus's overflow and gamepad connections and
+its container ScreenGuis (about 3 MB per swap), a Promise library's pending chains. Look for top-level `Connect`,
+`Instance.new`, `task.spawn` and `RunService` calls in each package you use. Two fixes work:
+
+- **Drive it from the generation.** If the library lets you step it yourself, do that from the trove instead of letting
+  it connect its own: `this.trove.connect(RunService.Heartbeat, (dt) => vide.step(dt))`.
+- **Load it once, outside the payload.** Keep one copy for the server's life: a place script requires it from
+  `ReplicatedStorage.lib` (like the [player data library](../guides/player-data.md)), or the first generation clones the
+  bundled module there (outside the generation's folder, so it outlives the generation) and later generations require
+  that copy. Its state then survives swaps too, so each generation still removes what it registered through its trove.
 
 ## 6. Networking
 
@@ -714,6 +754,30 @@ onStart() {
 - React, Roact or Vide: mount the root in a controller and unmount it through the trove
   (`this.trove.add(() => root.unmount())`).
 
+### Animations, cutscenes and minigames across swaps
+
+A client swap ends everything the old generation was playing. Players notice when something stops halfway, so resume
+it from plain data instead of restarting it (or telling the player to start again).
+
+- **Looped animations** die with the generation unless the next one plays them again; one-shot tracks are fine. Persist
+  `{ id, animationId, startedAt }` for each looped track and replay it in the next generation under the same `id`, so a
+  later "stop" message for that id still ends it.
+- **State-driven effects** need no event at all: a tool's idle animation follows "this tool is a child of the character"
+  plus a synced atom ([State with charm](../guides/state.md#patterns-that-survive-swaps)).
+- **Cutscenes** are a track plus a camera. Persist `{ startedAt, endsAt }`, and on start resume with
+  `track.TimePosition = elapsed` (skip it when `endsAt` has passed). Players see one camera blip.
+
+  ```ts
+  onStart() {
+  	const cutscene = this.ctx.persist("cutscene.v1", () => ({ startedAt: 0, endsAt: 0 }));
+  	const now = Workspace.GetServerTimeNow();
+  	if (now < cutscene.endsAt) this.play(now - cutscene.startedAt); // sets track.TimePosition, then plays
+  }
+  ```
+
+- **Minigames:** a Tween can't be resumed at a phase. Persist the inputs so far (hits, answers, the current step) and
+  start the remaining part again.
+
 ## 8. Player data
 
 Saving is game code; you pick the library. On TypeTorch the library must outlive the generations, so it lives in the
@@ -733,8 +797,10 @@ place, its session handles live in `persist`, sessions load on join and are rele
 
 TypeTorch has its own analytics engine: joins, sessions, devices, tech health, zones and new players' first sessions are
 logged for you, and your code adds funnels, purchases, currency and custom events
-([Analytics](../guides/analytics.md)). Nothing runs until you create an `AnalyticsEngine`. An analytics SDK you
-already use can stay; if it logs "joined" from a join handler, guard it like any one-time effect (rule 3).
+([Analytics](../guides/analytics.md)). Nothing runs until you create an `AnalyticsEngine`, so create it in the
+`onInit` of a module with a low `loadOrder` (server and client), not from a helper that first runs on some game event:
+an idle server would send nothing. An analytics SDK you already use can stay; if it logs "joined" from a join handler,
+guard it like any one-time effect (rule 3).
 
 ## 9. Install the kernel in your place
 
@@ -906,12 +972,18 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 - [ ] `Dependency<T>()` only in methods and `onInit`/`onStart` (never a constructor, field initializer or module top
       level); cycles broken with `Lazy<T>`
 - [ ] connections, instances, threads in troves; loops only in `onStart` or the trove
+- [ ] no cleanup function calls `trove.remove` / `add` / `extend` (child troves from `extend()` need no removal)
+- [ ] `this.ctx.persist` / `playerState` and `Dependency<T>()` assigned in `onInit` or `onStart`, never in field
+      initializers
+- [ ] libraries with module-level setup (connections, ScreenGuis, steppers) driven from the trove or loaded once
+      outside the payload
 - [ ] no module-level state; what must survive is in `persist` as plain data (per-player maps in `playerState`)
 - [ ] players via `onPlayerAdded` / `observePlayers`; join handlers idempotent
 - [ ] tags via `observeElement`, characters via `@rbxts/observers` (stop function in the trove)
 - [ ] no `_G` / `shared`
 - [ ] no RemoteEvent/RemoteFunction anywhere; one `createNetwork`
-- [ ] UI: code-built in troves, Studio-built tagged and observed
+- [ ] UI: code-built in troves, Studio-built tagged and observed; looped animations and cutscenes resume after a swap
+- [ ] `invokeWithTimeout` calls pass seconds (0.5 to 120), not milliseconds
 - [ ] player data follows [the pattern](../guides/player-data.md); store names split by channel
 - [ ] developer product receipts recorded in the profile before `PurchaseGranted`; no saves only in `onStop`
 - [ ] side effects guarded from the cloud test (`TypeTorchTest`); `typetorch test --cloud` passes
@@ -936,7 +1008,12 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 | A Flamework import left (`@flamework/core` `OnStart`) | "You can only use npm scopes that are listed in your typeRoots" | import from `@typetorch/framework` |
 | `Dependency<T>()` in a constructor, a field initializer or at module top level (`const X = Dependency<X>()`) | the start fails: "X isn't constructed yet" | call it in a method or `onInit` |
 | Two modules that inject each other | the start fails: "dependency cycle: A -> B -> A" | `Lazy<T>` on one side, or `Dependency<T>()` in a method (section 4) |
-| `invokeWithTimeout(5000)` kept from Flamework code that meant milliseconds | clamped to 120 s, with a warning | seconds: `invokeWithTimeout(5)` |
+| `invokeWithTimeout(5000)` kept from Flamework code that meant milliseconds | clamped to 120 s, with a warning (the codemod keeps arguments as they are) | seconds: `invokeWithTimeout(5)` |
+| `this.trove.add(() => this.trove.remove(child))` | "Cannot call trove.remove() while cleaning"; before framework 0.5.2 the whole generation stop aborts and the old dev menu stays on screen | drop it: a child from `trove.extend()` is cleaned by its parent |
+| `private state = this.ctx.persist(...)` as a field initializer | fails: `ctx` isn't attached yet | assign it in `onInit` |
+| A library that connects or creates GUIs when required (Vide, TopbarPlus) | a copy leaks on every swap (MBs per swap) | step it from the trove, or load it once outside the payload (rule 9) |
+| `new AnalyticsEngine()` only in a helper called on the first game event | an idle server sends nothing | create it in a low-`loadOrder` module's `onInit` |
+| A looped animation started by an event | it stops on every client swap | persist it and replay it ([section 7](#animations-cutscenes-and-minigames-across-swaps)) |
 | A per-player Map in `persist` with no leave cleanup | it grows with every player who ever joined the server | `this.ctx.playerState` (rule 2) |
 | `npx rbxtsc` in a Bun project on Windows | runs an unrelated placeholder package | `bun run build` or `bunx rbxtsc` |
 | Dev branch writes prod data | real players' data changes from a test server | split store names by `TypeTorch.channel` |

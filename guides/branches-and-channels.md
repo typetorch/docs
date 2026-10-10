@@ -57,6 +57,10 @@ Every branch and every build has a **channel**: `prod` or `dev`. It is the secur
 
 - A prod-channel branch refuses a dev-channel or dirty build unless you pass `--force` to `deploy`. `promote` refuses
   it even with `--force` ("rebuild for prod").
+- The other way round is allowed, and the build keeps its channel: a prod-channel build promoted to a dev branch makes
+  that branch's private and reserved servers run prod rules (`TypeTorch.channel` is `"prod"`, read-only dev menu,
+  channel-split stores on prod data) until a dev-channel deploy replaces it
+  ([Promote](deploy-and-rollback.md#promote)).
 - A public server stays effective `prod` whatever it runs: an A/B pin of a dev build, or an owner's switch to a dev
   branch. Its dev menu stays read-only.
 

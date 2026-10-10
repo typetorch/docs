@@ -75,7 +75,7 @@ setNetworkLimits({ "vc.status": { timeout: 5 } }); // every invoke of this leaf
 
 - `invokeWithTimeout(seconds, ...args)` wins over the leaf's `timeout`, which wins over the default 15 s.
 - Both are in **seconds**, from 0.5 to 120. A value outside is clamped, with one warning (Flamework code that passed
-  `5000` meaning milliseconds gets 120 s).
+  `5000` meaning milliseconds gets 120 s; `typetorch migrate` doesn't change the arguments).
 - The client reads the leaf's `timeout`, so call that `setNetworkLimits` in code both realms load (next to
   `createNetwork` in `src/shared/net.ts`).
 

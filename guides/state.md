@@ -169,6 +169,21 @@ On the client, a second `CharmSync.client({ atoms: { quests: myQuestsAtom } })` 
 `onPlayerAdded` replays every player after a swap, and the player trove ends each syncer when the player leaves. Keep
 the server-only atom's values across swaps the same way (`persistAtoms`-style, or `this.ctx.playerState`).
 
+## Patterns that survive swaps
+
+- **Derive from state, not from events.** Atoms that are synced and persisted (`persistAtoms`) keep their last values
+  across a client swap, and the server sends them again on the hydrate. A client that derives what should exist from
+  them (a held tool's idle animation, a flight effect, a mod flag) redraws it after every swap by itself. A
+  "play" / "stop" event pair breaks: the new generation never saw the "play".
+- **Deleted keys travel as `None`.** Setting a key to `undefined` on the server reaches the client as charm-sync's
+  `None` marker. Code that reads raw payloads checks `isNone(value)` (from `@rbxts/charm-sync`), never `value ===
+  undefined`.
+- **Prune per-player keys on a real leave.** A dictionary keyed by UserId keeps every player who ever joined. One server
+  module removes the key: `this.trove.connect(Players.PlayerRemoving, (player) => ...)`. Not a `playerTrove` cleanup,
+  which also runs on every swap.
+- **Clients can't write synced atoms.** charm-sync goes server to client only. A client toggle other players must see
+  (an emote, a setting shown on the character) is a network leaf the server checks, then writes into the atom.
+
 ## Rules
 
 - **`persist` holds values, never atoms:** an atom keeps the old generation's code alive.

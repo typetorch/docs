@@ -76,13 +76,20 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    - **Flamework projects are mostly a swap:** same decorator and lifecycle names, imports from
      `@typetorch/framework` (also `Modding`, `Reflect`, `t`; custom decorators use
      `@metadata typetorch:parameters injectable`), `extends Module` + `super()`, `@flamework/networking` →
-     `createNetwork` (`predict` → `emit`, `invokeWithTimeout` in seconds), components → observers.
+     `createNetwork` (`predict` → `emit`, `invokeWithTimeout` in seconds: the codemod keeps the arguments, so grep for
+     it and turn millisecond values like `5000` into seconds), components → observers.
      `Dependency<T>()` stays (from `@typetorch/framework`): the
      cycle breaker (with `Lazy<T>`) and the way plain classes reach modules, from `onInit` on; move calls in
      constructors, field initializers and module top level into methods. Then `bun remove` every `@flamework/*` and
      `rbxts-transformer-flamework`, delete `flamework.build`, `flamework.json`, `include/flamework`. Type ids changed
      format: data saved under Flamework ids won't match (flag it). The swap-safety pass is the real work.
-   - Swap safety: everything in `this.trove`; no module-level state (instance fields, or
+   - Swap safety: everything in `this.trove`, and no cleanup function calls `trove.remove`/`add`/`extend` (it throws
+     while cleaning; before framework 0.5.2 that aborts the whole generation stop; a child from `trove.extend()` is
+     cleaned by its parent anyway); `this.ctx.persist`/`playerState` and `Dependency<T>()` assigned in `onInit` or
+     `onStart`, never in field initializers or constructors; libraries with module-level setup (Vide's stepper,
+     TopbarPlus, anything that connects or makes GUIs when required) stepped from the trove or loaded once outside the
+     payload; looped animations and cutscenes persisted and resumed after a swap; `TypeTorch.onSwapOut` (runs before
+     any cleanup) for last-resort saves; no module-level state (instance fields, or
      `this.ctx.persist("key.v1", () => init)` with plain data only; per-player maps via
      `this.ctx.playerState("key.v1", init)`, removed on a real leave); players via `onPlayerAdded(player, playerTrove)` /
      `observePlayers`, idempotent (persisted set for one-time effects), real leaves via
@@ -113,10 +120,12 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
      topics to `TypeTorch.messaging.subscribe/publish` (kernel 0.3.8; one kernel-held topic, no re-subscribe per swap,
      dev branches don't reach prod, a no-op in the cloud test); messages stay under 1 KiB.
    - Hot assets only if asked: `hotAsset(key, template)`. Analytics only if asked: `new AnalyticsEngine()` on server
-     and client (its backend is a user step).
+     and client, in a low-`loadOrder` module's `onInit` (it starts on the first construction; its backend is a user
+     step).
 5. **Checks:** `bun run build`; `bun run typetorch build` (prints `built <id> ... modules`); `out/shared/net.luau` has
    `t.` guards; the pattern scan prints nothing:
    `git grep -nE "Players\.PlayerAdded\.Connect|new Instance\(\"(Remote|UnreliableRemote)(Event|Function)\"\)|_G\b|@flamework/|Flamework\.(ignite|addPaths)|Knit\.Start" -- src`;
+   review every hit of `git grep -nE "trove\.add\(\(\) =>.*\.(remove|add|extend)\(|invokeWithTimeout\(" -- src` by hand;
    commit, rebuild: no `-dirty`; `bun run typetorch build --branch prod`; `rojo build studio.project.json -o .typetorch/studio-check.rbxl`.
 6. **Stop** at user actions (rule 2).
 7. **Finish** with "What you need to do" (numbered, filled in): fill the ids; Game Settings (HTTP on, Studio API access

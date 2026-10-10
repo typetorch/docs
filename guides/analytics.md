@@ -44,6 +44,9 @@ const variant = analytics.experiment("onboarding", ["short", "long"]); // the sa
 - **One engine per generation and realm.** Every `new AnalyticsEngine()` joins the one already running (the first
   one's options win), so any module can create its own. It stops with the generation. Unsent rows wait in `persist`
   and the next generation sends them, so a hot swap loses nothing.
+- **It starts on the first `new AnalyticsEngine()` of the generation**, not before. Create it in the `onInit` of a
+  module with a low `loadOrder`. Created only from a helper that first runs on a game event, it doesn't start on an
+  idle server, and that server sends nothing (no sessions, no tech rows).
 - **Server calls take the player first.** Without a player, an event is server-only (no player id).
 - **Client calls** are about the local player. They are marked `src = "client"` (a client can lie), and the server
   checks their shape, size (props at most 4 KB) and rate (120 a minute, 5,000 a session; a client's experiment calls
@@ -300,6 +303,11 @@ Run them in three ways:
 
 Useful options: `funnel` (`funnel` name), `timeline` and `player-graph` (`pid`), `flow` and `player-graph` (`facet`:
 `all`, `zone`, `screen` or `activity`; `minCount`; `maxEdges`), `experiment` (`experiment`, `scope`, `control`).
+
+**"Is anything arriving?"** Ask the DuckDB server directly instead of waiting for a chart: `POST /v1/sql` with the
+admin token and one read-only `SELECT` over `events` and `recordings` (today's live rows included) answers in seconds.
+Charts bucket by time, so their newest bucket can trail by a few minutes. See
+[Debugging endpoints](fleet-and-alerts.md#debugging-endpoints).
 
 ## Node graphs
 

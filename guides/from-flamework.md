@@ -131,7 +131,8 @@ What differs from Flamework:
   and counted in the dev menu, never a script error.
 - Request timeouts: the leaf's `timeout` (`setNetworkLimits`), else `createClient({ defaultTimeout })`, else 30 s
   (Flamework's client default; `createNetwork`'s own is 15 s). `invokeWithTimeout(10000)` meant as milliseconds is
-  clamped to 120 s with a warning (Flamework took seconds too).
+  clamped to 120 s with a warning (Flamework took seconds too). The codemod keeps the arguments as they are, so search
+  for them: `git grep -n "invokeWithTimeout(" -- src`.
 - A rejected request rejects with TypeTorch's player-facing reasons ("The server didn't answer in time.", "Bad
   request."), not `NetworkingFunctionError`.
 - **Not supported:** server -> client requests (a leaf of `ServerToClientFunctions` has no methods: a client can't be
