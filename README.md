@@ -16,7 +16,7 @@ Pick one path:
 
 | You have | Start here | Time |
 |---|---|---|
-| Nothing yet: a new game | **[Fresh setup](getting-started/fresh-setup.md)**: from zero to a live hot-swap | about 1 hour |
+| Nothing yet: a new game | **[Fresh setup](getting-started/fresh-setup.md)**: `bunx @typetorch/cli init` in an empty folder, or every step by hand; from zero to a live hot-swap | under an hour with `init` |
 | A roblox-ts game | **[Migrate an existing game](getting-started/migrate.md)**: services, swap safety, networking, data, UI; with live players, inside the [go-live checklist](guides/go-live-checklist.md) | a few hours to days; about a week with live players |
 | An AI coding agent | **[Agent playbook](agents/AGENTS.md)**: tell your agent "migrate this project to typetorch" | |
 

@@ -54,7 +54,9 @@ approving. You finish with a numbered "What you need to do" list that tells them
    framework 0.3.2 (both on npm). Dev access lists through `typetorch access push` need kernel 0.3.8 on the servers
    (the signed settings record; 0.3.6-0.3.7 read the old ConfigService key). Cross-server messages
    (`TypeTorch.messaging`), `TypeTorch.servers()`, `TypeTorch.liveConfig` and the loading screen signals need kernel
-   0.3.8. Planned: `typetorch init`, content packs, the typed asset map from files,
+   0.3.8. `typetorch init` (CLI 0.10) is the guided setup for a new game, and it repairs a game that is already set
+   up. It publishes, deploys and asks for keys, so it is the user's to run, never yours: name it in "What you need to
+   do". Planned: content packs, the typed asset map from files,
    `typetorch test --unit`, `/tt grant`/`revoke`.
 9. **No GitHub Actions, ever** (the owner's rule: they are a supply-chain risk). Don't add `.github/workflows`, actions,
    or any hosted CI, and don't suggest them. Builds, cloud tests and deploys run on the user's machine.
