@@ -1,3 +1,5 @@
+<img src="brand/typetorch.svg" width="72" alt="TypeTorch logo">
+
 # TypeTorch docs
 
 TypeTorch updates live Roblox games **without restarting their servers**. You write the game in
@@ -113,6 +115,10 @@ flowchart LR
   [fresh setup](getting-started/fresh-setup.md#2-get-the-code)). Without it, `npx @typetorch/cli <command>` does the
   same.
 - Ids in examples are fake: universe `1234567890`, place `9876543210`, group `1234567`, user `111111111`.
+
+## Logo
+
+The TypeTorch logo, its PNG and favicon exports, colours and usage rules are in [brand/](brand/README.md).
 
 ## License
 
