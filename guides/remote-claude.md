@@ -15,9 +15,13 @@ Claude can act on your running server ("jump me", "give me 100 coins") or change
 - The [dev-server](https://github.com/typetorch/dev-server): Node 20+ or Bun 1.3+. The template has
   `@typetorch/dev-server` in its dev dependencies, so `bun install` gets it. Without it: npx (see below), or a checkout
   next to your game (`bun install` in it).
-- An Open Cloud key with `universe-messaging-service:publish`, as `OPENCLOUD_API_KEY` (or `ROBLOX_API_KEY`, its alias). The dev-server tells game servers where the session is with it. It finds the key the same way the
-  CLI does: the real environment, then the game repo's `.env` (next to `typetorch.json`; no parent folder's). Keep the key
-  in that `.env`, which is gitignored.
+- An Open Cloud key with `universe-messaging-service:publish`: `OPENCLOUD_DEPLOY_KEY`, else the shared
+  `OPENCLOUD_API_KEY` (or `ROBLOX_API_KEY`, its alias). The dev-server tells game servers where the session is with it.
+  It finds the key the same way the CLI does: the real environment, then the game repo's `.env` (next to
+  `typetorch.json`; no parent folder's; `--env-file <path>` or `TYPETORCH_ENV_FILE` read another file instead). Keep the
+  key in that `.env`, which is gitignored. The backend's keys (`TYPETORCH_API_KEY`, `TYPETORCH_ADMIN_TOKEN`) are never
+  read here. When you play on another PC, screenshots arrive as CaptureService uploads, which `OPENCLOUD_ASSETS_KEY`
+  (else the shared key) downloads.
 
 - Experience settings: **Allow HTTP Requests** on. `ServerScriptService.LoadStringEnabled` on for `run_luau`, only in
   a place where you want it (a test place: `kernel deploy --loadstring`, CLI 0.7.5+); keep it off in a live game.
@@ -35,7 +39,12 @@ git switch dev
 bun run typetorch remote-claude --users 111111111
 ```
 
-`typetorch dev` is the same command, shorter (`bun run typetorch dev --users 111111111`).
+`typetorch dev` is the same command, shorter (`bun run typetorch dev --users 111111111`, or `tt dev` with the CLI
+installed globally).
+
+- `--users`: the Roblox user ids allowed to prompt (no wildcard). It is remembered in `.typetorch/remote-claude.json`
+  (git-ignored); omitted, the last list passed in this repo is used, else the owners in `typetorch.json` (`members` with
+  the role `"owner"`; dev-server 0.3.3+).
 
 `typetorch remote-claude` runs the dev-server with the same arguments. It finds it in `TYPETORCH_DEV_SERVER`, the game's
 `node_modules` (where the template's `bun install` puts it), next to the CLI, or a sibling `../dev-server` checkout.
@@ -57,8 +66,14 @@ In game: open a server on that branch (`/tt new dev`), open **DEV > Claude**, pa
 for up to 3 hours. Each code pairs one user on one server once; the next code prints right away.
 
 Useful flags: `--branch <name>`, `--max-prompts <n>` (default 50), `--no-deploy`, `--protect <globs>` (files Claude may
-not edit), `--code-ttl <minutes>`, `--model <name>`. Terminal commands while it runs: `code`, `users`,
+not edit), `--code-ttl <minutes>` (default 180), `--model <name>`, `--max-budget-usd <n>` (a cap per run on Claude Code's
+own cost estimate), `--cli <entry>` (the TypeTorch CLI used for deploys), `--no-clipboard`, `--no-tunnel` (no Cloudflare
+tunnel, for a local client only; what `serve --claude` uses). Terminal commands while it runs: `code`, `users`,
 `revoke <userId>`, `rotate`, `status`, `cancel <promptId>`, `quit`.
+
+It also runs in Docker (locally or as a Coolify app): the dev-server repo's `Dockerfile` and `compose.yaml`, with the
+users in `TT_USERS` and `claude auth login` inside the container. See the
+[dev-server README](https://github.com/typetorch/dev-server#docker).
 
 **Check:** the Claude tab shows the session instead of "Not connected: start the dev server on this branch".
 
@@ -109,6 +124,31 @@ assets, from your PC). The chip clears after you send; without it Claude has no 
   Remove button. Scripts are stripped. Needs "Allow Loading Third Party Assets" (Studio > File > Experience
   Settings > Security; it applies to every server of the experience, prod included).
 - In **Code** mode it records the asset in `toolbox.lock.toml` instead.
+
+## From Studio (`serve --claude`)
+
+The TypeTorch Studio plugin has a **Claude** button that opens the same chat in Studio. It needs
+[`typetorch serve`](studio-testing.md) with `--claude` (CLI 0.12+) on the machine with the game checkout:
+
+```sh
+bun run typetorch serve --claude
+```
+
+- serve runs remote-claude on this machine without a tunnel (`remote-claude --no-tunnel`) and pairs with it on the
+  Studio user's behalf: nobody pastes a code. A remote-claude you start yourself in the repo works too (serve finds it
+  through `.typetorch/remote-claude.session.json`).
+- `--claude-users <ids>`: the Roblox user ids allowed (remembered). Without it, the owners in `typetorch.json`. Studio
+  prompts as the Roblox user it runs as.
+- **Code mode only.** Claude edits the branch in its worktree, then the tab shows the same deploy card as the game:
+  **Deploy** (runs `typetorch deploy` on that branch, so the branch must be dev-channel; with `"approval": "all"` it
+  waits for `typetorch approve` on your PC) or **Discard**. Live mode works only from the in-game tab: Studio's Live
+  pill says so.
+- The "+" menu has Dex path (the Studio selection), My logs, Server logs (in a playtest) and Toolbox; screenshots work
+  from the Play client. Recent chats are listed, and the chat follows you between Edit and Play.
+- Replies stream to the tab over a WebSocket (`/tt/claude/stream`), so they show as Claude writes them.
+- **A helper on another machine** pairs their Studio with `serve --remote` ([A Studio on another
+  machine](studio-testing.md#a-studio-on-another-machine)); add their user id to `--claude-users`. Pair again after
+  updating the plugin, so serve knows their Roblox user.
 
 ## Security in short
 

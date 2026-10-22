@@ -188,9 +188,10 @@ permission to upload for that group.
 ## Live servers
 
 **Servers log `branch prod has no artifact yet; waiting for a deploy`, or (kernel 0.3)
-`nothing loaded (no verified, bootstrap or usable stored head); waiting for a signed deploy`.**
-Nothing was deployed to that branch yet, or no running server stored the head. Keep a server running (join the game)
-and deploy again.
+`nothing loaded (no verified, bootstrap or usable stored head); peers and the backup next, and waiting for a signed deploy`.**
+Nothing was deployed to that branch yet, or the head wasn't stored. Deploy again: the CLI stores the head in the game's
+DataStore when the deploy key has the DataStore scopes (`universe-datastores.objects:read`, `:create`, `:update`); without
+them it warns "the head isn't stored durably" and only running servers get it, so keep one open (join the game).
 
 **After a swap, the old dev menu stays on screen, dead, over the new one** (its header names an older
 `<artifact> #<generation>`), memory grows by several MB per swap, or something the old build made keeps acting.
@@ -223,7 +224,7 @@ and harmless (one per past generation, so a few dozen after a day of deploys). A
 (MBs per swap) is the entry above.
 
 **A deploy doesn't reach Studio.**
-Deploy messages never reach Studio playtests. Use [the Studio local payload](studio-testing.md).
+Deploy messages never reach Studio playtests. Use [the Studio local payload](studio-testing.md) with `typetorch serve`.
 
 **Dev menu: "No trusted prod head".**
 The server has no signed head for its branch and no bootstrap head. The next signed prod deploy boots it. If you
@@ -321,6 +322,40 @@ within seconds.
 
 **`typetorch doctor` warns that the place holds `ServerStorage.TypeTorchDev`.**
 A Studio test session was published. Delete the folder in Studio and publish again (live servers ignore it).
+
+## Studio and `typetorch serve`
+
+**The plugin's panel says "Waiting for typetorch serve" (or `serve status` lists no Studio).**
+Start `bun run typetorch serve` in the game folder, and allow the plugin's HTTP request to localhost when Studio asks
+(Studio asks per port; the plugin probes 34880-34887 one at a time). The plugin only syncs a place whose experience
+(`game.GameId`) is `typetorch.json`'s `universeId`: for another place or an unpublished file press **Connect anyway**
+(or `typetorch studio reconnect --anyway`). If the sync is paused, turn "Auto-connect" back on in the panel.
+
+**`typetorch studio ...` says no Studio is attached, but Studio is open.**
+The plugin may be stuck. In Studio's command bar (or the Roblox Studio MCP's `execute_luau`):
+`game:GetService("ServerStorage"):SetAttribute("TypeTorchReconnect", os.time())`.
+
+**`@typetorch/studio-plugin isn't installed` from `typetorch studio install-plugin`.**
+The plugin is not on npm. Download `TypeTorchSync.rbxm` from the
+[latest release](https://github.com/typetorch/studio-plugin/releases/latest) into Studio's plugins folder, or build a
+checkout: `bun run typetorch studio install-plugin --from ../studio-plugin`.
+
+**A save doesn't reach the running playtest.**
+Live reload needs kernel 0.5.4+ in `node_modules/@typetorch/kernel` (synced by `studio.project.json`) and the panel's
+"Live playtest: on". With an older kernel, Stop + Play.
+
+**Two sync plugins fight over the place.**
+Connect only one of the stock Rojo plugin and the TypeTorch plugin at a time.
+
+**The remote pairing link stopped working.**
+A quick tunnel's address changes whenever cloudflared restarts; serve prints a new link (`typetorch serve status`).
+Links last 15 minutes and work once; `typetorch serve pair` makes a new one. After 5 wrong codes pairing is locked
+until you make a new code. For a fixed address use your own tunnel with `serve --remote --url https://<tunnel>`.
+
+**The Studio Claude tab says "Claude isn't running" or "This typetorch serve is too old for Claude".**
+Start serve with `--claude` (CLI 0.12+), with `@typetorch/dev-server` installed and Claude Code logged in with your
+Claude.ai account. "Not on the session's user list": add the Roblox user id with `--claude-users`. The checkout must
+be on a dev-channel branch. After `serve restart claude`, check `serve logs` for the reason.
 
 ## remote-claude
 

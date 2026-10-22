@@ -45,12 +45,15 @@ approving. You finish with a numbered "What you need to do" list that tells them
    flag everything for the user to test.
 7. **Keep ids honest.** Never invent a universe, place, group or user id. Use the user's, or the placeholder `1`, and
    say so in the final list.
-8. **Only promise what exists today.** On npm: `@typetorch/framework`, `transformer`, `kernel`, `cli` and
-   `dev-server`; the template installs all five with `bun install` (`npx @typetorch/cli` works too). Built and usable:
+8. **Only promise what exists today.** On npm: `@typetorch/framework`, `transformer`, `kernel`, `cli` (also installed
+   as `tt`) and `dev-server`; the template installs all five with `bun install` (`npx @typetorch/cli` works too). Not
+   on npm: the Studio plugin (`TypeTorchSync.rbxm` from its GitHub releases) and the backend (a checkout or its Docker
+   image). Built and usable:
    kernel deploys that patch only the kernel into the live place (Luau Execution, no download; a copy with `kernel deploy --place-file` when the place doesn't allow saving through the API), the cloud test
    (`typetorch test --cloud`, automatic before prod deploys), `onStop` at server shutdown (kernel 0.3.2), the fleet API
    (`typetorch servers`, `report`, `alerts`) and the optional `AnalyticsEngine` (framework 0.3.0; its backend is
-   `@typetorch/backend`, a git repo, not on npm). Owners switching any server in place needs kernel 0.3.4 and
+   `@typetorch/backend`, a git repo, not on npm). The Studio loop: `typetorch serve` (CLI 0.11+) with the Studio plugin,
+   live reload in a playtest (kernel 0.5.4+), `typetorch studio ...` and `typetorch mcp` for agents. Owners switching any server in place needs kernel 0.3.4 and
    framework 0.3.2 (both on npm). Dev access lists through `typetorch access push` need kernel 0.3.8 on the servers
    (the signed settings record; 0.3.6-0.3.7 read the old ConfigService key). Cross-server messages
    (`TypeTorch.messaging`), `TypeTorch.servers()`, `TypeTorch.liveConfig` and the loading screen signals need kernel
@@ -58,8 +61,9 @@ approving. You finish with a numbered "What you need to do" list that tells them
    up. It publishes, deploys and asks for keys, so it is the user's to run, never yours: name it in "What you need to
    do". Planned: content packs, the typed asset map from files,
    `typetorch test --unit`, `/tt grant`/`revoke`.
-9. **No GitHub Actions, ever** (the owner's rule: they are a supply-chain risk). Don't add `.github/workflows`, actions,
-   or any hosted CI, and don't suggest them. Builds, cloud tests and deploys run on the user's machine.
+9. **No CI for the game, ever** (the owner's rule: hosted CI is a supply-chain risk). Don't add `.github/workflows`,
+   actions, or any hosted CI to the game repo, and don't suggest them. Builds, cloud tests and deploys run on the user's
+   machine. (TypeTorch's own packages are released by tag-triggered workflows; that is not a pattern for games.)
 
 ## Step 1: Detect
 
@@ -552,6 +556,10 @@ bun run typetorch build
 5. Commit, then `bun run typetorch build` again: the id has no `-dirty`. Also try a prod build:
    `bun run typetorch build --branch prod` ("prod channel: $print/$warn removed").
 6. The Studio project builds: `rojo build studio.project.json -o .typetorch/studio-check.rbxl`, then delete that file.
+7. Optional, only when the user has Studio open with the TypeTorch plugin: `bun run typetorch serve --detach`, then
+   `bun run typetorch studio status --json`, `studio play`, `studio logs` (look for `[TypeTorch]` lines and errors) and
+   `studio stop`; or the same through `typetorch mcp`. `serve status --json` lists compile errors. Plain `serve` runs
+   no keys; never add `--remote` or `--claude`, and stop it (`serve stop`) when done.
 
 Fix, rebuild, log.
 
@@ -564,7 +572,8 @@ Don't do these; list them in Step 7:
   `rollback`, `pin`, `settings ...`, `access push`, `assets sync|status`, `kernel deploy`, `kernel restore`,
   `deployments`, `branch ls`, `test --cloud`, `servers`, `report`, `alerts`, `backend setup`, `update`;
 - publish a place; edit the place in Studio (kernel install, data library, `TypeTorchAsset` marks);
-- start `remote-claude`, the analytics server or a tunnel; write the analytics settings;
+- start `remote-claude`, the analytics server or a tunnel (including `typetorch serve --remote` or `--claude`); press
+  the Studio plugin's Upload or Publish to dev; write the analytics settings;
 - push to a remote; add GitHub Actions or any CI workflow.
 
 ## Step 7: Finish with "What you need to do"
@@ -624,8 +633,10 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
    - then, in Studio, remove the old scripts listed in MIGRATION_NOTES.md and publish, just before the first deploy.
 8. **Player data** (if listed in MIGRATION_NOTES.md): in Studio put the library at `ServerStorage.Packages.<Name>` and
    add the `ServerScriptService.DataHost` Script from the Player data guide; publish.
-9. **Test locally in Studio:** `bun run watch` and `bun run studio` (two terminals), connect the Rojo plugin, Play.
-   Server > Status shows "Studio: local payload". Use the dev menu's Reload to test a swap.
+9. **Test locally in Studio:** install the TypeTorch Studio plugin (`TypeTorchSync.rbxm` from
+   github.com/typetorch/studio-plugin/releases into Studio's plugins folder), run `bun run typetorch serve`, open the
+   place (the plugin attaches by itself), Play. Server > Status shows "Studio: local payload". Saves reload the running
+   playtest (kernel 0.5.4+); the dev menu's Reload tests a swap.
 10. **Check the kernel live:** join the game; F9 > Server shows `[TypeTorch] kernel <version> (API 1) on a public
     server, branch prod, signed deploys only (keys: key asset)`. `/tt status` answers.
 11. **Dev branch:** `git switch -c dev`, `bun run typetorch deploy`, then `/tt new dev` in game. Earn some data, deploy

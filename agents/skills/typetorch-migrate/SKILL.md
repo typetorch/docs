@@ -23,14 +23,14 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
 5. No new RemoteEvents, `loadstring`, `_G`, disabled guards or settings changes.
 6. Don't change player data formats, store names or keys.
 7. Never invent ids: the user's, or placeholder `1`.
-8. On npm: every `@typetorch/*` package except analytics (`bun install` in the template gets them; `npx
-   @typetorch/cli` works too). Built: kernel patch deploys (`kernel deploy`, or `--place-file`), the cloud test before prod
+8. On npm: `@typetorch/framework`, `kernel`, `transformer`, `cli` (alias `tt`) and `dev-server` (`bun install` in the
+   template gets them; `npx @typetorch/cli` works too); not on npm: the backend and the Studio plugin (GitHub releases). Built: kernel patch deploys (`kernel deploy`, or `--place-file`), the cloud test before prod
    deploys, `onStop` at shutdown (kernel 0.3.2), the fleet API, the optional `AnalyticsEngine`, `typetorch access
    push` (CLI 0.7.3+; servers read it from kernel 0.3.6), `typetorch init` (CLI 0.10; a user step that sets up a
    new game or repairs one, never run it yourself). Planned, never promise: content packs, `typetorch test --unit`,
    `/tt grant`.
-9. No GitHub Actions, ever (the owner's rule): never add `.github/workflows`, actions or hosted CI, never suggest
-   them.
+9. No CI for the game, ever (the owner's rule): never add `.github/workflows`, actions or hosted CI to the game repo,
+   never suggest them.
 
 ## Procedure
 
@@ -143,7 +143,7 @@ Before/after code for every pattern: https://github.com/typetorch/docs/blob/main
    `--dry-run`; or copy the three kernel folders from `.typetorch/place.rbxl` in Studio and publish); `ServerScriptService.LoadStringEnabled` off in a
    live game (on only in a test place for remote-claude's `run_luau`; `doctor` reports it); remove the old scripts in
    Studio just before the first deploy; data
-   library + `DataHost` in the place; test in Studio (`bun run watch` + `bun run studio`, Play); check F9 `[TypeTorch]
+   library + `DataHost` in the place; test in Studio (the TypeTorch Studio plugin + `bun run typetorch serve`, Play); check F9 `[TypeTorch]
    kernel ...`; dev branch deploy + `/tt new dev` + two deploys while playing (+ a product bought during a deploy;
    after each deploy read Server > Status "Health window: n/3 errors": 3 errors in 30 s roll every server back, so fix
    them or set `typetorch.json` `"health": { "errors": ... }` above the count, kernel 0.3.7+);

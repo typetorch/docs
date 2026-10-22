@@ -5,7 +5,8 @@ play. Every step ends with **Check**: what you should see when it worked.
 
 ## The quick way: `typetorch init`
 
-With Bun installed, run this in an empty folder (CLI 0.10+):
+With Bun installed, run this in an empty folder (CLI 0.10+; with the CLI installed globally, `typetorch init` or
+`tt init`):
 
 ```sh
 bunx @typetorch/cli init
@@ -49,7 +50,7 @@ owner** (or a member whose group role may create assets and publish places). The
 | [git](https://git-scm.com) | every build is identified by its commit | your OS package manager |
 | [Rokit](https://github.com/rojo-rbx/rokit) | pins Rojo and Lune per project | the Rokit releases page, then `rokit self-install` |
 | Roblox Studio | creating the experience, settings, testing | [create.roblox.com](https://create.roblox.com) |
-| Rojo Studio plugin 7.7.0-rc.1 (optional) | only for [testing in Studio](../guides/studio-testing.md) | from the Rojo release that matches `rokit.toml` |
+| TypeTorch Studio plugin (optional) | only for [testing in Studio](../guides/studio-testing.md) with `typetorch serve` | `TypeTorchSync.rbxm` from the [studio-plugin releases](https://github.com/typetorch/studio-plugin/releases/latest) into Studio's plugins folder |
 
 roblox-ts, Rojo and Lune are installed per project in step 2.
 
@@ -94,8 +95,8 @@ bun run typetorch build
 - `rojo --version` prints `7.7.0-rc.1` inside `my-game`.
 - `bun run build` compiles with no errors.
 - `bun run typetorch build` ends with a `built <id> (branch ..., channel ...)` line,
-  `.typetorch/payload.rbxm ... modules`, and `sources  template <commit>, framework v0.3.0, kernel v0.3.2` (the npm
-  versions you installed).
+  `.typetorch/payload.rbxm ... modules`, and `sources  template <commit>, framework v<version>, kernel v<version>` (the
+  npm versions you installed).
 - Later, `bun run typetorch update` moves the CLI to the newest version on npm (it asks first; `--check` only shows
   the versions).
 
@@ -246,8 +247,7 @@ Add these permissions and select your experience where asked:
   the default engine patches the place through Luau Execution. A copy (`--place-file`) is the fallback, see step 8. Creator
   Hub doesn't offer it for API keys.
 - Set an expiry date, and add your IP under accepted IP addresses if you can.
-- Everything runs from your machine. TypeTorch never uses GitHub Actions or other hosted CI, so the key never has to
-  leave your PC.
+- Everything runs from your machine. TypeTorch ships no CI for games, so the key never has to leave your PC.
 
 **Put the keys in the game repo's `.env`.** It's gitignored by the template, and it's where the CLI reads secrets
 (`typetorch.json` holds everything else, CLI 0.9). Add one line, then save:
@@ -316,12 +316,12 @@ bun run typetorch kernel deploy --replace-place --yes
 **Check:** join the game from the Roblox app. Open the Developer Console (F9) > **Server**. You should see:
 
 ```text
-[TypeTorch] kernel 0.3.2 (API 1) on a public server, branch prod, signed deploys only (keys: key asset)
-[TypeTorch] branch prod: nothing loaded (no verified, bootstrap or usable stored head); waiting for a signed deploy
+[TypeTorch] kernel <version> (API 1) on a public server, branch prod, signed deploys only (keys: key asset)
+[TypeTorch] branch prod: nothing loaded (no verified, bootstrap or usable stored head); peers and the backup next, and waiting for a signed deploy
 ```
 
-(The version is the kernel you installed. A kernel from the
-[local override](#unreleased-framework-or-kernel-changes-optional) shows its commit: `kernel 0.3.2@<commit>`.)
+(`<version>` is the kernel you installed, for example `0.5.4`. A kernel from the
+[local override](#unreleased-framework-or-kernel-changes-optional) shows its commit: `kernel <version>@<commit>`.)
 
 Type `/tt status` in chat: it answers (you are the owner, so you are a dev).
 
@@ -341,8 +341,9 @@ bun run typetorch deploy
 - Then it waits up to 90 s for the servers' reports, and rolls the branch back by itself if the build fails on them
   ([safe deploys](../guides/deploy-and-rollback.md#safe-deploys)). That needs the fleet API; until you set it up, the
   wait is skipped with a note.
-- Keep a server running for the first deploy: without a writable registry, the head is stored by the servers that
-  receive the message. Later servers boot from that stored head.
+- The CLI also stores the head in the game's DataStore (the **durable head**; it needs the deploy key's DataStore
+  scopes from step 6), so servers that start later boot it even if none was running. Without those scopes only running
+  servers get the deploy: keep one open for the first deploy.
 
 **Check:**
 
@@ -408,6 +409,7 @@ Devs only. They work even when a build is broken, so they are the fallback when 
 | `/tt reload` | load the branch head again | dev |
 | `/tt rollback` | swap this server back to its previous artifact | dev; owners on prod-channel servers |
 | `/tt pin <assetId>` / `/tt unpin` | hold this server on a known artifact / release it | devs on dev servers; owners on any server |
+| `/tt bundle` | send a debug bundle of this server to the backend (kernel 0.5.3+) | dev |
 | `/tt dev` | open the dev menu | dev |
 
 `/tt grant` and `/tt revoke` are **planned**.
@@ -426,7 +428,8 @@ It points `prod` back to the previous different build. Nothing is rebuilt or upl
 
 ## Next steps
 
-- [Testing in Studio](../guides/studio-testing.md): run your local code with `bun run watch` and `bun run studio`.
+- [Testing in Studio](../guides/studio-testing.md): run your local code with `bun run typetorch serve` and the Studio
+  plugin; saves reload a running playtest.
 - [Live servers and alerts](../guides/fleet-and-alerts.md): `typetorch servers`, deploy reports, alerts, and the
   automatic rollback after a bad deploy.
 - [Analytics](../guides/analytics.md): your own analytics, experiments and player journeys (the template already
