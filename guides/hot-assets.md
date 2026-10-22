@@ -3,8 +3,7 @@
 Builders edit models and UI templates in the real place and publish it as usual. New servers get them from the place.
 **Running servers get the new versions live, with no restart.**
 
-> **New (2026-10-05):** the CLI and the framework side are built and unit-tested. A full live run (a real upload, then
-> a live swap) hasn't been done yet. Try it on a dev branch first.
+Try a new hot asset on a dev branch first.
 
 | Hot | Not hot |
 |---|---|
@@ -22,7 +21,7 @@ In Studio, give the instance an attribute `TypeTorchAsset` (string) with a short
 - **where it sits decides who sees it:** under ServerStorage or ServerScriptService it is server-only; anywhere else
   (ReplicatedStorage, Workspace...) it replicates to clients.
 
-Publish the place.
+Publish the place. (Or skip the publish: [from Studio](#from-studio-no-publish) below.)
 
 ## 2. Sync
 
@@ -52,6 +51,17 @@ bun run typetorch deploy
   rollback brings back the older asset versions.
 - Needs the assets key with `asset:read`, `asset:write` and Luau Execution
   (`universe.place.luau-execution-session:read` and `:write`).
+- `bun run typetorch assets types` writes `src/shared/assets.gen.ts`: every key with its class, and a `HotAssetKey`
+  type, from the lockfile. Once the file exists, every sync refreshes it.
+
+### From Studio (no publish)
+
+The TypeTorch Studio plugin's **Hot assets** card does the same from the open place, with
+[`typetorch serve`](studio-testing.md#hot-assets-from-the-panel) running: select an instance, **Add** (it sets
+`TypeTorchAsset`), then **Check** (`assets status`), **Upload** (`assets sync`) or **Publish to dev** (`assets sync
+--deploy dev`). The plugin exports the marked instances itself, so unpublished edits count (`--studio-export` on the
+CLI). Those entries record place version 0 in the lockfile, so new servers load them instead of adopting the place's
+copies, until a sync from a published place records a real version again. Commit the lockfile as usual.
 
 ## 3. Use them in code
 
@@ -73,7 +83,9 @@ rebuild(shop.get());
 | `key`, `version` | the key, and the live copy's version |
 
 - On every generation start, before any module loads, the server keeps, adopts (the place's own copy, when the place
-  version matches the lockfile) or loads (`LoadAssetVersion`) each asset. It waits at most 8 s; slower loads finish in
+  version matches the lockfile, or, framework 0.5.3+, when the place's backup build vouches for it after a backup
+  refresh or kernel deploy) or loads (`LoadAssetVersion`) each asset. A loaded version gets the place copy's
+  CollectionService tags back. It waits at most 8 s; slower loads finish in
   the background and fire `changed`.
 - Clients never request anything: they watch the live copy's tag, and replicated assets arrive by replication.
 - **Clones never count and never update by themselves.** A clone in PlayerGui, a Backpack or Workspace keeps working

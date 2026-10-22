@@ -103,11 +103,11 @@ restart) before prod takes a deploy again. Losing the `.env` means new Open Clou
 ## Bootstrap heads
 
 Builds deployed before signing existed have no signature. So `kernel deploy` stamps `BootstrapHeads`: the current prod
-heads (`{"prod":{"a":<assetId>,"s":<seq>,"i":"<artifact id>"}}`), from the registry and your local deployment log. A
-prod server trusts exactly those, unsigned; anything newer must be signed.
+heads (`{"prod":{"a":<assetId>,"s":<seq>,"i":"<artifact id>"}}`), from your local deployment log. A prod server trusts
+exactly those, unsigned; anything newer must be signed.
 
-Run `kernel deploy` from the machine that has the latest deployment log (or with a readable registry). A prod deploy
-made elsewhere is missing from `BootstrapHeads` and is refused until the next signed deploy.
+Run `kernel deploy` from the machine that has the latest deployment log. A prod deploy made elsewhere is missing from
+`BootstrapHeads` and is refused until the next signed deploy.
 
 ## The boot fail-safe
 

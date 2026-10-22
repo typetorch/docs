@@ -70,6 +70,15 @@ at the backend. The steps below do the same by hand.
 4. **Check:** kernels read the record at boot, about every minute, and within seconds of a ping. Join a server, then
    `bun run typetorch servers`.
 
+- **On this PC:** `bun run typetorch backend run` starts a backend checkout behind a Cloudflare quick tunnel and runs
+  `backend setup --url <tunnel>` each time the tunnel's address changes, so servers follow it within seconds (`init`
+  sets it up and registers it as a login task). The explorer is then `http://localhost:8787`.
+- **Sign in with typetorch.dev:** a backend with a public https URL can let owners sign in through
+  [dash.typetorch.dev](https://github.com/typetorch/dash) instead of a Roblox OAuth app per game. Owners get admin only
+  on a trusted browser (by default; the backend's `TYPETORCH_CENTRAL_LOGIN_UNBLESSED` decides):
+  `bun run typetorch backend bless` signs a one-time link with your main prod key and opens it in the browser to trust.
+  Details: the [backend README](https://github.com/typetorch/backend#sign-in-with-typetorchdev).
+
 ## Commands
 
 ```sh
@@ -145,6 +154,33 @@ TYPETORCH_ALERT_WEBHOOK_LEVELS=critical
 The API also streams changes live (Server-Sent Events, `GET /v1/fleet/stream`, admin token) for your own tools; the
 CLI polls for now.
 
+## Errors, debug bundles and remote debug
+
+The same backend shows more than the fleet list. Open its **web explorer** (the backend's URL in a browser; sign in with
+the admin token, Sign in with Roblox, or typetorch.dev), with pages such as Overview, Players, Funnels, Experiments, Fleet, Errors,
+Performance, Query and Settings pages ([backend README](https://github.com/typetorch/backend#the-explorer)).
+
+- **Error logs** (kernel 0.4.0+): every server's errors, server and client, with player names and ids replaced
+  (`<player.name>`), fingerprinted and counted per minute per branch and build, posted to `<url>/v1/errors`. The
+  Errors page lists the kinds with the players who hit them; a player's page lists the errors they hit.
+- **Budget view** (kernel 0.4.0+): what TypeTorch spends of the server's DataStore, MemoryStore, HTTP and
+  MessagingService limits, per caller, and memory. In game: the dev menu's Server > Budget. Heartbeats carry a summary,
+  and (kernel 0.4.2+) the server's TPS, so the Fleet and Performance pages show TPS and memory.
+- **Remote debug** (kernel 0.5.0+): every JobId on the Fleet page opens `/servers/<JobId>`. While it is open, that live
+  server is read like the dev menu, **read-only** (Status, Logs, Players, State, Dex, Modules, Builds, Budget, Errors,
+  Network, Audit). A Roblox server can't be called into, so it pulls: the next heartbeat tells it it is watched, and it
+  long-polls the backend for allow-listed commands, owners only, answers scrubbed of secrets. Nothing is sent while
+  nobody watches. With an Open Cloud messaging key on the backend (`OPENCLOUD_API_KEY`, `TYPETORCH_UNIVERSE_ID`), the
+  server wakes within seconds instead of at its next heartbeat (kernel 0.5.1+).
+- **Debug bundles** (kernel 0.5.3+): when a server fails (a critical alert, a generation that fails to start, players
+  moved off it, or shutting down soon after a failure), it posts what happened by itself: the failure, the deploy
+  state and swap reports, recent alerts, the last 300 server log lines, and the players with their client logs. A dev
+  can send one with `/tt bundle`. The alert names it (`d.bundle`). The server's page keeps its bundles, alerts, reports
+  and a timeline for 30 days after the server is gone (the Fleet page's **Recently gone** table).
+
+Keep the backend current with the kernel: an older backend answers 404 to bundles, and the server then stops sending
+them for its lifetime.
+
 ## Debugging endpoints
 
 Two backend routes answer most "what is going on?" questions in seconds. Both take the admin token as
@@ -165,6 +201,9 @@ curl -s -X POST -H "Authorization: Bearer $TYPETORCH_ADMIN_TOKEN" -H "Content-Ty
   over the views `events` and `recordings` (every day file plus today's live rows), at most 10,000 rows. The answer is
   `{ columns, rows, truncated, ms }`. `TYPETORCH_SQL=0` turns it off (404). It answers "is anything arriving?" long
   before a chart does.
+- **`GET /v1/identity/resolve?pid=...&uid=...`:** turns analytics pids into Roblox UserIds and back (ids only). A
+  script or an LLM agent should use the backend's **lookup token** (`TYPETORCH_LOOKUP_TOKEN`), which works on this route
+  only, instead of the admin token.
 - There is no `/v1/branches` or `/v1/registry` (404). Branch heads and the deployment history are in the CLI:
   `typetorch branch ls` and `typetorch deployments` ([the deployment log](deploy-and-rollback.md#the-deployment-log)).
 

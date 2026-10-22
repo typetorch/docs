@@ -866,7 +866,9 @@ service that uses tags.
 
 - Hard-coded asset ids keep working when the assets belong to (or are shared with) the experience owner.
 - **Hot assets (built):** builders mark models and UI templates in the place with the `TypeTorchAsset` attribute,
-  `typetorch assets sync` uploads them, and running servers pick up new versions with no restart. Code that clones
+  `typetorch assets sync` (or the Studio plugin's Hot assets card, without a place publish) uploads them, and running
+  servers pick up new versions with no restart. `typetorch assets types` writes the keys as a typed map
+  (`src/shared/assets.gen.ts`). Code that clones
   templates switches to `hotAsset(key, template)`. See [Hot assets](../guides/hot-assets.md#migrating-existing-templates).
 - **Builders** keep working in the place and publish from Studio: kernel deploys patch only the kernel, so they never
   touch builders' content. Maps need a place publish and new servers (Manage > Servers > Migrate moves players to the
@@ -933,7 +935,7 @@ topics you keep still fit, but each one subscribes again on every swap.
    ```
 
    `typetorch build` refuses a payload with anything but Folders and ModuleScripts, and names the offending path.
-2. [Test in Studio](../guides/studio-testing.md): `bun run watch`, `bun run studio`, Play. Use the dev menu's Reload to
+2. [Test in Studio](../guides/studio-testing.md): `bun run typetorch serve` with the Studio plugin, Play. Use the dev menu's Reload to
    test a swap while you play.
 3. Deploy a dev branch (`git switch -c dev`, `bun run typetorch deploy`), open it with `/tt new dev`, play, deploy
    again while playing. Test player data across two deploys.

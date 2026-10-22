@@ -22,7 +22,7 @@ the pointer and tells live servers on that branch to swap.
 ## Owners switch any server in place
 
 Owners (see [roles](security.md#who-can-do-what)) can change what the server they are in runs, prod included, while
-everyone stays in the game. Needs kernel 0.3.4 and framework 0.3.2 (newer than the npm release today; coming soon).
+everyone stays in the game. Needs kernel 0.3.4 and framework 0.3.2.
 
 - **Switch** (Server > Branch, or `/tt branch <name>`): this server follows that branch from now on, and takes its
   deploys. On a public server this lasts only for this server's lifetime: new servers still boot the signed `prod`
@@ -73,6 +73,21 @@ bun run typetorch deploy            # branch feature-shop, dev channel
 
 In game: `/tt new feature-shop`, test, then merge into `main` and deploy `prod` from there. Each deploy is logged with
 its commit; `bun run typetorch branch ls` lists branches, their channels and live heads.
+
+## Removing a branch
+
+Servers record at most **32 branches** (`branch ls` warns from 28). Remove dev branches you are done with:
+
+```sh
+bun run typetorch branch rm feature-shop --dry-run
+bun run typetorch branch rm feature-shop
+```
+
+- It removes the branch's head from the kernel's DataStore heads (y/N, or `--yes`) and hides it in this machine's log.
+- It refuses the default branch and every prod-channel branch, a head that changed since it was read, and a branch live
+  servers still run (checked through the [fleet API](fleet-and-alerts.md); without it, only with `--force`).
+- Servers' MemoryStore copy keeps the branch until it expires (45 days after its last write). Deploying the branch
+  again recreates it.
 
 ## Data on dev branches
 

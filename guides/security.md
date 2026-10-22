@@ -71,6 +71,7 @@ What stays open, by design or for now:
 | Basin R2 token (SQL reads) | your PC only | in the game's settings |
 | Erasure webhook secret (`ROBLOX_WEBHOOK_SECRET`), alert webhook URL, the backend's Open Cloud key (`OPENCLOUD_API_KEY`) | the backend's environment | in git |
 | remote-claude pairing codes | your terminal and clipboard | in a commit (they expire after one use or 3 hours) |
+| `typetorch serve --remote` pairing links | your terminal (`serve status`), then the person you send it to | in a public channel (one use, 15 minutes; paired devices are listed by `serve devices`) |
 
 - The CLI keeps keys and tokens in memory, gives each one only to the client for its job, never prints them, and
   redacts them from errors. Child processes (rbxtsc, rojo, lune, git) get an allowlisted environment without keys.
@@ -89,10 +90,27 @@ What stays open, by design or for now:
   run `backend setup` again. For the admin token, change `TYPETORCH_ADMIN_TOKEN` on the backend (that ends every explorer
   session) and in the game repo's `.env`.
 
-## No GitHub Actions
+## `typetorch serve` and remote Studios
 
-TypeTorch doesn't use or ship GitHub Actions or any hosted CI: they are a common supply-chain risk, and they would need
-your keys. Builds, cloud tests, signing and deploys run on your own machine.
+- The control API listens on `127.0.0.1` only. Every request needs `X-TypeTorch: 1`, a loopback `Host` and no `Origin`,
+  and there is no CORS, so a web page can't call it. serve's children (rbxtsc, rojo, your `--with` scripts) get the
+  CLI's minimal environment, without keys; the hot asset jobs run inside serve with your keys.
+- `--remote` opens a gateway (`127.0.0.1:34890`) behind a public tunnel. Only a paired device gets in: a one-time code
+  (15 minutes; 5 wrong codes lock pairing until a new code), then a device token kept hashed in
+  `.typetorch/serve-remote.json`, valid 30 days or until `serve unpair`. A remote Studio syncs code read-only (never
+  Rojo's `write` or `open`), and its hot asset buttons upload with **your** keys and deploy only to the dev branch.
+  Pair only people you would give that to.
+- `--claude` lets the Roblox users in `--claude-users` (default: the owners in `typetorch.json`) prompt Claude Code on
+  your machine, in Code mode, with remote-claude's rules (below). Deploys from it follow your approval policy.
+
+## No CI for your game
+
+TypeTorch ships no GitHub Actions or other hosted CI for games, and nothing in it needs your Open Cloud key or signing
+keys in a CI system: hosted CI is a common supply-chain risk, and it would need those keys. Builds, cloud tests,
+signing and deploys run on your own machine. `approve --import <dir>` exists for automation you choose to run yourself.
+
+TypeTorch's own npm packages are released from a version tag by a GitHub workflow, with npm trusted publishing and
+provenance ([Releases](../README.md#releases)). That workflow holds no Roblox key and never touches a game.
 
 ## Never publish secrets
 

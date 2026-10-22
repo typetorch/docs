@@ -19,7 +19,7 @@ apply a change within seconds, with no deploy and no place publish.
 | `access` | `members`, `revoked`, `devBadgeId` from `typetorch.json` ([who gets the dev menu](../getting-started/fresh-setup.md#11-the-dev-menu-and-who-gets-it)) | `typetorch access push` |
 | `defaultBranch`, `channels` | from `typetorch.json` | `typetorch settings push` |
 | `fleet` | derived from `backend` for kernels before 0.4: `{ url, token }`, the [fleet API](fleet-and-alerts.md) and its write-only ingest token | `typetorch backend setup` |
-| `backend` | `{ url, key, analytics? }`: the TypeTorch backend and its game key (CLI 0.9; kernels before 0.4 read the `fleet` and `analytics` sections it derives) | `typetorch backend setup` |
+| `backend` | `{ url, key, analytics? }`: the TypeTorch backend and its game key (CLI 0.9; kernels before 0.4 read the `fleet` and `analytics` sections it derives). `analytics` holds the analytics dials and the experiment overrides | `typetorch backend setup`; `typetorch experiment` for `backend.analytics.experiments` ([Analytics: experiments](analytics.md#experiments)) |
 | `analytics` | the [analytics sink settings](analytics.md#settings-the-analytics-field), derived from `backend` | `typetorch backend setup` |
 | `game` | your own live values, read with `TypeTorch.liveConfig` | `typetorch settings set game.<key>` |
 
@@ -38,6 +38,7 @@ bun run typetorch settings unset game.event
 bun run typetorch settings push                    # defaultBranch, channels and access from typetorch.json
 bun run typetorch access push                      # access only
 bun run typetorch backend setup --url https://backend.example.com
+bun run typetorch experiment weights onboarding 3,1   # an analytics experiment override
 ```
 
 Every write reads the record, checks that your keys signed it, changes one field, raises `seq` by one, signs it with

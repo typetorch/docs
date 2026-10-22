@@ -6,9 +6,11 @@ that was live, so you can compare builds, experiments and devices.
 
 - **Write side:** `AnalyticsEngine` in `@typetorch/framework` (0.3.0+), on the server and the client.
 - **Backend, your choice:** a self-hosted **DuckDB server** (one small VPS), or **Cloudflare Basin** (no server).
-- **Read side:** the [backend](https://github.com/typetorch/backend) (`@typetorch/backend`, a git repo, not on npm yet):
-  the queries, the DuckDB server, the fleet API, `bun run report`.
-- A web explorer is **coming** (in progress, not usable yet).
+- **Read side:** the [backend](https://github.com/typetorch/backend) (`@typetorch/backend`, run from a checkout or its
+  Docker image; not on npm): the queries, the DuckDB server, the fleet API, `bun run report`, and the **web explorer**
+  at the backend's URL (Overview, Roblox, Retention, Funnels, Players, Flow, Experiments, First session, Events, Errors,
+  Performance, Query; sign in with the admin token, Sign in with Roblox, or typetorch.dev).
+- **Live experiment overrides:** `typetorch experiment` (CLI 0.10.2+; [below](#experiments)).
 
 Contents: [Using it in a game](#using-it-in-a-game) · [What is collected](#what-is-collected) ·
 [The event format](#the-event-format) · [Backends](#backends) · [Settings](#settings-the-analytics-field) ·
@@ -190,9 +192,15 @@ Know these before you start:
 
 ## Settings: the `analytics` field
 
-Game servers read their sink settings from the `analytics` field of the game's [signed settings record](settings.md)
-(kernel 0.3.8+). It is server-only (never sent to clients), and a change reaches running servers within seconds, so
-you change dials live, with no deploy or place publish.
+Game servers read their sink settings from the game's [signed settings record](settings.md) (kernel 0.3.8+). It is
+server-only (never sent to clients), and a change reaches running servers within seconds, so you change dials live,
+with no deploy or place publish.
+
+- **DuckDB (framework 0.4+, kernel 0.4+):** the record's `backend` = `{ url, key, analytics? }` is the sink: events go to
+  `<url>/v1/ingest` with the game key, and the dials come from `backend.analytics` (`flushSeconds`, `recordShare`,
+  `techEvery`, `experiments`).
+- **Basin, and older frameworks:** the `analytics` field below. `backend setup` keeps deriving it from `backend` for
+  frameworks before 0.4; a Basin sink is always read from it.
 
 ```json
 {
@@ -224,8 +232,9 @@ you change dials live, with no deploy or place publish.
 bun run typetorch backend setup --url https://backend.example.com --flush-seconds 15 --record-share 1
 ```
 
-It derives this section from `backend` and keeps the other fields (`techEvery`, `experiments`). CLI 0.9 has no command that
-sets those two: `settings set analytics` only points to `backend setup`. Read it back with `bun run typetorch settings get
+It derives this section from `backend` and keeps the other fields (`techEvery`, `experiments`). `typetorch experiment`
+writes the experiment overrides ([below](#experiments)); no command sets `techEvery`, and `settings set analytics` only
+points to `backend setup`. Read it back with `bun run typetorch settings get
 analytics` (the token hidden), and stop sending with `bun run typetorch settings unset backend` (it drops `fleet` and
 `analytics` too). The CLI signs the record with both prod keys, and servers refuse one that doesn't verify.
 
@@ -246,13 +255,36 @@ for each variant.
 A session holds at most **32 experiments** (framework after 0.3.2). A 33rd name isn't assigned: the call returns the
 first variant (the control), isn't stamped, and logs a warning.
 
-Change it live in the settings key, no deploy:
+Change it live with `typetorch experiment`, no deploy. It writes the override into the signed settings record (the
+same signed write as `settings set`: read, verify, change, sign with both keys, ping), so servers pick it up within
+seconds:
 
-| Dial | Effect |
-|---|---|
-| `"active": false` | everyone gets the first variant (not stamped) |
-| `"weights": [3, 1]` | 75% / 25%, in the order the game lists the variants |
-| `"variant": "long"` | force one variant for everyone |
+```sh
+bun run typetorch experiment list                        # every override, with the variants the backend saw (7 days)
+bun run typetorch experiment weights onboarding 3,1      # 75% get the first variant, 25% the second
+bun run typetorch experiment settle onboarding long      # everyone gets "long", stamped: make it final
+bun run typetorch experiment stop onboarding             # everyone gets the control (the first variant), not stamped
+bun run typetorch experiment resume onboarding           # drop stop / settle, keep the weights
+bun run typetorch experiment clear onboarding            # remove the override: equal split again
+bun run typetorch experiment force onboarding 123456 long   # one player (UserId or pid) gets "long", for QA
+bun run typetorch experiment unforce onboarding 123456
+```
+
+| Dial (in the override) | Set by | Effect |
+|---|---|---|
+| `"active": false` | `stop` | everyone gets the first variant (not stamped) |
+| `"weights": [3, 1]` | `weights` | 75% / 25%, in the order the game lists the variants |
+| `"variant": "long"` | `settle` | one variant for everyone |
+| `"players": { "<UserId or pid>": "long" }` | `force` | those players get that variant over everything else (at most 200; needs a framework that reads `players`) |
+
+- The variants live in game code, so the CLI can't check them by itself: `--variants a,b` (the game's list, in order)
+  makes `weights` and `settle` check the count and the name first. `--dry-run` shows the override before and after.
+- Weights move as few players as possible: a player only switches when the boundary moves past their hash.
+- It needs a backend in the record (`typetorch backend setup`) first. The overrides live in `backend.analytics.experiments`
+  (framework 0.4+), mirrored into the old `analytics.experiments`. Every change is logged to `experiments.jsonl` in the
+  state dir; `settings status` lists the overrides.
+- The explorer's Experiments page shows each experiment's state, weights and forced players, and opens the players of
+  a variant.
 
 **Per server:** a share of servers runs a different build: a kernel A/B pin (`bun run typetorch pin <artifact>
 --branch prod --pct 10`, signed on prod; on dev branches also the dev menu's "Load a build" > Share of a branch). Events

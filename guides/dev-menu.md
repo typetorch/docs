@@ -78,7 +78,7 @@ A sidebar group with a **Server | Client** toolbar:
 ### Server
 
 - **Status:** JobId, server type, uptimes, the build's health window ("3 errors / 30 s"), place version, players,
-  memory, the last deploy message and how long it took to arrive, recent swaps, and (kernel 0.3.8) **Settings**: the
+  memory, server TPS (kernel 0.4.2+), the last deploy message and how long it took to arrive, recent swaps, and (kernel 0.3.8) **Settings**: the
   [signed settings record](settings.md) this server holds ("#12, 3m old (sig)"). **Attention** lists what needs a look, and the tab shows a **badge** (red for errors, yellow
   for warnings):
 
@@ -102,6 +102,8 @@ A sidebar group with a **Server | Client** toolbar:
   | run_luau off | `LoadStringEnabled` is off (dev servers; right for a live game) |
   | Pinned / A/B experiment | this server holds a pinned build |
   | Studio: local payload | a Studio session runs your local code ([Testing in Studio](studio-testing.md)) |
+  | Running the backup build / Moving players out / Backup build failed | [never an empty server](deploy-and-rollback.md#never-an-empty-server): nothing else could run, the server runs the place's backup build, or moves players out |
+  | Detached job slow / Detached jobs near the cap | [`TypeTorch.runDetached`](player-data.md) jobs run long or near the 256 cap |
   | Registry, High memory | the settings record can't be read; the server uses a lot of memory |
   | No settings / Settings refused / Settings unreadable / Settings copy refused | the [settings record](settings.md) is missing, doesn't verify, can't be read, or a newer copy was refused while a good one is kept (`typetorch settings status`) |
   | Messaging offline / Messaging busy / Messages dropped | [`TypeTorch.messaging`](messaging.md): the kernel can't subscribe, the universe's topic is near its rate limit, or messages were given up |
@@ -122,6 +124,11 @@ A sidebar group with a **Server | Client** toolbar:
   - **Devs** get them on private and reserved servers of dev branches.
   - Reload and Rollback as before. The dev menu allows one swap (reload, switch, rollback, load) per server every 2 s.
   - On older kernels, prod servers show "Use the CLI: typetorch pin" instead of in-place loads.
+
+- **Budget** (kernel 0.4.0+): what TypeTorch spends of this server's DataStore, MemoryStore, HTTP and MessagingService
+  limits in the last minute, as bars against Roblox's limits for the player count; who spends it (kernel, devtools,
+  analytics, framework, game); the DataStore budget left (shared with your game's own requests); and memory. Older
+  kernels show one line.
 
 ### Manage
 
@@ -185,4 +192,5 @@ They work even when a build is broken. Devs only.
 | `/tt reload` | load the branch head again | dev |
 | `/tt rollback` | back to this server's previous build | dev; owners on prod-channel servers |
 | `/tt pin <assetId>` / `/tt unpin` | hold this server on a known build / release it | devs on dev servers; owners on any server |
+| `/tt bundle` | send a [debug bundle](fleet-and-alerts.md#errors-debug-bundles-and-remote-debug) of this server to the backend (kernel 0.5.3+) | dev |
 | `/tt dev` | open the dev menu | dev |

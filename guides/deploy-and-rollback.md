@@ -11,16 +11,17 @@ bun run typetorch deploy
 
 What `deploy` does, in order:
 
-1. **Clean build:** removes ignored files from `out/` and `include/`, writes `src/shared/build.ts`, runs rbxtsc (prod
-   channel: debug prints and source paths removed), builds `.typetorch/payload.rbxm` with Rojo, and checks it holds only
-   Folders and ModuleScripts.
+1. **Clean build:** removes ignored files from `out/` and `include/`, puts the build cache back (below), writes
+   `src/shared/build.ts`, runs rbxtsc (prod channel: debug prints and source paths removed), builds
+   `.typetorch/payload.rbxm` with Rojo, and checks it holds only Folders and ModuleScripts.
 2. **Upload** as a new private Model asset owned by `creator`, and wait until moderation says Approved.
 3. Log it as "uploaded" (`uploads.jsonl` in the state dir), so a later step can't lose it.
 4. **Cloud test** (always for prod-channel branches; [below](#the-cloud-test)): the build boots headless in your place.
 5. **Approval** (below): a y/N at your terminal, or a proposal.
 6. **Sign** (prod-channel branches only; [Prod signing](prod-signing.md)).
-7. Take the next `#seq`, update the registry (when your key can read it), publish the deploy message, log "published"
-   in `deployments.jsonl`.
+7. Take the next `#seq` (claimed from the game's DataStore), publish the deploy message, store the head in the game's
+   DataStore (the **durable head**, so servers that start later or missed the message boot it), log "published" in
+   `deployments.jsonl`.
 8. **Wait for the servers' reports** (prod-channel branches, by default; [below](#wait-and-automatic-rollback)).
 
 Live servers on that branch swap within about 1 to 2 seconds; public servers wait a random 0 to 10 s first so they
@@ -29,7 +30,14 @@ about 11 s for the cloud test on prod.
 
 Useful flags: `--branch <b>`, `--channel prod|dev`, `--message <text>` (shown in the dev menu), `--no-build` (deploy
 the last build), `--force` (a dev-channel or dirty build to a prod-channel branch), `--test` /
-`--skip-test "<reason>"`, `--wait [s]` / `--no-wait`, `--rollout <1-99>` (dev-channel branches).
+`--skip-test "<reason>"`, `--wait [s]` / `--no-wait`, `--rollout <1-99>` (dev-channel branches), `--propose` (write a
+proposal even at a terminal).
+
+**Build cache.** After a clean build, `out/` and rbxtsc's `tsconfig.tsbuildinfo` are kept in
+`.typetorch/build-cache/<channel>/`, with a hash per file. The next clean build puts them back and rbxtsc recompiles only
+what changed (seconds for a one-file edit). It is dropped when a file fails its hash or `tsconfig.json`, `package.json`
+or a lockfile changed; dev and prod never share one. It needs `"incremental": true` with the tsbuildinfo inside `outDir`.
+`TYPETORCH_BUILD_CACHE=0` turns it off.
 
 ### Artifact ids and the deployment number
 
@@ -241,10 +249,29 @@ this one). `typetorch servers` counts them (`clients`), with a `client_failed` w
 - Every `typetorch kernel deploy` bakes the current prod build's kept payload into the place, replacing the old
   backup. Without a kept payload (prod was deployed from another machine, or before CLI support) it warns and the place
   keeps the backup it has: deploy prod once from the machine that runs `kernel deploy`. `--no-backup` skips it.
+- **Automatic refresh:** after `deploy`, `approve` or `promote` publishes build N+1 to the default (prod-channel) branch
+  at your terminal, the place's backup becomes build N once N is **proven healthy**: the fleet API has its reports with
+  no failure or rollback, no server running it is failed or degraded, and it went out at least `backup.healthyHours`
+  ago. It saves only the backup slot (a Luau Execution save, like a kernel deploy) and never blocks or fails the deploy:
+  when it can't (no fleet API, an unproven build, unpublished saves, Team Create, the Save Place API setting, no place
+  key, a non-interactive run) it prints one line, `backup      not refreshed: ...`. A rollback never moves the backup.
+  Set it in `typetorch.json`: `"backup": { "refresh": "auto", "healthyHours": 3 }` (the defaults), or
+  `"refresh": "off"`.
+- **Now:** `bun run typetorch backup refresh [--build <x>]` makes a proven-healthy prod build (default: the prod head)
+  the backup at once (y/N or `--yes`; `--dry-run`; an unproven build needs `--force`).
+- **Hot assets:** each save publishes a new place version. When the place's hot-asset copies match the lockfile, the
+  save stamps the new backup so new servers (framework 0.5.3+) keep adopting the place's copies on that version;
+  when it can't, the automatic refresh is skipped with the fix (`typetorch assets sync --deploy <branch>`).
 - `typetorch doctor` shows the backup in the place, with its age. It warns past 30 days.
 - **Player data:** the backup is an older build. If your data has a schema version, your code must refuse (or migrate)
-  data written by a newer version, so a backup that runs against newer player data can't corrupt it. Keep the backup
-  fresh by running `kernel deploy` after big prod releases.
+  data written by a newer version, so a backup that runs against newer player data can't corrupt it.
+
+### A build taken down by moderation
+
+`bun run typetorch deploy --reupload <artifactId|#seq|commit|assetId> [--branch <b>]` uploads the exact bytes kept at
+upload (`.typetorch/payloads/`) as a **new** asset, waits for moderation and deploys it like any deploy (cloud test,
+approval, a new `#seq`, signed on prod). The artifact id stays; servers on the old asset swap to the new copy. Then
+`typetorch backup refresh` if the backup was that build.
 
 ## Promote
 
@@ -302,7 +329,8 @@ marks each branch's live head. Uploads that never went out are listed with their
 - The logs live in the **state dir**: `.typetorch/` in the game, or `TYPETORCH_STATE_DIR`. Deploys from one machine
   take a lock there, and the DataStore counter keeps `#seq` unique across machines.
 - Every command takes `--json`.
-- With a readable registry the log also includes deploys made on other machines.
+- `deployments` shows **this machine's** log. `branch ls` also reads the kernel's DataStore heads, so it sees deploys
+  made on other machines.
 - `deployments.jsonl` in the state dir is the full record, one JSON row per `#seq`, with `action`, `channel`, `branch`,
   the artifact and `by`. It shows what `deployments` and the dev menu leave out, such as the channel a promote kept.
 
@@ -367,8 +395,9 @@ A new, empty place takes `kernel deploy --replace-place --yes` instead
 | new server to a playable build | about 2 s, at most 15 s (players are held meanwhile) |
 | kernel 0.3.6, nothing loads: to another server's build / the backup / the moves | about 5 s / 5 to 10 s / 15 s (simulated) |
 
-## No GitHub Actions
+## No CI for your game
 
-TypeTorch doesn't use or ship GitHub Actions or any other hosted CI: they are a common supply-chain risk. Builds, cloud
-tests and deploys run from your own machine. `approve --import <dir>` exists for automation
-you choose to run yourself.
+TypeTorch ships no GitHub Actions or other hosted CI for games: hosted CI is a common supply-chain risk, and it would
+need your keys. Builds, cloud tests and deploys run from your own machine. `approve --import <dir>` exists for
+automation you choose to run yourself. (TypeTorch's own packages are released by tag-triggered workflows:
+[Releases](../README.md#releases).)

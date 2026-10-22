@@ -40,7 +40,7 @@ Nothing here touches your live game until step 8, the cut-over.
 
 ## 4. Test in Studio
 
-- [ ] On the copy place: `bun run watch` and `bun run studio`, Play ([Testing in Studio](studio-testing.md)).
+- [ ] On the copy place: `bun run typetorch serve` with the Studio plugin, Play ([Testing in Studio](studio-testing.md)).
 - [ ] Dev menu > Reload, twice: `persist` state and player data survive.
 
 ## 5. Install the kernel in the copy
