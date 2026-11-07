@@ -144,7 +144,7 @@ The `session` row written when a player joins carries all of Roblox's join data 
 |---|---|---|
 | `from` | | `direct`, `teleport`, `teleport_game`, `referral`, `share`, `follow`, or `notification` (a [notification](notifications.md) tap whose launch data verified) |
 | `nid`, `nk` | the launch data | the notification's send id and kind, only with `from = "notification"` |
-| `launch` | LaunchData | `notification` (verified), `tt_bad` (starts with `tt1n.` but fails the check; `launch_bad` says why: `sig`, `user`, `old`, `format`), or your game's own launch data: its first 32 characters, with `launch_len` |
+| `launch` | LaunchData | `notification` (verified), `tt_bad` (starts with `tt1n.` but fails the check; `launch_bad` says why: `sig`, `user`, `old`, `format`), or, for your game's own launch data, its first 32 characters only when the analytics setting `joinLaunchPrefix` is `true` (in the settings record's `backend.analytics`; default off, since launch data can hold anything). Its length is always kept as `launch_len` |
 | `src_place`, `src_game` | SourcePlaceId, SourceGameId | public ids |
 | `ref` | ReferredByPlayerId | the referrer's pid when this backend has seen them, else `"other"`; never a UserId |
 | `follow` | FollowUserId | the same treatment |
@@ -156,7 +156,9 @@ The `session` row written when a player joins carries all of Roblox's join data 
 | `verified` | HasVerifiedBadge | |
 | `membership` | MembershipType | its name |
 
-No raw UserId of another player leaves the game: the row's own pid stays its only identity.
+No raw UserId of another player leaves the game: the row's own pid stays its only identity. Other players' pids
+(`ref`, `follow`, `party_pids`) cost a DataStore read each, so a join looks up at most 2 of them; the rest count as
+`"other"` or aren't listed.
 
 ### Notification rows
 
@@ -175,7 +177,7 @@ row still counts). No row holds a UserId.
 | `planned` | backend | `nid`, `k`, `for` (the send time), `why` (`asap` / `hour`) |
 | `skipped` | backend | `k`, `why` (`online`, `quiet`, `capped_day`, `capped_week`, `lapsed`, `muted`, `outranked`, `expired`, `dropped`) |
 | `sent` | backend | `nid`, `k`, `try`, `roblox_id`, `category` |
-| `failed` | backend | `nid`, `k`, `http`, `code` (e.g. `bad_template`), `final` |
+| `failed` | backend | `nid`, `k`, `http`, `code` (e.g. `bad_template`, `daily_limit`, `dup_refused`), `final` |
 | `open` | game server | `nid`, `k`, `age` (seconds since sent), `first` |
 | `open_bad` | game server | `why` (`sig`, `user`, `old`, `format`) |
 | `played` | game server | `nid`, `k`, `secs` (the opened session's length) |

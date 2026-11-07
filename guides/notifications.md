@@ -31,6 +31,8 @@ them); the message text is a **notification string** you create by hand in the C
 5. **The game code**: `want` / `drop` on the server, `promptOptIn` on the client, `onOpen` for taps.
 6. **Turn off dry run** when the rows look right: the backend's Settings page, `notify.dryRun` (on by default).
 
+Updating: release the **backend first**, then the framework and the CLI (they need its routes).
+
 ## Kinds
 
 A kind is a reason to notify, declared once in `typetorch.json` and pushed to the backend:
@@ -61,7 +63,7 @@ A kind is a reason to notify, declared once in `typetorch.json` and pushed to th
 | `perWeek` | 1-7: a cap for `daily` kinds |
 | `maxWaitHours` | how long a `preferred_hour` send may wait for that hour |
 | `category` | Roblox's dashboard groups impressions and clicks by it; default the kind name |
-| `allowTemplate` | `want(user, kind, { template })` may pick another message id for this kind |
+| `allowTemplate` | `want(user, kind, { template })` may pick another message id for this kind. A game-supplied message id that Roblox doesn't know halts only that message id, not the kind |
 | `beats` | `{ "kinds": ["streak"], "withinHours": 4 }`: outranks those kinds only within its last N hours. Off by default |
 
 Top level: `dailyCap` 1-3 (only 1 matters while Roblox allows 1), `quietAfterLeaveMinutes`, `lapse` (in ascending
@@ -108,10 +110,12 @@ const disconnect = notify.onOpen((player, open) => {
   the backend refuses a missing one (`missing_param`) or an extra one (`unknown_param`). A kind without `text` isn't
   checked.
 - `want` is an upsert per (user, kind, key): the last write wins. `at` is the earliest send time (default now),
-  `until` the latest. Works for offline users.
+  `until` the latest, and it must be after `at` (refused otherwise). Works for offline users.
 - Intents are batched like analytics (a swap-safe queue, flushed every `flushSeconds` and at 200 items) to the backend
   with the game key. Presence is added for you on join and leave, so nobody gets a notification while in the game or
-  just after leaving.
+  just after leaving. Game servers re-send "online" for every player still in the server every 3 hours; the backend
+  treats an "online" older than `notify.presenceStaleHours` (default 6) as gone, so a server that crashed without its
+  leave events doesn't block those players forever.
 - `onOpen` carries `data`, not the intent's `key` (the launch data has a 200-byte budget). Put what you need in `data`.
 - In Studio, or with no backend in the settings record, nothing is sent; the rows are still written.
 
@@ -135,6 +139,10 @@ The explorer's **Notifications** page (backend) shows, per kind and day: wanted,
 or more, back the next day; the opt-in funnel (checked, shown, closed, inferred subscribed) by `where`; the queue; and
 failures. Roblox's own impressions and clicks per category are in the Creator Dashboard only; TypeTorch doesn't import
 them.
+
+**Per player**: the page also looks up one player (by UserId, pid or username, owners only; the route is
+`GET /v1/notify/user?uid=|pid=|name=`): their consent (opt-in checks, prompts and the inferred answer, with dates), the
+notifications they were sent (with opened / played) and their pending intents.
 
 A tap that verifies also marks the join row: `from = "notification"`, `nid`, `nk` (the kind). The session's `played`
 row gives its length, and every other row of that session shares its `sid`, so "what they did after the tap" is a join on
@@ -171,8 +179,9 @@ bun run typetorch notify resume streak
 ## Dry run
 
 A new backend starts in **dry run** (`notify.dryRun`): it plans and counts everything and writes the rows, but never
-calls Roblox. Use it to check what would go out (`typetorch notify status`, the Notifications page), then turn it off on
-the backend's Settings page. Turn it back on any time; `notify pause` stops planning sends altogether.
+calls Roblox. Intents stay **pending** in dry run, so each one is really sent once dry run is off (if still in its
+window). Use it to check what would go out (`typetorch notify status`, the Notifications page), then turn it off on the
+backend's Settings page. Turn it back on any time; `notify pause` stops planning sends altogether.
 
 ## Templates
 
@@ -208,6 +217,16 @@ To recover:
 2. `bun run typetorch notify push`
 3. `bun run typetorch notify resume <kind>`
 
+## Other send failures
+
+- **401 / 403 from Roblox** (the backend's Open Cloud key is wrong or lacks `user.user-notification:write`): the backend
+  **halts all sending** and alerts; `typetorch notify status` shows `ALL SENDING HALTED (auth)`. Intents keep queueing.
+  Fix the key on the backend (`typetorch doctor` probes the same-named key here), then turn sending back on.
+- **400 other than "not opted in"** (a bad request for that one notification): it fails for good (`failed`, `final`),
+  with no retry.
+- **Network errors, 5xx and rate limits** are retried. A send that may have gone out before a crash and is refused as a
+  repeat is coded `dup_refused`.
+
 ## Keys and the signed tap
 
 Anyone can make a deep link with launch data, so the backend signs every notification's launch data:
@@ -217,20 +236,26 @@ tt1n.<nid>.<kind>.<userId base36>.<send time base36>.<data base64url>.<signature
 ```
 
 The signature is the first 16 bytes of HMAC-SHA256 with the notify key. On join, the framework checks: the signature
-(the current key, or the previous one for 7 days after a rotation), that the UserId is the joining player, and that it is
+(the current key, or the previous one for 14 days after a rotation: the token's own lifetime), that the UserId is the joining player, and that it is
 under 14 days old; then the backend says whether this tap is the first. Launch data that doesn't start with `tt1n.` is
 yours and left alone. A bad one is ignored and counted (`open_bad`).
 
 `typetorch notify key rotate`:
 
 1. makes a new key (32 random bytes, base64url);
-2. sends it to the backend first (`PUT /v1/notify/keys`, with the old key as `previous`), so the backend accepts both
-   while servers catch up;
-3. signs it into the [settings record](settings.md) as `backend.notify.keys` with both prod keys.
+2. signs it into the [settings record](settings.md) first, as `backend.notify.keys = { current: new, previous: old,
+   since }` with both prod keys, and pings the servers. Game servers are the only ones that verify taps, so they must
+   know the new key before anything is signed with it;
+3. then sends the same keys to the backend (`PUT /v1/notify/keys`), which signs with the new key from then on.
+
+If step 3 fails, nothing breaks: servers accept both keys and the backend keeps signing with the old one (still
+`previous`). Fix the cause and run `bun run typetorch notify key rotate --backend-only`, which sends the record's keys.
+With `--no-ping`, servers pick up the new key on their next settings read (within about a minute), so the CLI leaves step
+3 to you: run `--backend-only` after that minute.
 
 The key is never printed: the CLI shows a fingerprint (the first 8 hex of its SHA-256). It lives only in the signed
-record (server only, never replicated) and the backend's key file. Rotating again within 7 days drops the older previous
-key, so taps on notifications signed with it fail (the CLI warns). Rotation needs the same keys and scopes as every
+record (server only, never replicated) and the backend's key file. The previous key stays valid for 14 days. Rotating
+again within 14 days drops the older previous key, so taps on notifications signed with it fail (the CLI warns). Rotation needs the same keys and scopes as every
 settings write (both prod key files, the deploy key's DataStore scopes).
 
 ## Open questions (spikes)
