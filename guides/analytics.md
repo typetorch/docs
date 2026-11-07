@@ -117,7 +117,7 @@ contract, with every event and its props, is
 |---|---|
 | `v` | format version, `1` |
 | `t` | unix ms, on the game server's clock (client events are corrected) |
-| `kind` | `session`, `tech`, `zone`, `funnel`, `purchase`, `currency`, `state`, `experiment`, `custom`, `recording_meta`, `fleet` |
+| `kind` | `session`, `tech`, `zone`, `funnel`, `purchase`, `currency`, `state`, `experiment`, `custom`, `recording_meta`, `fleet`, `notify` ([below](#notification-rows)) |
 | `name` | the event name (1-64 characters) |
 | `pid`, `sid` | random player id and session id (`""` on server-only events) |
 | `job`, `srv`, `place` | JobId, server type (`public`, `private`, `reserved`, `studio`), PlaceId |
@@ -127,7 +127,7 @@ contract, with every event and its props, is
 | `state` | the player's state after the event, `zone:<z>\|screen:<s>\|activity:<a>` |
 | `exp` | the player's experiments as JSON, `{"onboarding":"short"}` |
 | `sexp` | the server's experiment: the artifact id of an A/B pin, or `""` |
-| `src` | `server` or `client` |
+| `src` | `server` or `client` (`backend` on rows the backend writes itself: [notification rows](#notification-rows)) |
 | `props` | the event's own data as JSON text, at most 4096 bytes |
 
 **recordings** (first sessions): `v`, `t`, `pid`, `sid`, `job`, `art`, `chunk`, `codec` (`tt-rec-1`), `data`
@@ -135,6 +135,53 @@ contract, with every event and its props, is
 
 Delivery is at least once: a hot swap during a request sends that batch again. The DuckDB server drops exact
 duplicates when it writes each day's file.
+
+### The join row
+
+The `session` row written when a player joins carries all of Roblox's join data and the player facts, in `props`:
+
+| Prop | From | Note |
+|---|---|---|
+| `from` | | `direct`, `teleport`, `teleport_game`, `referral`, `share`, `follow`, or `notification` (a [notification](notifications.md) tap whose launch data verified) |
+| `nid`, `nk` | the launch data | the notification's send id and kind, only with `from = "notification"` |
+| `launch` | LaunchData | `notification` (verified), `tt_bad` (starts with `tt1n.` but fails the check; `launch_bad` says why: `sig`, `user`, `old`, `format`), or your game's own launch data: its first 32 characters, with `launch_len` |
+| `src_place`, `src_game` | SourcePlaceId, SourceGameId | public ids |
+| `ref` | ReferredByPlayerId | the referrer's pid when this backend has seen them, else `"other"`; never a UserId |
+| `follow` | FollowUserId | the same treatment |
+| `party`, `party_pids` | Members | the party's size, and the pids of members seen before |
+| `ctx`, `ctx_item`, `ctx_asset`, `ctx_outfit`, `ctx_asset_type` | GameJoinContext | JoinSource, ItemType, AssetId, OutfitId, AssetType |
+| `tp`, `tp_bytes` | TeleportData | whether there is any, and its JSON size (never the content) |
+| `age_days` | AccountAge | exact days, next to the age bucket |
+| `locale` | Player.LocaleId | |
+| `verified` | HasVerifiedBadge | |
+| `membership` | MembershipType | its name |
+
+No raw UserId of another player leaves the game: the row's own pid stays its only identity.
+
+### Notification rows
+
+[Notifications](notifications.md) write rows with `kind = "notify"`. The game server writes the framework's; the
+backend writes its own with `src = "backend"`, `sid` empty, and `pid` from the UserId it has seen before (else empty: the
+row still counts). No row holds a UserId.
+
+| `name` | Written by | Props |
+|---|---|---|
+| `want` | game server | `k` (kind), `key` (the first 12 hex of the key's SHA-256), `at`, `until`, `offline` |
+| `drop` | game server | `k`, `key`, `why` (the game's) |
+| `optin_check` | game server (from the client) | `can`, `where`, `err` |
+| `optin_shown` | game server | `where` |
+| `optin_closed` | game server | `where`, `secs` (how long the prompt was up) |
+| `optin_inferred` | backend | `state`: `subscribed` (a first send was accepted) or `not_subscribed` (Roblox said "not opted in") |
+| `planned` | backend | `nid`, `k`, `for` (the send time), `why` (`asap` / `hour`) |
+| `skipped` | backend | `k`, `why` (`online`, `quiet`, `capped_day`, `capped_week`, `lapsed`, `muted`, `outranked`, `expired`, `dropped`) |
+| `sent` | backend | `nid`, `k`, `try`, `roblox_id`, `category` |
+| `failed` | backend | `nid`, `k`, `http`, `code` (e.g. `bad_template`), `final` |
+| `open` | game server | `nid`, `k`, `age` (seconds since sent), `first` |
+| `open_bad` | game server | `why` (`sig`, `user`, `old`, `format`) |
+| `played` | game server | `nid`, `k`, `secs` (the opened session's length) |
+
+Roblox doesn't tell the game whether a player accepted the opt-in prompt, so `optin_closed` never says; the backend's
+`optin_inferred` is the only answer.
 
 ## Backends
 
