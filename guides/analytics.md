@@ -214,7 +214,7 @@ row still counts). No row holds a UserId.
 | `optin_closed` | game server | `where`, `secs` (how long the prompt was up) |
 | `optin_inferred` | backend | `state`: `subscribed` (a first send was accepted) or `not_subscribed` (Roblox said "not opted in") |
 | `planned` | backend | `nid`, `k`, `for` (the send time), `why` (`asap` / `hour`) |
-| `skipped` | backend | `k`, `why` (`online`, `quiet`, `capped_day`, `capped_week`, `lapsed`, `muted`, `outranked`, `expired`, `dropped`) |
+| `skipped` | backend | `k`, `why` (`online`, `quiet`, `capped_day`, `capped_week`, `lapsed`, `muted`, `outranked`, `expired`, `dropped`, `pref_off` (the player switched the kind off: `setOff`), `repeat`) |
 | `sent` | backend | `nid`, `k`, `try`, `roblox_id`, `category` |
 | `failed` | backend | `nid`, `k`, `http`, `code` (e.g. `bad_template`, `daily_limit`, `dup_refused`), `final` |
 | `open` | game server | `nid`, `k`, `age` (seconds since sent), `first` |
