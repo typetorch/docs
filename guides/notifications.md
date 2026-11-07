@@ -19,6 +19,10 @@ you under it; delivery isn't guaranteed (Roblox scales reach with how often play
 them); the message text is a **notification string** you create by hand in the Creator Dashboard, with
 `{placeholders}`. There is no API to create those strings: see [Templates](#templates).
 
+Adding them to a game for the first time? The [Playbook](#playbook-adding-notifications-to-a-game) walks through choosing
+kinds that pass Roblox's rules, testing the strings against Roblox's text filter, the game code pattern, preferences and the
+end-to-end check.
+
 ## Setup
 
 1. **The backend** (`typetorch backend setup`, [Fleet and alerts](fleet-and-alerts.md)) with an Open Cloud key that has
@@ -221,8 +225,10 @@ each kind's string is made by hand once. `typetorch.json` holds its `text`; the 
 4. `bun run typetorch notify push`. Until then, `push` warns about every kind with a text but no template id: such a kind
    is planned and counted, never sent.
 
-Changed a text? Make a new string in the dashboard (keep the old one until no intent needs it), `templates set` the new id,
-then push.
+Changed a text? Editing a string in the dashboard keeps its message id and changes what is sent at once (2026-11-07), so
+update the kind's `text` to the same words and push. For a different meaning, make a new string instead, `templates set`
+the new id, then push. Re-test with `typetorch notify test` either way: Roblox's text filter judges the whole rendered text
+([Playbook](#2-make-the-strings-and-test-each-one)).
 
 ## A halted kind (bad template)
 
@@ -248,6 +254,9 @@ To recover:
   Fix the key on the backend (`typetorch doctor` probes the same-named key here), then turn sending back on.
 - **400 other than "not opted in"** (a bad request for that one notification): it fails for good (`failed`, `final`),
   with no retry.
+- **400 `INVALID_ARGUMENT` "… contains words blocked by the text filter"**: Roblox filtered the rendered text (the template
+  with its params). Also final. Common cause: marketing words such as "FREE" next to an item name; see the
+  [Playbook](#2-make-the-strings-and-test-each-one).
 - **Network errors, 5xx and rate limits** are retried. A send that may have gone out before a crash and is refused as a
   repeat is coded `dup_refused`.
 
@@ -282,17 +291,116 @@ record (server only, never replicated) and the backend's key file. The previous 
 again within 14 days drops the older previous key, so taps on notifications signed with it fail (the CLI warns). Rotation needs the same keys and scopes as every
 settings write (both prod key files, the deploy key's DataStore scopes).
 
+## Playbook: adding notifications to a game
+
+What we learned shipping them in a real game (Zomvival, 2026-11-07). Follow it in order and a new game needs about a day.
+
+### 1. Pick the kinds (Roblox's rules first)
+
+Roblox reviews and throttles experiences by these
+([guidelines](https://create.roblox.com/docs/production/promotion/experience-notifications)), so every kind must pass all of them:
+
+- **Personal.** About the player's own state: their gift, their streak, their unclaimed reward, someone passing *them* on a
+  board. Never a broadcast ("Update out!", "Event live!"): those go everyone at once and are exactly what gets throttled.
+- **No ads, sales, Robux or purchases.** No "50 % off", no "buy", no streak-revive offers, no boost-expiry nags.
+- **No fake urgency, no "FREE".** "Claim before the daily reset" is fine when it is true. "FREE" next to an item name gets
+  the whole message blocked by Roblox's text filter (below).
+- **Nothing to players who stopped playing.** Keep every intent's window short (hours to a few days) and let `lapse` taper
+  the rest; a player gone for weeks is where "come back" spam starts.
+- **Fewer is better.** Roblox scales reach by how often players open them. One good kind beats five weak ones.
+
+A list that passed review, in priority order (lower wins on a day with several due):
+
+| Kind | Priority | When it is wanted | Window | Repeat |
+|---|---|---|---|---|
+| `gift_named` "{gift} is waiting for you in your mailbox!" | 10 | a gift letter written to an offline player; at every leave, each unopened gift | now .. 7 days | `per_key` (letter id) |
+| `streak_end` "Your {streak}-day streak ends soon. Play a round to keep it!" | 20 | at a leave, a streak of 3+ days | 3 h .. 15 min before the day to play on ends | `daily`, `asap` |
+| `lb_passed` "{name} passed you on the {board} leaderboard. Take your spot back!" | 30 | a board refresh where a top-10 user (not online) dropped a place to someone from below; never a Robux board | now .. 24 h, key = the board | `daily`, `perWeek` 2 |
+| `quests_ready` "Quest rewards are waiting: {count} finished. Claim them before the daily reset!" | 40 | at a leave, finished but unclaimed quests | now .. the reset | `daily`, `perWeek` 3 |
+| `daily_ready` "Your day {day} reward is ready. Join to claim it!" | 50 | at a leave, a player who claimed one in the last 3 days | from when it opens, 36 h | `daily`, `perWeek` 3 |
+
+### 2. Make the strings and test each one
+
+1. `typetorch notify templates`, paste each text into **Engagement > Notifications**, `templates set <kind> <id>`,
+   `typetorch notify push` ([Templates](#templates)).
+2. **Send every kind once to yourself with realistic params**: `typetorch notify test <yourUserId> <kind> --param name=value`.
+   A test send skips the caps and goes out at once. Then check `GET /v1/notify/user?uid=<userId>` (admin token) or the
+   explorer's player page: `sent` + `http 200`.
+3. **Roblox's text filter runs on the whole rendered message, placeholders filled in.** A blocked one answers
+   `400 INVALID_ARGUMENT` "######## contains words blocked by the text filter." The `#` mask is as long as the rendered
+   text, so you can tell which variant it filtered. It is final (no retry), so a filtered notification is simply lost.
+   Seen in practice: "FREE {gift} is waiting…" was blocked with `{gift}` = "Elite for 7 days" and "Elite", while the same
+   gift passed without "FREE". Keep params plain nouns ("Elite for 7 days", "$500", "3"), never marketing words, and
+   re-test after any text edit.
+4. **Editing a string in the dashboard keeps its message id and takes effect at once.** Update the kind's `text` in
+   `typetorch.json` to the same words and `notify push` (the backend checks params against it).
+5. **Test on the owner's account only for content.** The universe owner skips Roblox's 1-a-day limit, so two sends a day
+   reaching you prove nothing about the limit.
+
+### 3. Game code: want from the save, drop when the reason is gone
+
+Keep the rules in a pure module (no services, no clock: pass `now`), so a bun sim can test them, and keep the service thin:
+
+```ts
+// Each kind's reason from the player's own save: one want OR one drop per kind and key, so the backend's copy is exactly the save's
+export function planFromData(data: PlayerData, userId: number, now: number): { wants: Want[]; drops: Drop[] }
+
+// Server: at every leave (the profile's last write), plus when a preference changes
+playerData.ProfileReleasing.Connect((profile) => {
+	const plan = planFromData(profile.Data, profile.UserId, os.time());
+	for (const d of plan.drops) notify.drop(profile.UserId, d.kind, d.key, d.why);
+	for (const w of plan.wants) notify.want(profile.UserId, w.kind, { key: w.key, at: w.at, until: w.until, params: w.params });
+});
+```
+
+- **State kinds** (streak, quests, daily) come from the save at the leave. Use key `""` (one intent per kind, upserted), and
+  `drop` when the reason is gone (streak too short, nothing to claim), so a stale reason never goes out.
+- **Event kinds** (a gift to an offline player, a leaderboard pass) are wanted where the event happens, by UserId, from any
+  server. Use a stable key (the letter id, the board) so every server seeing the same event upserts one intent.
+- **No need to drop on join.** The backend never sends to a player who is online or within `quietAfterLeaveMinutes` of
+  leaving, and the next leave re-plans everything.
+- **Windows**: `at` = the earliest moment it is true, `until` = when it stops being worth saying. A window under ~30 min
+  isn't worth wanting.
+
+### 4. Player preferences
+
+Give players a toggle per kind (Settings), stored in their save. Gate the save-planned kinds in `planFromData` (an off kind
+is dropped), **and** send the whole off set with `setOff(user, kinds)` at every join and every change: event kinds are wanted
+by servers that can't read the save, and the backend skips any intent of an off kind (`skipped`, why `pref_off`, kept, so
+switching it back on resumes it).
+
+### 5. The opt-in prompt
+
+`promptOptIn(where)` shows Roblox's prompt, at most once a session; Roblox itself shows it at most once per 30 days and never
+to under-13s. Ask at a natural moment that explains the value (e.g. when the player closes their mailbox: "get told when a
+gift arrives"), plus a button in Settings. The answer is not told to the game: the backend learns it from its first send
+(`optin_inferred`).
+
+### 6. Check it end to end
+
+1. A test send reaches your device (`notify test`).
+2. Tap it: an `open` row (the verified token, `onOpen` fires) and, after you play, `played`.
+3. The explorer's **Notifications** page shows the funnel; the player page shows each send, its status, opened / played.
+4. A gift to yourself while offline: the `want` row, then a `sent` after `quietAfterLeaveMinutes`.
+
+If you call Open Cloud yourself (outside TypeTorch): `join_experience` and `analytics_data` go **inside** `payload`
+(the API reference's `UserNotification_Payload`). At the top level, as the Open Cloud guide's curl example has it, Roblox
+answers 200 and silently drops both, so taps carry no launch data and the dashboard has no category.
+
 ## Open questions (spikes)
 
 What TypeTorch assumes until these are measured on a test universe:
 
 | # | Question | Assumed now |
 |---|---|---|
-| S4 | Does the launch data survive every path (phone app, desktop app, web, first install)? | it does; expect some "clicked but no open row" |
+| S4 | Does the launch data survive every path (phone app, web, first install)? | it does; expect some "clicked but no open row" |
 | S6 | What `JoinSource` does a notification tap have? | nothing depends on it; it is logged as `ctx` on the join row |
 | S3 (partly) | The exact refusal for a second send in a day, on a non-owner account | HTTP 429 `RESOURCE_EXHAUSTED` with "1 notification per recipient" (below) |
 
 Settled (measured on a test universe, 2026-11-07):
+
+- **S4, desktop**: the launch data arrives on a tap (desktop app and browser) once `join_experience` is inside `payload`;
+  at the top level Roblox drops it silently (the backend sends the nested shape since 2026-11-07).
 
 - **S1, not opted in**: HTTP 400 `FAILED_PRECONDITION` "not opted in". The backend mutes the user for 7 days and writes
   `optin_inferred {state: "not_subscribed"}`.
