@@ -6,16 +6,17 @@ backend decides WHEN and WHAT and sends; the framework checks the tap and writes
 no signer and no funnel.
 
 - Your game server queues **intents** (`want` / `drop`), also for players who are offline.
-- The [backend](https://github.com/typetorch/backend) plans each user's next send (Roblox allows **1 a day per user per
-  experience**), sends it through Open Cloud with a **signed launch data token**, and retries.
+- The [backend](https://github.com/typetorch/backend) plans each user's next send (**at most `dailyCap` a day per user**,
+  1 by default), sends it through Open Cloud with a **signed launch data token**, and retries.
 - When a player taps it, the framework verifies the token on the game server and calls your `onOpen`.
 - Every step is an analytics row (`kind = "notify"`), so the funnel (wanted, sent, opened, played) is on the explorer's
   **Notifications** page with no extra code.
 
-Roblox rules that shape all of this: only players who **opted in** (13 and over) get them; at most 1 per user per day per
-experience; delivery isn't guaranteed (Roblox scales reach with how often players engage with them); the message text is a
-**notification string** you create by hand in the Creator Dashboard (Engagement > Notifications), with `{placeholders}`.
-There is no API to create those strings.
+Roblox rules that shape all of this: only players who **opted in** (13 and over) get them; Roblox documents 1 per user
+per day per experience, but its API doesn't refuse a second send (it is at most dropped silently at delivery), so
+TypeTorch's `dailyCap` is the guard; delivery isn't guaranteed (Roblox scales reach with how often players engage with
+them); the message text is a **notification string** you create by hand in the Creator Dashboard, with
+`{placeholders}`. There is no API to create those strings: see [Templates](#templates).
 
 ## Setup
 
@@ -23,8 +24,9 @@ There is no API to create those strings.
    the scope `user.user-notification:write`: `OPENCLOUD_NOTIFY_KEY` in the backend's environment, else its
    `OPENCLOUD_API_KEY`. `typetorch doctor` checks the scope on the same-named key in your game repo's `.env` (an empty
    request that can't send anything).
-2. **The notification strings**: one per kind in the Creator Dashboard. Copy each message id.
-3. **The kinds** in `typetorch.json` (below), then `typetorch notify push`.
+2. **The kinds** in `typetorch.json` (below), each with its `text`.
+3. **The notification strings**: `typetorch notify templates`, make each one in the Creator Dashboard, then
+   `typetorch notify templates set <kind> <message_id>` ([Templates](#templates)). Then `typetorch notify push`.
 4. **The signing key**: `typetorch notify key rotate` (once; again whenever you want a new key).
 5. **The game code**: `want` / `drop` on the server, `promptOptIn` on the client, `onOpen` for taps.
 6. **Turn off dry run** when the rows look right: the backend's Settings page, `notify.dryRun` (on by default).
@@ -40,10 +42,10 @@ A kind is a reason to notify, declared once in `typetorch.json` and pushed to th
   "lapse": [[14, 7], [30, 2], [60, 1]],   // days since last seen -> max sends a week; past the last = stop
   "unopenedBackoff": { "after": 5, "factor": 0.5, "days": 14 },
   "kinds": {
-    "gift_new":      { "template": "<message_id>", "priority": 10, "repeat": "per_key",  "send": "preferred_hour", "maxWaitHours": 48 },
+    "gift_new":      { "text": "{sender} sent you {gift}!", "template": "<message_id>", "priority": 10, "repeat": "per_key",  "send": "preferred_hour", "maxWaitHours": 48 },
     "gift_expiring": { "template": "<message_id>", "priority": 20, "repeat": "per_key",  "send": "asap" },
     "day2":          { "template": "<message_id>", "priority": 30, "repeat": "once_ever" },
-    "streak":        { "template": "<message_id>", "priority": 60, "repeat": "daily" },
+    "streak":        { "text": "Your {user-streak-remaining} day streak ends soon", "template": "<message_id>", "priority": 60, "repeat": "daily" },
     "daily":         { "template": "<message_id>", "priority": 70, "repeat": "daily",    "perWeek": 3 }
   }
 }
@@ -51,6 +53,7 @@ A kind is a reason to notify, declared once in `typetorch.json` and pushed to th
 
 | Field | Meaning |
 |---|---|
+| `text` | the notification string's text: at most 99 characters, `{placeholders}` named `a-z A-Z 0-9 _ -` (1-32 characters). You paste it into the Creator Dashboard ([Templates](#templates)); the backend checks each intent's `params` against its placeholders |
 | `template` | the notification string's message id. A kind without one is planned and counted, never sent |
 | `priority` | 0-1000, **lower wins** when several are due for one user on one day. Put event kinds (a new gift) above recurring ones (a streak reminder): a streak can go any day |
 | `repeat` | `once_ever` (per user, forever), `per_key` (once per intent key, e.g. per gift id), `daily` (at most once a day) |
@@ -66,7 +69,8 @@ days; players who drift away hear from you less, then not at all), `unopenedBack
 send `factor` as often for `days`).
 
 Rules (the CLI checks them whenever it reads `typetorch.json`; the backend checks them again on push): kind names are
-1-24 characters of `a-z 0-9 _`; `custom` is reserved for one-offs; template at most 128 characters; unknown fields are
+1-24 characters of `a-z 0-9 _`; `custom` is reserved for one-offs; template at most 128 characters; `text` at most 99
+characters with every `{` closed and valid placeholder names; unknown fields are
 refused, so a typo can't silently do nothing.
 
 ## In game code
@@ -82,7 +86,7 @@ const notify = TypeTorch.notifications(); // server
 notify.want(recipientUserId, "gift_new", {
 	key: letterGuid,                       // one intent per key; want again = update it
 	until: expiresAt,                      // unix seconds; default now + 7 days
-	params: { gift: "5 Z-Coins" },         // the string's {placeholders}: at most 8, values at most 64 characters
+	params: { sender: "Ava", gift: "5 Z-Coins" }, // exactly the text's {placeholders}: at most 8, values at most 64 characters
 	data: "mail:" + letterGuid,            // at most 64 bytes, handed back to onOpen on the tap
 });
 
@@ -100,6 +104,9 @@ const disconnect = notify.onOpen((player, open) => {
 });
 ```
 
+- `params` must name exactly the placeholders of the kind's `text` (dashes allowed: `{ "user-streak-remaining": "4" }`):
+  the backend refuses a missing one (`missing_param`) or an extra one (`unknown_param`). A kind without `text` isn't
+  checked.
 - `want` is an upsert per (user, kind, key): the last write wins. `at` is the earliest send time (default now),
   `until` the latest. Works for offline users.
 - Intents are batched like analytics (a swap-safe queue, flushed every `flushSeconds` and at 200 items) to the backend
@@ -140,6 +147,8 @@ All of them use `typetorch.json` `backend.url` and `TYPETORCH_ADMIN_TOKEN` from 
 ```sh
 bun run typetorch notify push                       # typetorch.json notifications -> the backend (checked first)
 bun run typetorch notify push --dry-run             # show what would be pushed
+bun run typetorch notify templates                  # each kind's text to paste in the Creator Dashboard
+bun run typetorch notify templates set streak <message_id>   # write the new id into typetorch.json
 bun run typetorch notify status                     # on / paused, dry run, rate, keys (set or not), queue, 24 h, each kind
 bun run typetorch notify test 123456789 gift_new --param gift="5 Z-Coins" --data mail:42
 bun run typetorch notify send 123456789 <message_id> --param name=value
@@ -153,7 +162,7 @@ bun run typetorch notify resume streak
 - `test` sends one notification of a kind now, **bypassing the caps** (marked `test`). Dry run still applies.
 - `send` is a one-off with any message id, as kind `custom` (the message id is its category). It **respects** the
   1-a-day rule and mutes, so it may answer "not sent" with the reason.
-- `--param name=value` can be repeated (at most 8; names `a-z A-Z 0-9 _`, values at most 64 characters); `--data` is at
+- `--param name=value` can be repeated (at most 8; names `a-z A-Z 0-9 _ -`, values at most 64 characters); `--data` is at
   most 64 bytes.
 - `pause` / `resume` set the backend's runtime setting `notify.enabled` (with a kind: `notify.kinds.<kind>.enabled`),
   the same switches as its Settings page. Every change is audited.
@@ -164,6 +173,23 @@ bun run typetorch notify resume streak
 A new backend starts in **dry run** (`notify.dryRun`): it plans and counts everything and writes the rows, but never
 calls Roblox. Use it to check what would go out (`typetorch notify status`, the Notifications page), then turn it off on
 the backend's Settings page. Turn it back on any time; `notify pause` stops planning sends altogether.
+
+## Templates
+
+Roblox has no API that creates notification strings (the Creator Dashboard's own endpoint needs a browser login), so
+each kind's string is made by hand once. `typetorch.json` holds its `text`; the CLI does the rest of the bookkeeping:
+
+1. `bun run typetorch notify templates` prints every kind: its text on its own lines (copy it as it is, placeholders
+   included), its placeholders, and whether it has a `template` id yet. It also prints the link to the experience in the
+   Creator Dashboard.
+2. There, open **Engagement > Notifications** and create a notification string per missing kind: paste the text.
+3. Copy the new string's message id and run `bun run typetorch notify templates set <kind> <message_id>`. It writes
+   `notifications.kinds.<kind>.template` into `typetorch.json` and changes nothing else in the file.
+4. `bun run typetorch notify push`. Until then, `push` warns about every kind with a text but no template id: such a kind
+   is planned and counted, never sent.
+
+Changed a text? Make a new string in the dashboard (keep the old one until no intent needs it), `templates set` the new id,
+then push.
 
 ## A halted kind (bad template)
 
@@ -177,8 +203,8 @@ typo, or the string was deleted in the Creator Dashboard). That is a config erro
 
 To recover:
 
-1. Fix `notifications.kinds.<kind>.template` in `typetorch.json` (copy the message id again from Engagement >
-   Notifications).
+1. Fix the id: copy the message id again from Engagement > Notifications (or make the string again from
+   `typetorch notify templates`), then `bun run typetorch notify templates set <kind> <message_id>`.
 2. `bun run typetorch notify push`
 3. `bun run typetorch notify resume <kind>`
 
@@ -213,11 +239,18 @@ What TypeTorch assumes until these are measured on a test universe:
 
 | # | Question | Assumed now |
 |---|---|---|
-| S2 | Roblox's rate limit for sends, and its `429` | 10 sends / s (`notify.rate`); on a `429` the rate halves, `Retry-After` is honoured, then +10 % a minute back up |
-| S3 | Is "1 a day" a rolling 24 h or a UTC day, and what is the error when over? | `notify.clock = rolling24` (next send at least 24 h after the last); `utc_day` is the other choice. A `429` with code `RESOURCE_EXHAUSTED` that mentions a daily / per-user limit re-plans the send for the next day |
 | S4 | Does the launch data survive every path (phone app, desktop app, web, first install)? | it does; expect some "clicked but no open row" |
 | S6 | What `JoinSource` does a notification tap have? | nothing depends on it; it is logged as `ctx` on the join row |
 
-Settled: a user who isn't opted in gets HTTP 400 `FAILED_PRECONDITION` "not opted in" (S1): the backend mutes them for 7
-days and writes `optin_inferred {state: "not_subscribed"}`. A wrong message id gets 404 (S1b): [a halted
-kind](#a-halted-kind-bad-template).
+Settled (measured on a test universe, 2026-11-07):
+
+- **S1, not opted in**: HTTP 400 `FAILED_PRECONDITION` "not opted in". The backend mutes the user for 7 days and writes
+  `optin_inferred {state: "not_subscribed"}`.
+- **S1b, wrong message id**: HTTP 404 `NOT_FOUND`: [a halted kind](#a-halted-kind-bad-template).
+- **S2, rate limit**: 4000 requests a second per key. Every answer says so in its `x-ratelimit-limit`,
+  `x-ratelimit-remaining` and `x-ratelimit-reset` headers, and the backend paces itself by them (never more in a window
+  than the last `remaining`; it waits for the reset at 0). `notify.rate` is only an optional lower ceiling of our own. A
+  `429` still halves the pace and honours `Retry-After`.
+- **S3, 1 a day**: the API doesn't refuse a second send to the same user on the same day (both answer 200), and has no
+  daily-limit error. So **`dailyCap` is the only guard**. `notify.clock` picks its day: `rolling24` (default: the next
+  send at least 24 h after the last) or `utc_day`.
