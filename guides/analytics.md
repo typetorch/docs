@@ -160,6 +160,43 @@ No raw UserId of another player leaves the game: the row's own pid stays its onl
 (`ref`, `follow`, `party_pids`) cost a DataStore read each, so a join looks up at most 2 of them; the rest count as
 `"other"` or aren't listed.
 
+#### `jd`: the raw join data
+
+Next to the summary props above, the join row keeps a privacy-safe copy of `Player:GetJoinData()` itself as the prop
+`jd`, field by field, so you can see exactly what Roblox handed the server (for example, whether a notification's launch
+data arrived at all). It is on by default; [`backend.analytics.joinData`](settings.md#join-data-backendanalyticsjoindata)
+turns it off (`"summary"`) or trims the join row further (`"off"`).
+
+| `jd` field | From `GetJoinData()` | What is kept |
+|---|---|---|
+| `keys` | the table's top-level keys | every key Roblox returned, sorted |
+| `LaunchData` | LaunchData | the string, cut to 200 bytes (Roblox's own limit) at a UTF-8 boundary. Present only when Roblox sent the key, even as `""` |
+| `LaunchDataLen` | LaunchData | its full length in bytes, before any cut |
+| `SourcePlaceId`, `SourceGameId` | the same | numbers (public ids), present only when Roblox sent them |
+| `GameJoinContext` | GameJoinContext | every field as a string (enum items by name). `{}` means Roblox sent the key with nothing in it; no `GameJoinContext` means it didn't send the key |
+| `TeleportData` | TeleportData | `{ bytes, type, keys }`: its JSON size, its Luau type and, for a table, its top-level keys (at most 20, each cut to 32 characters, sorted). **Never its content** |
+| `Members` | Members | `{ count, pids }`: each party member's pid, or `"other"`. Never a UserId |
+| `ReferredByPlayerId`, `FollowUserId` | the same | the player's pid, or `"other"`; absent when Roblox sent 0 or nothing. Never a UserId |
+| `other` | any key Roblox adds later | `{ "<key>": "<type name>" }`: the type only, never the value |
+| `trunc` | | `true` only when `jd` was cut to fit its cap |
+
+- **Other players are pids or `"other"`.** Looking a player's pid up costs a DataStore read; `jd` and the summary props
+  (`ref`, `follow`, `party_pids`) share the same budget of at most 2 reads per join, and one lookup per player serves
+  both. Everyone past the budget, or never seen, is `"other"`.
+- **At most 1 KB.** When the JSON is bigger, it is cut in this order until it fits, and `trunc: true` is set:
+  `TeleportData.keys` (then `TeleportData` itself), `Members.pids`, `LaunchData` (shortened; `LaunchDataLen` keeps the
+  real length), each `GameJoinContext` value (to 64 characters), then `other`.
+- **Where you see it:** the explorer's player **Timeline** shows it on the join event (pretty-printed, collapsible, with
+  a `trunc` badge when cut). The **Notifications** page's per-player view shows the opening session's `jd` next to each
+  opened notification, where the backend provides it.
+
+Example: a player tapped a notification, but Roblox dropped the launch data on the way (there is no `nid` / `nk`, and
+`from` isn't `notification`). The row's `jd` shows that the key arrived empty:
+
+```json
+{ "keys": ["GameJoinContext", "LaunchData"], "LaunchData": "", "LaunchDataLen": 0, "GameJoinContext": {} }
+```
+
 ### Notification rows
 
 [Notifications](notifications.md) write rows with `kind = "notify"`. The game server writes the framework's; the

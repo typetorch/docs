@@ -72,6 +72,39 @@ A wrong address or key in `backend` isn't rejected by anything else: game server
 If one fails, the command prints it in red with a fix, writes nothing and exits 1; `--force` writes anyway. The checks need
 a backend with `GET /v1/auth/check` (`@typetorch/backend`).
 
+## Join data (`backend.analytics.joinData`)
+
+How much of Roblox's join data (`Player:GetJoinData()`) the analytics join row keeps. It sits in the record's
+`backend.analytics` next to the other analytics dials (frameworks reading the old `analytics` field, and
+`new AnalyticsEngine({ settings })` in tests, take the same value). Servers apply a change within seconds.
+
+| Value | The join row keeps |
+|---|---|
+| `"full"` (default) | the summary props ([Analytics: the join row](analytics.md#the-join-row)) **and** `jd`, a field-by-field copy of `GetJoinData()` ([`jd`](analytics.md#jd-the-raw-join-data)) |
+| `"summary"` | the summary props only, no `jd` |
+| `"off"` | only what it kept before notifications (plans/29): `from`, `ctx`, `tp`, `party`, the age bucket, Premium, country, friends in the server, returning or not. No `jd`, and none of the newer join props |
+
+Any other value is refused with a warning and read as `"full"`.
+
+**Why `"full"` keeps LaunchData.** It is at most 200 bytes (Roblox's own limit), and it is the only way to debug
+[notification](notifications.md) and share-link routing: whether the launch data reached the server at all, and what it
+was. A notification tap whose launch data Roblox dropped looks like any direct join without it.
+
+**What `jd` never holds,** in any mode:
+
+- another player's UserId: party members, the referrer and the followed player are pids, or `"other"`;
+- TeleportData's content: only its size, type and top-level key names;
+- the value of a join-data key TypeTorch doesn't know: only its type.
+
+**Personal data in your launch data?** If your game's share links or notifications put anything personal in the launch
+data (a name, an email, an invite code tied to a person), set `"joinData": "summary"`.
+
+**`joinLaunchPrefix` is separate.** It only decides whether the summary prop `launch` keeps the first 32 characters of
+your game's own launch data (default off). `jd.LaunchData` follows `joinData` alone, so with `joinData: "full"` the launch
+data is in `jd` even when `joinLaunchPrefix` is off.
+
+No CLI command writes `joinData` yet: `backend setup` keeps any value already in `backend.analytics`.
+
 ## Live values in game code
 
 ```ts
