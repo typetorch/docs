@@ -190,8 +190,10 @@ turns it off (`"summary"`) or trims the join row further (`"off"`).
   a `trunc` badge when cut). The **Notifications** page's per-player view shows the opening session's `jd` next to each
   opened notification, where the backend provides it.
 
-Example: a player tapped a notification, but Roblox dropped the launch data on the way (there is no `nid` / `nk`, and
-`from` isn't `notification`). The row's `jd` shows that the key arrived empty:
+Example: a player tapped a notification, but the launch data never reached the server (there is no `nid` / `nk`, and
+`from` isn't `notification`). The row's `jd` shows that the key arrived empty. (This was a real case: the send put
+`join_experience` at the top level of the Open Cloud body instead of inside `payload`, so Roblox ignored it; the backend
+since puts it inside `payload`.)
 
 ```json
 { "keys": ["GameJoinContext", "LaunchData"], "LaunchData": "", "LaunchDataLen": 0, "GameJoinContext": {} }

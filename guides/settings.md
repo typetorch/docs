@@ -88,7 +88,7 @@ Any other value is refused with a warning and read as `"full"`.
 
 **Why `"full"` keeps LaunchData.** It is at most 200 bytes (Roblox's own limit), and it is the only way to debug
 [notification](notifications.md) and share-link routing: whether the launch data reached the server at all, and what it
-was. A notification tap whose launch data Roblox dropped looks like any direct join without it.
+was. A notification tap whose launch data never arrived looks like any direct join without it.
 
 **What `jd` never holds,** in any mode:
 
