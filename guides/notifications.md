@@ -5,7 +5,8 @@ that opens the game when tapped. TypeTorch runs them natively. **Your game says 
 backend decides WHEN and WHAT and sends; the framework checks the tap and writes the rows.** You write no scheduler,
 no signer and no funnel.
 
-- Your game server queues **intents** (`want` / `drop`), also for players who are offline.
+- Your game server queues **intents** (`want` / `drop`), also for players who are offline, and each player's
+  switched-off kinds (`setOff`).
 - The [backend](https://github.com/typetorch/backend) plans each user's next send (**at most `dailyCap` a day per user**,
   1 by default), sends it through Open Cloud with a **signed launch data token**, and retries.
 - When a player taps it, the framework verifies the token on the game server and calls your `onOpen`.
@@ -28,7 +29,7 @@ them); the message text is a **notification string** you create by hand in the C
 3. **The notification strings**: `typetorch notify templates`, make each one in the Creator Dashboard, then
    `typetorch notify templates set <kind> <message_id>` ([Templates](#templates)). Then `typetorch notify push`.
 4. **The signing key**: `typetorch notify key rotate` (once; again whenever you want a new key).
-5. **The game code**: `want` / `drop` on the server, `promptOptIn` on the client, `onOpen` for taps.
+5. **The game code**: `want` / `drop` (and `setOff` if players can switch kinds off) on the server, `promptOptIn` on the client, `onOpen` for taps.
 6. **Turn off dry run** when the rows look right: the backend's Settings page, `notify.dryRun` (on by default).
 
 Updating: release the **backend first**, then the framework and the CLI (they need its routes).
@@ -119,6 +120,29 @@ const disconnect = notify.onOpen((player, open) => {
 - `onOpen` carries `data`, not the intent's `key` (the launch data has a 200-byte budget). Put what you need in `data`.
 - In Studio, or with no backend in the settings record, nothing is sent; the rows are still written.
 
+### Server: kinds a player switched off
+
+If your settings let players switch notification kinds off, tell the backend with `setOff`. Checking the player's
+save before each `want` isn't enough: another server may `want` for this player while they are offline (a gift letter,
+a leaderboard pass), and it can't read their save. The backend keeps each user's off set and skips their intents of
+those kinds, whoever issued them.
+
+```ts
+// Server. Signature: setOff(user: Player | number, kinds: string[]): boolean
+notify.setOff(player, ["daily", "quests"]); // the player's whole off set
+notify.setOff(player, []);                  // every kind on again
+```
+
+- It **replaces** the user's off set each time (not a toggle): send the full list whenever the setting changes, and
+  once per join if your save is the source of truth (so a change made while the backend was unreachable catches up).
+- At most 32 kind names (1-24 of `[a-z0-9_]`); duplicates are ignored. A kind doesn't have to be pushed yet.
+- Ordered like `want` / `drop` (the item's `rev`: the latest call wins), batched and swap-safe through the same queue;
+  `false` with a warning when the arguments are refused here. Server only.
+- The backend **keeps** the skipped intents (row `skipped` with `why = "pref_off"`): switching the kind back on resumes
+  an intent whose window (`until`) is still open. A send already planned for a kind that is switched off is cancelled.
+- `typetorch notify test` sends ignore it, and so do custom one-offs (`typetorch notify send`).
+- The explorer's per-player view shows the kinds a player switched off.
+
 ### Client: the opt-in prompt
 
 ```ts
@@ -141,7 +165,7 @@ failures. Roblox's own impressions and clicks per category are in the Creator Da
 them.
 
 **Per player**: the page also looks up one player (by UserId, pid or username, owners only; the route is
-`GET /v1/notify/user?uid=|pid=|name=`): their consent (opt-in checks, prompts and the inferred answer, with dates), the
+`GET /v1/notify/user?uid=|pid=|name=`): their consent (opt-in checks, prompts and the inferred answer, with dates), the kinds they switched off (`setOff`), the
 notifications they were sent (with opened / played) and their pending intents.
 
 A tap that verifies also marks the join row: `from = "notification"`, `nid`, `nk` (the kind). The session's `played`
