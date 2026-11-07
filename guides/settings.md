@@ -19,7 +19,7 @@ apply a change within seconds, with no deploy and no place publish.
 | `access` | `members`, `revoked`, `devBadgeId` from `typetorch.json` ([who gets the dev menu](../getting-started/fresh-setup.md#11-the-dev-menu-and-who-gets-it)) | `typetorch access push` |
 | `defaultBranch`, `channels` | from `typetorch.json` | `typetorch settings push` |
 | `fleet` | derived from `backend` for kernels before 0.4: `{ url, token }`, the [fleet API](fleet-and-alerts.md) and its write-only ingest token | `typetorch backend setup` |
-| `backend` | `{ url, key, analytics? }`: the TypeTorch backend and its game key (CLI 0.9; kernels before 0.4 read the `fleet` and `analytics` sections it derives). `analytics` holds the analytics dials and the experiment overrides | `typetorch backend setup`; `typetorch experiment` for `backend.analytics.experiments` ([Analytics: experiments](analytics.md#experiments)) |
+| `backend` | `{ url, key, analytics?, notify? }`: the TypeTorch backend and its game key (CLI 0.9; kernels before 0.4 read the `fleet` and `analytics` sections it derives). `analytics` holds the analytics dials and the experiment overrides. `notify` = `{ keys: { current, previous?, since } }`: the [notification](notifications.md) launch-data signing keys (43-character base64url strings; `since` in unix seconds) | `typetorch backend setup`; `typetorch experiment` for `backend.analytics.experiments` ([Analytics: experiments](analytics.md#experiments)); `typetorch notify key rotate` for `backend.notify` ([Notifications: keys](notifications.md#keys-and-the-signed-tap)) |
 | `analytics` | the [analytics sink settings](analytics.md#settings-the-analytics-field), derived from `backend` | `typetorch backend setup` |
 | `game` | your own live values, read with `TypeTorch.liveConfig` | `typetorch settings set game.<key>` |
 
@@ -53,6 +53,8 @@ the servers.
 - Every write needs both signing key files (else: "run `typetorch keys init`") and the deploy key's DataStore scopes
   (`universe-datastores.objects:read`, `:create`, `:update`) plus `universe-messaging-service:publish` for the ping.
 - `typetorch keys rotate` and `keys resign` re-sign the record with the new keys.
+- `typetorch notify key rotate` writes `backend.notify.keys` (after it sends the new key to the backend). The keys are
+  secrets like the game key: `settings status` and `get` hide them, and `backend setup` keeps them.
 - `typetorch doctor` reads it, checks the signature and tests the `backend` address and keys in it.
 
 ### Checked before it is signed
