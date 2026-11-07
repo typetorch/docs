@@ -12,9 +12,9 @@ no signer and no funnel.
 - Every step is an analytics row (`kind = "notify"`), so the funnel (wanted, sent, opened, played) is on the explorer's
   **Notifications** page with no extra code.
 
-Roblox rules that shape all of this: only players who **opted in** (13 and over) get them; Roblox documents 1 per user
-per day per experience, but its API doesn't refuse a second send (it is at most dropped silently at delivery), so
-TypeTorch's `dailyCap` is the guard; delivery isn't guaranteed (Roblox scales reach with how often players engage with
+Roblox rules that shape all of this: only players who **opted in** (13 and over) get them; at most 1 per user per day
+per experience (refused at send time), plus an aggregate daily cap across experiences; TypeTorch's own `dailyCap` keeps
+you under it; delivery isn't guaranteed (Roblox scales reach with how often players engage with
 them); the message text is a **notification string** you create by hand in the Creator Dashboard, with
 `{placeholders}`. There is no API to create those strings: see [Templates](#templates).
 
@@ -241,6 +241,7 @@ What TypeTorch assumes until these are measured on a test universe:
 |---|---|---|
 | S4 | Does the launch data survive every path (phone app, desktop app, web, first install)? | it does; expect some "clicked but no open row" |
 | S6 | What `JoinSource` does a notification tap have? | nothing depends on it; it is logged as `ctx` on the join row |
+| S3 (partly) | The exact refusal for a second send in a day, on a non-owner account | HTTP 429 `RESOURCE_EXHAUSTED` with "1 notification per recipient" (below) |
 
 Settled (measured on a test universe, 2026-11-07):
 
@@ -251,6 +252,15 @@ Settled (measured on a test universe, 2026-11-07):
   `x-ratelimit-remaining` and `x-ratelimit-reset` headers, and the backend paces itself by them (never more in a window
   than the last `remaining`; it waits for the reset at 0). `notify.rate` is only an optional lower ceiling of our own. A
   `429` still halves the pace and honours `Retry-After`.
-- **S3, 1 a day**: the API doesn't refuse a second send to the same user on the same day (both answer 200), and has no
-  daily-limit error. So **`dailyCap` is the only guard**. `notify.clock` picks its day: `rolling24` (default: the next
-  send at least 24 h after the last) or `utc_day`.
+- **S3, 1 a day (partly settled)**: Roblox refuses a user's second notification of the day at send time with HTTP 429,
+  code `RESOURCE_EXHAUSTED`, a message containing "1 notification per recipient"
+  ([devforum](https://devforum.roblox.com/t/issues-with-opencloud-experience-notifications/3874557)). Roblox also lists
+  an aggregate daily cap across experiences.
+  - **That refusal** is a "daily limit" for the backend: the send ends `failed` (code `daily_limit`) with no retry, and
+    the notification is re-planned for the user's next day.
+  - **Any other `429`** is rate limiting: the backoff above (`x-ratelimit-*`, `Retry-After`).
+  - **`dailyCap` stays** our own guard, so the refusal should be rare. `notify.clock` picks its day: `rolling24`
+    (default: the next send at least 24 h after the last) or `utc_day`.
+  - **Don't test limits on the owner's account.** Test sends to the universe owner all answered 200: the owner most
+    likely skips the throttle, so those sends say nothing about limits.
+  - **Still open**: the exact message, until it is confirmed on a non-owner account.
