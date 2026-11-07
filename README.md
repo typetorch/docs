@@ -69,7 +69,7 @@ flowchart LR
 | [Settings](guides/settings.md) | the signed settings record: dev access, fleet, analytics and your own live values (`liveConfig`), `typetorch settings` |
 | [Cross-server messages](guides/messaging.md) | `TypeTorch.messaging` (one kernel-held topic, dev branches kept off prod, limits), `TypeTorch.servers()` |
 | [Loading screens](guides/loading-screen.md) | your own loading screen: `ClientReady`, `Holding`, `TypeTorchBootScreen`, `TypeTorchKernelScreen` |
-| [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, DuckDB or Basin, experiments and live overrides (`typetorch experiment`), the web explorer, queries, node graphs, privacy, a local quick start |
+| [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, the join row and its raw join data (`jd`), DuckDB or Basin, experiments and live overrides (`typetorch experiment`), the web explorer, queries, node graphs, privacy, a local quick start |
 | [Notifications](guides/notifications.md) | native Roblox experience notifications: kinds in `typetorch.json`, `TypeTorch.notifications()` (`want`, `drop`, `onOpen`, `promptOptIn`), templates made by hand (`typetorch notify templates`), signed taps, the funnel, `typetorch notify` |
 | [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
 | [Player data](guides/player-data.md) | the swap-safe data pattern (library writes as DataHost jobs or `TypeTorch.runDetached`), ProfileStore and ProfileService examples, the cloud test and developer product receipts |
