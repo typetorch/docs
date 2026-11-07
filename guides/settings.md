@@ -53,7 +53,7 @@ the servers.
 - Every write needs both signing key files (else: "run `typetorch keys init`") and the deploy key's DataStore scopes
   (`universe-datastores.objects:read`, `:create`, `:update`) plus `universe-messaging-service:publish` for the ping.
 - `typetorch keys rotate` and `keys resign` re-sign the record with the new keys.
-- `typetorch notify key rotate` writes `backend.notify.keys` (after it sends the new key to the backend). The keys are
+- `typetorch notify key rotate` writes `backend.notify.keys` first, then sends the new key to the backend (the previous key stays valid 14 days). The keys are
   secrets like the game key: `settings status` and `get` hide them, and `backend setup` keeps them.
 - `typetorch doctor` reads it, checks the signature and tests the `backend` address and keys in it.
 
