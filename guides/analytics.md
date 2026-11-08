@@ -78,7 +78,7 @@ the player's state (`zone:Lobby|screen:Shop|activity:round`).
 
 | Group | Option | Events |
 |---|---|---|
-| Sessions | `sessions` | join and leave, session length, where they came from (direct, teleport, friend follow, share link...), device and input type, screen size, account age bucket, Premium, country, friends in the server (one friend-list lookup per join), first visit or returning, days since the last visit |
+| Sessions | `sessions` | join and leave, session length, where they came from (direct, teleport, friend follow, share link...), device and input type, screen size, account age bucket, Premium, country, the player policy (ads, paid random items, trading, sharing, subscriptions, China, allowed links; framework 0.6.3), the device trust level (`Player.DeviceTrustLevel`, settled on the leave row; framework 0.6.3), friends in the server (one friend-list lookup per join), first visit or returning, days since the last visit |
 | Tech health | `tech` | server FPS and heartbeat, client FPS, ping, memory, load time, client and server errors, hot swaps and rollbacks, and who left within 60 s of a swap |
 | Zones | `zones` | entering and leaving zones: parts or models tagged `TTZone` in the place, named by a `Name` attribute or the instance name. The smallest zone around the player wins |
 | Screens | `screens` | ScreenGuis in PlayerGui, and GuiObjects tagged `TTScreen` |
