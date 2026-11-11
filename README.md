@@ -71,6 +71,7 @@ flowchart LR
 | [Loading screens](guides/loading-screen.md) | your own loading screen: `ClientReady`, `Holding`, `TypeTorchBootScreen`, `TypeTorchKernelScreen` |
 | [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, the join row and its raw join data (`jd`), DuckDB or Basin, experiments and live overrides (`typetorch experiment`), the web explorer, queries, node graphs, privacy, a local quick start |
 | [Notifications](guides/notifications.md) | native Roblox experience notifications: kinds in `typetorch.json`, `TypeTorch.notifications()` (`want`, `drop`, `setOff`, `onOpen`, `promptOptIn`), templates made by hand (`typetorch notify templates`), signed taps, the funnel, `typetorch notify` |
+| [API keys](guides/api-keys.md) | named backend keys with roles (`game`, `lookup`, `support`, `analyst`, `admin`) and scopes, `typetorch keys create/list/revoke`, the per-player support endpoints (`/v1/players/by-uid/{uid}/events`, `summary`), the event allow-list, per-key rate limit and audit, built-in env tokens |
 | [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
 | [Player data](guides/player-data.md) | the swap-safe data pattern (library writes as DataHost jobs or `TypeTorch.runDetached`), ProfileStore and ProfileService examples, the cloud test and developer product receipts |
 | [State with charm](guides/state.md) | charm atoms across swaps: server atoms from `persist`, charm-sync over `createNetwork`, the client's hydrate request |
