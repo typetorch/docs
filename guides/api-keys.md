@@ -21,7 +21,7 @@ A role is a fixed set of scopes:
 | `lookup` | `identity:resolve` | turning a UserId into its pids |
 | `support` | `identity:resolve`, `players:read` | support tools: one player's allowed rows and summary |
 | `analyst` | `analytics:sql`, `analytics:query`, `identity:resolve` | notebooks and dashboards over the analytics data |
-| `admin` | all | everything the admin token can do |
+| `admin` | all | everything the admin token can do, except replacing the owner list (`PUT /v1/access`) and the trust-link signing keys (`PUT /v1/access/keys`): those stay with the admin token |
 
 What each scope opens:
 
