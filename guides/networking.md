@@ -44,12 +44,14 @@ network.server.shop.purchased.fireAll("sword");
 network.server.shop.purchased.fireExcept(player, "sword");
 network.server.shop.purchased.fireList([a, b], "sword");
 network.server.shop.purchased.fireUnreliable(player, "sword");
+network.server.shop.purchased.fireAllUnreliable("sword");
 ```
 
 Client (in a controller):
 
 ```ts
 network.client.shop.buy.fire("sword", 1);
+network.client.shop.buy.fireUnreliable("sword", 1); // over the unreliable remote: may be dropped, never resent
 this.trove.add(network.client.shop.purchased.on((itemId) => this.showPurchased(itemId)));
 this.trove.addPromise(
 	network.client.shop.price.invoke("sword").then((reply) => {
@@ -59,9 +61,14 @@ this.trove.addPromise(
 );
 ```
 
-- `on` registers a listener (several allowed); `handle` sets the one request handler of a leaf.
-- `invoke` resolves with the handler's result or rejects after 15 s ("The server didn't answer in time"), or when the
-  generation stops.
+- `on` registers a listener (several allowed); `handle` sets the one request handler of a leaf (a second `handle`
+  replaces the first, with a warning). Each returns a disconnect function, which the trove takes.
+- A handler may return a Promise: the answer waits for it. A handler that throws or rejects makes the client's `invoke`
+  reject with "Something went wrong, try again.".
+- `invoke` resolves with the handler's result or rejects after 15 s ("The server didn't answer in time."), or when the
+  generation stops ("This version of the game is shutting down.").
+- A listener or handler that throws is warned (`[net] shop.buy listener threw: ...`) and counted in the dev menu; it
+  never breaks the other listeners.
 
 ### Timeouts
 
@@ -113,7 +120,16 @@ setNetworkLimits({
 });
 ```
 
-Guards check shapes only. Keep your game's own checks in the handler: distance, ownership, cooldowns, prices.
+| Key | Default | Meaning |
+|---|---|---|
+| `rate` | `[20, 10]` | token bucket per player and leaf: burst, refill per second |
+| `maxString` | `1000` | longest string, anywhere in the arguments |
+| `maxEntries` | `300` | most entries in one table |
+| `maxDepth` | `4` | deepest table nesting |
+| `timeout` | `15` | requests only: seconds the client's `invoke` waits ([Timeouts](#timeouts)) |
+
+Keys are dotted leaf paths. A key you leave out keeps its default. Guards check shapes only. Keep your game's own
+checks in the handler: distance, ownership, cooldowns, prices.
 
 ## Rules
 
@@ -127,8 +143,14 @@ Guards check shapes only. Keep your game's own checks in the handler: distance, 
   and warns about generic or conditional leaves (checked loosely: use a union of tuples) and about values that never
   arrive (functions, threads, signals, connections, AnimationTracks).
 - Register handlers through the trove, so a swap removes them.
-- During a swap, a message sent with the old build's id gets a "resync" answer, and the client waits for its own swap.
-  Pending `invoke`s reject with "This version of the game is shutting down".
+- **Across a swap** (framework 0.3.0+): each client drops server messages from another generation than its own, so
+  the server holds what it sends a player until that player's client runs the new generation and says hello. Reliable
+  messages are queued (256 per player at most, sent anyway after 30 s); unreliable ones are dropped meanwhile.
+- A message a client sends with the old generation's id is dropped by the server. On kernel 0.3.2+ an event (`fire`)
+  still reaches the new generation when the network's protocol hash didn't change; a request never does. For a dropped
+  message the kernel tells that client, and its pending `invoke`s fail at once with "The game is updating, try again."
+  (and so do new ones until its own swap). On a client's own swap, its pending `invoke`s reject with "This version of
+  the game is shutting down." (`typetorch build` stamps the protocol hash from your `createNetwork` declarations.)
 - Third-party networking (`@rbxts/net`, `@flamework/networking`, Zap, Blink, ByteNet) doesn't run inside a payload.
   From `@flamework/networking`: `connect` → `on`, `setCallback` → `handle`, `broadcast` → `fireAll`, `except` →
   `fireExcept`, `predict` → `emit`, `invokeWithTimeout` keeps its name (seconds). Or keep Flamework's names for now

@@ -21,13 +21,16 @@ Every TypeTorch product takes the mark from here. In a README outside this repo,
 <img src="https://raw.githubusercontent.com/typetorch/docs/main/brand/typetorch.svg" width="64" alt="TypeTorch">
 ```
 
+The docs site serves the same files at `https://www.typetorch.dev/brand/<file>` (and `favicon.ico` at
+`https://www.typetorch.dev/favicon.ico`).
+
 ## Colours
 
 | Token | Hex | Where |
 |---|---|---|
 | Tile, top left | `#fb7a32` | gradient start |
 | Tile, bottom right | `#d9480f` | gradient end |
-| Flame core | `#e8590c` | also the accent on `dash.typetorch.dev` |
+| Flame core | `#e8590c` | also the accent on `dash.typetorch.dev` and www.typetorch.dev |
 | Letters and flame | `#ffffff` | |
 
 ## Rules

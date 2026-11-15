@@ -14,23 +14,48 @@ bunx @typetorch/cli init
 
 It asks one question at a time and walks through steps 1 to 11 below. It does the terminal work itself, and for the
 parts that happen in Creator Hub (creating the experience, the API key) it links the exact page and checks the result.
-In order, it checks your tools, clones the template, reads your experience from its Creator Hub URL, probes the
-Open Cloud key and writes `.env`, writes `typetorch.json` (it shows it to you first), makes the signing keys, publishes
-the kernel place, and deploys `main` and `dev`. Each step says why it
-exists, links the section below that it replaces, and checks its result the way `typetorch doctor` would. Every
-upload, deploy and SSH session gets its own y/N.
+Each step says why it exists, links the section below that it replaces, and checks its result the way
+`typetorch doctor` would. Every upload, deploy and SSH session gets its own y/N.
+
+| Step | What it does |
+|---|---|
+| 1. tools | checks Bun, git and Rokit (offers to run Bun's install script) |
+| 2. project | clones the template (into this folder when it is empty, else into a new subfolder named after the project), drops the template's `origin`, runs `bun install`, `rokit install` and a first `typetorch build` |
+| 3. roblox | reads your experience from its Creator Hub URL (the creator comes from Roblox), probes the Open Cloud key and writes it to `.env`, finds your user id from your Roblox username (a group game; a user-owned game takes the creator), then shows and writes `typetorch.json` and commits it |
+| 4. keys | `keys init` and `keys init --fallback` (step 7), then commits `typetorch.json` |
+| 5. kernel | an empty place: `kernel deploy --dry-run`, then `--replace-place --yes`; a place with Studio content: `kernel deploy --install` (a patch, which needs the place setting "Allow place to be updated using Save Place API") |
+| 6. backend | optional, below |
+| 7. deploy | commits, deploys `main` (prod), offers a `dev` branch and deploys it, then `access push` |
+| 8. agent | writes `AGENT_PROMPT.md` |
+
+The `typetorch.json` it writes maps git `main` to `prod` and git `dev` to `dev`, sets `"approval": "prod"`, and makes
+you the only member, as `owner`. A folder that already holds a roblox-ts game stops at step 2: moving a game is a
+[migration](migrate.md).
+
+The scope list `init` shows for the Open Cloud key leaves out `universe.place:write`, but `--replace-place` in its kernel step
+publishes a place file and needs it. Add it to the key for an empty place (the full scope list is in
+[step 6 below](#6-the-open-cloud-api-key-owner)).
 
 - **Optional backend.** The backend step can set one up for you: on a VPS with Coolify, on a VPS without Docker (a
   systemd service with Caddy in front, your domain or a free sslip.io name), or on this PC behind a free Cloudflare
   quick tunnel. It can also point the game at a backend you already run, or skip it. `typetorch init --teardown`
   removes what that step installed. See [Live servers and alerts](../guides/fleet-and-alerts.md).
-- **Agent prompt.** The last step writes `AGENT_PROMPT.md`: what is set up and the rules from the
-  [agent playbook](../agents/AGENTS.md), for your coding agent's first message. `typetorch init --agent` prints it again.
+- **Agent prompt.** The last step asks what your game is, then writes `AGENT_PROMPT.md`: what is set up and the rules
+  from the [agent playbook](../agents/AGENTS.md), for your coding agent's first message. `typetorch init --agent`
+  prints it again. When `claude` is on your PATH, it offers to add the `typetorch/claude-plugin` marketplace and start
+  Claude Code with that prompt.
+- **Package versions.** `init` itself runs the CLI you started it with, but the game gets the versions the template
+  pins, which are behind npm today ([take the newest versions](#take-the-newest-versions)). Afterwards `bun run typetorch ...` runs the
+  game's own CLI.
 - **Stopped half way?** Run it again. It continues at the first unfinished step (progress is in `.typetorch/init.json`,
   which never holds a secret).
 - **Already set up?** In a game that already has `typetorch.json`, `bun run typetorch init` checks what each step left
   behind (tools, dependencies, the Open Cloud key, the key files, the backend, the dev branch). It lists what is missing
-  or broken and offers to run that step again. `--phase <name>` runs one step again directly.
+  or broken and offers to run that step again. `--phase <name>` runs again from that step (`preflight`, `project`,
+  `roblox`, `keys`, `kernel`, `backend`, `deploy`, `agent`).
+- **Scripts and tests.** `--answers <file>` replays the answers from a JSON array of strings. Secrets never come from
+  that file: they come from the environment or `.env`. `--dir <folder>` starts somewhere other than the working
+  directory.
 
 The steps below are what `init` does, by hand. Use them as the reference when a step fails, or to set things up
 yourself.
@@ -52,7 +77,13 @@ owner** (or a member whose group role may create assets and publish places). The
 | Roblox Studio | creating the experience, settings, testing | [create.roblox.com](https://create.roblox.com) |
 | TypeTorch Studio plugin (optional) | only for [testing in Studio](../guides/studio-testing.md) with `typetorch serve` | `TypeTorchSync.rbxm` from the [studio-plugin releases](https://github.com/typetorch/studio-plugin/releases/latest) into Studio's plugins folder |
 
-roblox-ts, Rojo and Lune are installed per project in step 2.
+roblox-ts, Rojo and Lune are installed per project in step 2. Two more per-project tools, added in the game folder
+after step 2:
+
+| Tool | Why | Install |
+|---|---|---|
+| darklua | the [production pack](../guides/deploy-and-rollback.md#production-pack) (CLI 0.17+): strips comments and whitespace from the payload that `build`, `upload` and `deploy` make. Without it every build warns `darklua not found: this payload isn't minified` and uploads the unpacked code | `rokit add seaofvoices/darklua` (the template's `rokit.toml` doesn't list it yet) |
+| goblox (optional) | a Go port of roblox-ts, several times faster; `typetorch build` uses it when it is installed (CLI 0.16+, [Compiler](../guides/deploy-and-rollback.md#compiler)). The template's `build` script ends with `rbxtsc`, so each build then warns and runs goblox directly; end the script with `goblox` instead. goblox doesn't run the template's `rbxts-transform-debug` plugin: move the macros first ([Debug macros](migrate.md#debug-macros)) | `bun add -d goblox` |
 
 **Check:**
 
@@ -94,11 +125,43 @@ bun run typetorch build
 
 - `rojo --version` prints `7.7.0-rc.1` inside `my-game`.
 - `bun run build` compiles with no errors.
-- `bun run typetorch build` ends with a `built <id> (branch ..., channel ...)` line,
+- `bun run typetorch build` prints a `built <id>  (branch ..., channel ...)` line, then
   `.typetorch/payload.rbxm ... modules`, and `sources  template <commit>, framework v<version>, kernel v<version>` (the
-  npm versions you installed).
-- Later, `bun run typetorch update` moves the CLI to the newest version on npm (it asks first; `--check` only shows
-  the versions).
+  npm versions you installed). A newer CLI also prints a `compiler` line (`rbxtsc <version>` or `goblox <version>`).
+
+### Take the newest versions
+
+The template's versions are behind. Its `bun.lock` installs these, not the newest on npm:
+
+| Package | The template installs | npm (2026-11-15) |
+|---|---|---|
+| `@typetorch/framework` | 0.5.0 | 0.7.1 |
+| `@typetorch/kernel` | 0.5.1 | 0.5.7 |
+| `@typetorch/cli` | 0.9.1 | 0.18.1 |
+| `@typetorch/transformer` | 0.2.1 | 0.3.2 |
+| `@typetorch/dev-server` | 0.2.3 | 0.3.3 |
+
+Many commands in these docs need a newer CLI (`typetorch serve` needs 0.11+), live reload in Studio needs kernel
+0.5.4+, and step 8 publishes the kernel from `node_modules/@typetorch/kernel`. So update before step 8:
+
+```sh
+bun add @typetorch/framework@latest @typetorch/kernel@latest
+bun add -d @typetorch/cli@latest @typetorch/transformer@latest @typetorch/dev-server@latest
+rokit add seaofvoices/darklua
+bun run build
+```
+
+The template's `studio.project.json` (Studio testing) doesn't map the kernel's `RemoteDebug`, `Bundle` and `LiveDebug`
+modules, so a playtest warns `TypeTorchKernel.<name> is missing` and runs without them. Add them under
+`ServerScriptService.TypeTorchKernel` as `node_modules/@typetorch/kernel/place.project.json` maps them.
+
+Commit the changed `package.json`, `bun.lock` and `rokit.toml`. Later, `bun run typetorch update` moves the CLI alone
+to the newest version (it asks first; `--check` only shows the versions).
+
+A game set up with `typetorch init` already has the template's kernel in its place. After the update,
+`bun run typetorch kernel deploy --dry-run`, then `bun run typetorch kernel deploy`, patches the newer kernel in
+([Kernel updates](../guides/deploy-and-rollback.md#kernel-updates)). The patch needs the place setting **Allow place
+to be updated using Save Place API** on and no Team Create session.
 
 ### Unreleased framework or kernel changes (optional)
 
@@ -212,6 +275,15 @@ Remove the template's `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey`:
 | `kernel` | the kernel folder for `kernel deploy` (`node_modules/@typetorch/kernel`, or a kernel checkout) |
 | `signingPublicKeys`, `revokedKeys`, `fallbackPublicKey`, `keyAssetId` | written by `typetorch keys` (step 7). Don't edit by hand |
 | `backend` | optional, `{ "url": ... }`: written by `typetorch backend setup` ([Live servers and alerts](../guides/fleet-and-alerts.md)); CLI 0.8's `fleet` key is read once, with a warning |
+| `health` | optional, `{ "errors": 3, "window": 30, "rollback": true }`, with `"prod"` / `"dev"` overrides: when a server rolls a new build back (kernel 0.3.7+; [Set the health window](../guides/deploy-and-rollback.md#set-the-health-window)) |
+| `autoRollback` | optional, `{ "failedPct": 20 }`: `deploy --wait` rolls the branch back at this % of failed servers (1-100; [Wait and automatic rollback](../guides/deploy-and-rollback.md#wait-and-automatic-rollback)) |
+| `backup` | optional, `{ "refresh": "auto", "healthyHours": 3 }` (the defaults): a prod deploy or promote at your terminal makes the build it replaced the place's backup build, once that build ran `healthyHours` (0-168) with no failure; `"off"` leaves it to `kernel deploy` and `typetorch backup refresh` ([The backup build](../guides/deploy-and-rollback.md#the-backup-build)) |
+| `compiler` | optional, `"goblox"` or `"rbxtsc"`. Unset: goblox when it is installed, else rbxtsc; `TYPETORCH_COMPILER` overrides it ([Compiler](../guides/deploy-and-rollback.md#compiler)) |
+| `notifications` | optional: the experience notification kinds and caps that `typetorch notify push` sends to the backend ([Notifications](../guides/notifications.md)) |
+
+Unknown keys are ignored with a warning (`unknown key "..." (ignored)`). That includes `minify`, which the darklua
+warning suggests: CLI 0.18.1 doesn't read it yet, so use `--no-minify` on `build`, `upload` or `deploy` to skip the
+production pack.
 
 Commit it:
 
@@ -234,7 +306,7 @@ Add these permissions and select your experience where asked:
 |---|---|---|
 | assets | `deploy`, `upload`, `promote` (of an unfinished upload), `test --cloud`, `keys init` / `rotate` (the key asset), `assets sync` / `status`, `doctor` | `asset:read`, `asset:write`; Luau Execution `universe.place.luau-execution-session:read` and `:write` (the cloud test that runs before every prod deploy, hot assets, doctor's place check) |
 | deploy | `deploy`, `rollback`, `promote`, `approve`, `pin`, `keys rotate` / `resign`, `deployments`, `report`; `settings`, `backend setup`, `access push` | `universe-messaging-service:publish`; DataStore `universe-datastores.objects:read`, plus `:create` and `:update` (the shared deploy number and the [signed settings](../guides/settings.md), below) |
-| place | `kernel deploy` only | Luau Execution (`universe.place.luau-execution-session:read` and `:write`: the place is patched in a task, no download), and `asset:read` to record the place version; `universe.place:write` only to publish a `--place-file` copy |
+| place | `kernel deploy`, `kernel restore` | Luau Execution (`universe.place.luau-execution-session:read` and `:write`: the place is patched in a task, no download), and `asset:read` to record the place version; `universe.place:write` to publish a place file: `--replace-place` (step 8), a `--place-file` copy, `kernel restore <file>` |
 
 - **The shared deploy number.** Every machine that deploys (your PC, a second PC, remote-claude) takes the next
   deploy number (`#seq`) from the game's DataStore: the kernel's records of past deploys, and a counter the CLI claims
@@ -320,7 +392,7 @@ bun run typetorch kernel deploy --replace-place --yes
 [TypeTorch] branch prod: nothing loaded (no verified, bootstrap or usable stored head); peers and the backup next, and waiting for a signed deploy
 ```
 
-(`<version>` is the kernel you installed, for example `0.5.4`. A kernel from the
+(`<version>` is the kernel you installed, for example `0.5.7`. A kernel from the
 [local override](#unreleased-framework-or-kernel-changes-optional) shows its commit: `kernel <version>@<commit>`.)
 
 Type `/tt status` in chat: it answers (you are the owner, so you are a dev).
@@ -336,7 +408,7 @@ bun run typetorch deploy
 ```
 
 - `main` maps to the TypeTorch branch `prod` (prod channel), so the CLI builds a clean prod build (debug prints
-  removed), uploads it, waits for moderation, runs the **cloud test** (the build boots headless in your place, about
+  removed; packed with darklua when it is installed), uploads it, waits for moderation, runs the **cloud test** (the build boots headless in your place, about
   11 s), then asks **y/N**. Answer `y`: it signs the message with both keys and publishes it.
 - Then it waits up to 90 s for the servers' reports, and rolls the branch back by itself if the build fails on them
   ([safe deploys](../guides/deploy-and-rollback.md#safe-deploys)). That needs the fleet API; until you set it up, the
@@ -428,8 +500,8 @@ It points `prod` back to the previous different build. Nothing is rebuilt or upl
 
 ## Next steps
 
-- [Testing in Studio](../guides/studio-testing.md): run your local code with `bun run typetorch serve` and the Studio
-  plugin; saves reload a running playtest.
+- [Testing in Studio](../guides/studio-testing.md): run your local code with `bun run typetorch serve` (CLI 0.11+) and
+  the Studio plugin; saves reload a running playtest (kernel 0.5.4+).
 - [Live servers and alerts](../guides/fleet-and-alerts.md): `typetorch servers`, deploy reports, alerts, and the
   automatic rollback after a bad deploy.
 - [Analytics](../guides/analytics.md): your own analytics, experiments and player journeys (the template already

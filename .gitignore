@@ -10,3 +10,10 @@ CHANGELOG.md
 Thumbs.db
 .vscode/
 .idea/
+
+# docs site (VitePress, wrangler)
+node_modules/
+.vitepress/dist/
+.vitepress/cache/
+.wrangler/
+.cloudflare/

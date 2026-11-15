@@ -6,6 +6,8 @@ prod server load code. Only builds you approved on your own PC can.
 - Releases to **prod-channel** branches (deploys, rollbacks, promotes, re-signs) and pins to them are signed with
   Ed25519, automatically, when they are published.
 - Dev-channel releases are never signed: dev servers stay fast and open.
+- The same two keys sign the game's [settings record](settings.md) (dev access, the backend address, live values) on
+  every write.
 - **Kernel 0.3** checks the signatures on every prod-effective server: public servers, and private or reserved servers
   on a prod branch.
 
@@ -73,8 +75,8 @@ signature.
 
 | Situation | Do |
 |---|---|
-| Main key lost or leaked | `bun run typetorch keys rotate`: a new main pair; the key asset trusts only the new key and revokes the old one; servers are told to re-read it; then every prod branch's live head is **re-signed** (same build, new `#seq`, `r = "resign"`; servers move the head without a swap). No restart |
-| A re-sign failed or was rejected | `bun run typetorch keys resign` |
+| Main key lost or leaked | `bun run typetorch keys rotate`: a new main pair; the key asset trusts only the new key and revokes the old one; servers are told to re-read it; then every prod branch's live head is **re-signed** (same build, new `#seq`, `r = "resign"`; servers move the head without a swap), and so is the settings record. No restart |
+| A re-sign failed or was rejected | `bun run typetorch keys resign` (the live heads and the settings record) |
 | Fallback key leaked or lost | `bun run typetorch keys init --fallback --force` (revokes the old one in the key asset first), then `bun run typetorch kernel deploy` |
 
 ## Back up and drill
@@ -121,7 +123,9 @@ Folders and ModuleScripts. Such a server is flagged:
 It is **only for the first boot**. Live deploy messages, the 60 s poll, pins, `/tt rollback` and reloads stay strictly
 verified. The next signed deploy for the same build clears the flag without a swap; any other signed deploy replaces it.
 
-If nothing loads at all, the server stays empty and shows "No trusted prod head"; the next signed deploy boots it.
+If nothing verifies at all, the dev menu's Attention shows "No trusted prod head" until the next signed deploy. On
+kernel 0.3.6+ the server still doesn't stay empty: it runs the backup build baked into the place, or moves players
+([Never an empty server](deploy-and-rollback.md#never-an-empty-server)).
 
 **Accepted risk:** a server that boots while no trusted head exists can be steered by whoever can write the stored heads
 (code running in your universe), within the limits above.

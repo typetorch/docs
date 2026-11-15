@@ -39,11 +39,11 @@ banEverywhere(userId: number, reason: string) {
   (`meta.self`).
 - **Swaps:** the kernel subscribes once and keeps the subscription for the server's life, so a swap never subscribes
   again. Your listeners belong to the running build and go with it. A message that arrives during a swap is kept and
-  handed to the new build's listeners (`meta.replayed`).
-- **`publish` never yields.** The kernel queues the message and retries a failed send after 1, 3 and 9 s. It returns
-  `false` when the message was dropped at once (the queue is full, the server is closing). It throws right away on a
-  bad topic, data that isn't plain JSON (strings, numbers, booleans, arrays, string-keyed tables), or a message over
-  the size limit, with its size.
+  handed to the new build's listeners (`meta.replayed`): messages up to 10 s old, at most 50.
+- **`publish` never yields.** The kernel queues the message (at most 100 wait) and retries a failed send after 1, 3
+  and 9 s. It returns `false` when the message was dropped at once (the queue is full, the server is closing). It
+  throws right away on a bad topic, data that isn't plain JSON (strings, numbers, booleans, arrays, string-keyed
+  tables, nested at most 16 deep), or a message over the size limit, with its size.
 - **The cloud test** publishes nothing, so you don't need a `TypeTorchTest` guard around `publish`.
 - **Studio** never touches MessagingService: messages loop back to the session, so you can test a listener alone.
 
@@ -61,6 +61,7 @@ TypeTorch.messaging.subscribe("chat", handler, { from: "prod" }); // prod-channe
 TypeTorch.messaging.subscribe("chat", handler, { from: "branch" }); // this branch only
 TypeTorch.messaging.publish("event", data, { to: "branch" }); // only servers on the sender's branch hear it
 TypeTorch.messaging.publish("event", data, { to: "prod" }); // only prod-channel servers hear it
+TypeTorch.messaging.publish("event", data, { to: "all" }); // the default: each listener's `from` decides
 ```
 
 The tags are for routing, not proof: anything that can publish to your universe's MessagingService can forge them.
@@ -104,7 +105,10 @@ What this means for you:
 | kernel 0.3.8 | `TypeTorch/game` | from the first `subscribe`, for the server's life |
 | kernel 0.3.8 | `TypeTorch/rollcall` | from the first build that runs, for the server's life (the server list) |
 | framework roll call | one reply topic | about 3 s, while this server collects a server list |
-| remote-claude | 2 | dev-channel servers only |
+| remote-claude (framework devtools) | `TypeTorch/remote-claude`, `TypeTorch/tool` | only where the dev tools are open: dev rules, or a public server an owner switched to a dev branch |
+
+`TypeTorch/deploy` is also the kernel's control topic: the settings ping, the peers' ask, the remote debug wake (kernel
+0.5.1) and the live map wake (kernel 0.5.7) ride it, so none of them adds a subscription.
 
 So a server uses 5, briefly 7, of the 20 an empty server allows. Your own `SubscribeAsync` calls come on top: moving
 them to `TypeTorch.messaging` frees them (and their re-subscribe on every swap).

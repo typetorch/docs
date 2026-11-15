@@ -21,7 +21,7 @@ apply a change within seconds, with no deploy and no place publish.
 | `fleet` | derived from `backend` for kernels before 0.4: `{ url, token }`, the [fleet API](fleet-and-alerts.md) and its write-only ingest token | `typetorch backend setup` |
 | `backend` | `{ url, key, analytics?, notify? }`: the TypeTorch backend and its game key (CLI 0.9; kernels before 0.4 read the `fleet` and `analytics` sections it derives). `analytics` holds the analytics dials and the experiment overrides. `notify` = `{ keys: { current, previous?, since } }`: the [notification](notifications.md) launch-data signing keys (43-character base64url strings; `since` in unix seconds) | `typetorch backend setup`; `typetorch experiment` for `backend.analytics.experiments` ([Analytics: experiments](analytics.md#experiments)); `typetorch notify key rotate` for `backend.notify` ([Notifications: keys](notifications.md#keys-and-the-signed-tap)) |
 | `analytics` | the [analytics sink settings](analytics.md#settings-the-analytics-field), derived from `backend` | `typetorch backend setup` |
-| `game` | your own live values, read with `TypeTorch.liveConfig` | `typetorch settings set game.<key>` |
+| `game` | your own live values, read with `TypeTorch.liveConfig`, plus two [reserved keys](#reserved-game-keys) | `typetorch settings set game.<key>` |
 
 The whole record is at most 32 KB, `game` at most 16 KB.
 
@@ -34,7 +34,9 @@ bun run typetorch settings status                  # seq, age, whether your keys
 bun run typetorch settings get game.shop.price     # one field as JSON; `get` alone prints all of them
 bun run typetorch settings set game.shop.price 75  # change one game value
 bun run typetorch settings set game.event '{"name":"halloween","ends":1793000000}'
+bun run typetorch settings set game.event - < event.json   # `-` reads the JSON from stdin
 bun run typetorch settings unset game.event
+bun run typetorch settings unset backend           # drops backend and the fleet and analytics sections derived from it
 bun run typetorch settings push                    # defaultBranch, channels and access from typetorch.json
 bun run typetorch access push                      # access only
 bun run typetorch backend setup --url https://backend.example.com
@@ -43,8 +45,11 @@ bun run typetorch experiment weights onboarding 3,1   # an analytics experiment 
 
 Every write reads the record, checks that your keys signed it, changes one field, raises `seq` by one, signs it with
 both keys and writes it back (if another machine wrote in between, it starts over on the newer record). Then it pings
-the servers.
+the servers, and sends the record's owners to the backend (`PUT /v1/access` with `TYPETORCH_ADMIN_TOKEN`; only owners
+may Sign in with Roblox there). A backend that is down or refuses is a warning, never a failed write:
+`typetorch access push` sends the owners again.
 
+- `settings set` takes `game.<key>` only. The other fields have their own commands (table above).
 - `--dry-run` shows the result without writing.
 - `--no-ping`: servers still pick it up within about a minute.
 - `--force` replaces a record your keys didn't sign (you lost both keys, or game code wrote junk). Its old fields are
@@ -63,7 +68,9 @@ A wrong address or key in `backend` isn't rejected by anything else: game server
 (`NetFail`, HTTP 401, HTTP 530) until someone looks at the dev menu. So `backend setup` tests the value first (also with
 `--dry-run`), and `typetorch doctor` runs the same tests against the live record:
 
-1. **url**: it parses, is https (http only for localhost, on this PC), has no user info, and is the server's base address.
+1. **url**: it parses, is https (game servers accept nothing else), has no user info or query, uses only the characters
+   the kernel accepts, and is the server's base address (not a `/v1/...` path). `doctor` accepts http on localhost for
+   `typetorch.json` `backend.url`, which only the CLI reads.
 2. **healthz**: `GET <url>/healthz` answers `{"ok":true}` within 5 seconds.
 3. **key and admin token**: `GET <url>/v1/auth/check` (it changes nothing) says the game key has role `game` (write-only)
    and that the fleet and analytics parts run, and the admin token has role `admin`. Refused even with `--force`: the admin
@@ -71,6 +78,32 @@ A wrong address or key in `backend` isn't rejected by anything else: game server
 
 If one fails, the command prints it in red with a fix, writes nothing and exits 1; `--force` writes anyway. The checks need
 a backend with `GET /v1/auth/check` (`@typetorch/backend`).
+
+## Reserved game keys
+
+Two `game` keys are read by TypeTorch itself. Write them with `settings set` like any other value.
+
+| Key | What | Read by |
+|---|---|---|
+| `tt.events` | the scheduled live events: `{ "v": 1, "events": [{ "id", "name", "start", "end", "set": { "<key>": <json> } }] }`, times in unix seconds (UTC). While an event runs, its `set` values replace those `game` keys for `liveConfig`, switched on each server's own clock. The backend explorer's **Live events** page builds the schedule and gives the exact command: `typetorch settings set game.tt.events -` with the JSON on stdin. Cancelling an event is signing the schedule without it. Details and limits: [Live events](live-events.md) | framework 0.7.1+ (`TypeTorch.liveEvents()`, `liveConfig`) |
+| `feedback` | the player feedback rating scale ([Player feedback](feedback.md)). It wins over the game's `configure(...)`; an invalid value turns feedback off | framework 0.7.0+ (`TypeTorch.feedback()`) |
+
+## The analytics dials (`backend.analytics`)
+
+Next to `url` and `key`, the record's `backend.analytics` holds the analytics dials. Frameworks 0.4+ read them; servers
+apply a change within seconds. More in [Analytics](analytics.md#settings-the-analytics-field).
+
+| Field | What | Written by |
+|---|---|---|
+| `flushSeconds` | seconds between sends, 5-300 (default 15) | `backend setup --flush-seconds <s>` |
+| `recordShare` | share (0-1) of new players whose first session is recorded (default 1) | `backend setup --record-share <0-1>` |
+| `experiments` | the live experiment overrides | `typetorch experiment` |
+| `techEvery` | seconds between tech health samples, 15-3600 (default 60) | no command |
+| `recordSeconds` | seconds a first-session recording runs after the first input, 10-600 (default 60; framework 0.7.1+) | no command |
+| `positions` | up to 64 event names whose game-code events always carry the player's position (framework 0.7.1+) | no command |
+| `joinData`, `joinLaunchPrefix` | how much join data the join row keeps (Join data, below) | no command |
+
+No CLI command writes the last four yet. `backend setup` keeps whatever is already in `backend.analytics`.
 
 ## Join data (`backend.analytics.joinData`)
 

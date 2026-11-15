@@ -40,6 +40,8 @@ everyone stays in the game. Needs kernel 0.3.4 and framework 0.3.2.
 Every branch and every build has a **channel**: `prod` or `dev`. It is the security class.
 
 - `typetorch.json` `channels` sets it per branch; unlisted branches are `prod` when they are `defaultBranch`, else `dev`.
+  The CLI reads it from there. Servers (kernel 0.3.8+) read `defaultBranch` and `channels` from the
+  [signed settings record](settings.md): after changing either, run `bun run typetorch settings push`.
 - A build gets the channel of the branch it was built for (`--channel` overrides it). Prod builds compile debug prints
   away (`$print`, `$warn`) and strip source paths.
 - A server's **effective channel** is the strictest of its branch's channel, its build's channel, and `prod` for every

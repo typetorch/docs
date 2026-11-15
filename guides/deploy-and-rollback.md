@@ -12,8 +12,9 @@ bun run typetorch deploy
 What `deploy` does, in order:
 
 1. **Clean build:** removes ignored files from `out/` and `include/`, puts the build cache back (below), writes
-   `src/shared/build.ts`, runs rbxtsc (prod channel: debug prints and source paths removed), builds
-   `.typetorch/payload.rbxm` with Rojo, and checks it holds only Folders and ModuleScripts.
+   `src/shared/build.ts`, runs the [compiler](#compiler) (goblox or rbxtsc; prod channel: debug prints and source paths
+   removed), packs a [production copy](#production-pack) of the output, builds `.typetorch/payload.rbxm` with Rojo, and
+   checks it holds only Folders and ModuleScripts.
 2. **Upload** as a new private Model asset owned by `creator`, and wait until moderation says Approved.
 3. Log it as "uploaded" (`uploads.jsonl` in the state dir), so a later step can't lose it.
 4. **Cloud test** (always for prod-channel branches; [below](#the-cloud-test)): the build boots headless in your place.
@@ -31,13 +32,61 @@ about 11 s for the cloud test on prod.
 Useful flags: `--branch <b>`, `--channel prod|dev`, `--message <text>` (shown in the dev menu), `--no-build` (deploy
 the last build), `--force` (a dev-channel or dirty build to a prod-channel branch), `--test` /
 `--skip-test "<reason>"`, `--wait [s]` / `--no-wait`, `--rollout <1-99>` (dev-channel branches), `--propose` (write a
-proposal even at a terminal).
+proposal even at a terminal), `--no-minify` (skip the [production pack](#production-pack)), `--moderation-timeout <s>`.
 
-**Build cache.** After a clean build, `out/` and rbxtsc's `tsconfig.tsbuildinfo` are kept in
-`.typetorch/build-cache/<channel>/`, with a hash per file. The next clean build puts them back and rbxtsc recompiles only
-what changed (seconds for a one-file edit). It is dropped when a file fails its hash or `tsconfig.json`, `package.json`
-or a lockfile changed; dev and prod never share one. It needs `"incremental": true` with the tsbuildinfo inside `outDir`.
-`TYPETORCH_BUILD_CACHE=0` turns it off.
+**Build cache.** After a clean build, `out/` and the compiler's `tsconfig.tsbuildinfo` are kept in
+`.typetorch/build-cache/<channel>/`, with a hash per file. The next clean build puts them back and the compiler
+recompiles only what changed (seconds for a one-file edit). It is dropped when a file fails its hash or `tsconfig.json`,
+`package.json` or a lockfile changed; dev and prod never share one. Switching to goblox, or to another goblox version, is
+one full compile. It needs `"incremental": true` with the tsbuildinfo inside `outDir`. `TYPETORCH_BUILD_CACHE=0` turns
+it off.
+
+### Compiler
+
+The build compiles with **goblox** (roblox-ts ported to Go: the same flags, `out/` layout and incremental builds, several
+times faster) when it is installed in the game repo, else with **rbxtsc** (CLI 0.16.0+). goblox is optional:
+
+```sh
+bun add -d goblox
+```
+
+Which one runs, first match wins:
+
+| Source | Value |
+|---|---|
+| `TYPETORCH_COMPILER` (environment or the game repo's `.env`) | `goblox` or `rbxtsc` |
+| `typetorch.json` `"compiler"` | `goblox` or `rbxtsc` |
+| `node_modules/.bin/goblox` exists | goblox |
+| otherwise | rbxtsc |
+
+- goblox asked for but not installed fails the build; it never falls back to rbxtsc. Any other value is an error.
+- goblox runs `@typetorch/transformer` itself (from the same tsconfig `plugins` entry) and **ignores every other JS
+  tsconfig plugin**. Need one of those? Set `"compiler": "rbxtsc"`.
+- `build`, `upload` and `deploy` print the compiler and its version (`compiler    goblox <version>`). `typetorch doctor`
+  shows which compiler runs and why, and warns when goblox would skip a plugin in your tsconfig.
+
+### Production pack
+
+`build`, `upload` and `deploy` don't upload the compiler's output as it is. The CLI packs a transformed copy into
+`.typetorch/pack/` first, so the artifact id, the signature and the cloud test all cover the final bytes (CLI 0.17.0+,
+both channels):
+
+1. **Strip:** comments and whitespace go, but every line stays where it was, so error traces and analytics still point
+   at the right line. The compiler's header comment stays.
+2. **Define:** `__DEV__` becomes `false` and its dead branches are removed, on dev-channel builds too. React reads
+   `__DEV__` (default `false`), so its dev-mode checks and warnings are gone from every uploaded build. If game code sets
+   it (`_G.__DEV__ =` or `ReactGlobals.__DEV__ =`), this step is skipped with a warning and your value stands. `--no-minify`
+   also leaves `__DEV__` to be read at runtime.
+3. **Shake:** `*.story` modules that no other module names are left out. Packages are never shaken.
+
+- It needs **darklua** (`rokit add seaofvoices/darklua`; `TYPETORCH_DARKLUA` in the environment names another binary).
+  Without it the build warns `darklua not found: this payload isn't minified` and uploads the unpacked output. A darklua
+  error fails the build.
+- Each module's result is cached by content hash in `.typetorch/build-cache/pack/`, so an unchanged rebuild only hashes.
+- `--no-minify` on `build`, `upload` or `deploy` turns it off. The darklua warning also suggests `"minify": false` in
+  `typetorch.json`, but the CLI (0.17.0 through 0.18.1) drops that key as unknown (`unknown key "minify" (ignored)`),
+  so it has no effect yet: use `--no-minify`.
+- `typetorch serve` never packs: Studio syncs the compiler's output.
 
 ### Artifact ids and the deployment number
 
@@ -122,7 +171,7 @@ stops it, and boots it a second time as a swap would. Any error fails it. It tak
 
 On every server (kernel 0.3.2+):
 
-- **Load retries:** a build that fails to load is retried after 5, 15 and 60 s, and servers poll their branch's head
+- **Load retries:** a build that fails to load is retried after 5 s, 15 s, then three times a minute apart, and servers poll their branch's head
   every 60 s, so a server that missed a message catches up.
 - **Health window:** a new build is rolled back on that server when an `onStart` fails, or when its own scripts throw 3
   errors within 30 s of starting. Errors from place scripts or the kernel never count. Later errors only mark the
@@ -334,6 +383,24 @@ marks each branch's live head. Uploads that never went out are listed with their
 - `deployments.jsonl` in the state dir is the full record, one JSON row per `#seq`, with `action`, `channel`, `branch`,
   the artifact and `by`. It shows what `deployments` and the dev menu leave out, such as the channel a promote kept.
 
+### Deploy marks on the backend
+
+With a [backend](fleet-and-alerts.md) set up (CLI 0.9.1+), the CLI tells it about each release and place publish, so the
+explorer can show them:
+
+| After | Request | Holds |
+|---|---|---|
+| `deploy`, `approve`, `promote`, `rollback` (an automatic one too), `keys rotate` / `keys resign` | `POST /v1/fleet/deploy` | `#seq`, branch, artifact, channel, the kind (`deploy`, `rollback`, `promote`, `resign`), the build it replaced, your `--message` |
+| `kernel deploy`, `kernel restore` | `POST /v1/fleet/mark` | the kernel version, the new place version |
+| `backup refresh` (manual or automatic) | `POST /v1/fleet/mark` | the build that became the backup, the new place version |
+
+- They use the game key (`TYPETORCH_API_KEY`), like the CLI's alerts. Without `backend.url` in `typetorch.json` or a game
+  key, nothing is sent.
+- Best effort: 5 s timeout, never fails or holds up the command. When one doesn't go through, the output has one line,
+  `mark        no chart mark for ...`.
+- The explorer shows them on the **Deploys** page (the release history) and as vertical markers on its charts. The
+  deploy mark is also the start time the backend's stuck-server check measures from.
+
 ## Pins (A/B experiments)
 
 A pin holds chosen live servers on a known build, for a canary or an A/B test, until the next deploy that reaches them,
@@ -362,7 +429,11 @@ publish, and only new servers run it. Kernel updates are manual (an agent can do
 
 1. `bun run typetorch kernel deploy --dry-run` patches the kernel folders and the kernel's settings into the place's newest
    version (it must be published) and shows the summary: kernel old -> new, scripts changed per folder, settings, references.
-   Nothing is saved or published.
+   Nothing is saved or published. A place without a kernel yet needs `--install`.
+   - **Unpublished Studio saves?** When the newest version is a save (Studio or Team Create) that was never published,
+     the command refuses and lists those versions. Pick a base with `--base`: `--base published` patches the last
+     published version (the saves stay only in version history), `--base latest` patches the newest save and so ships
+     that work with the kernel, `--base <n>` takes version `n`. Use the same `--base` for the real run.
 2. `bun run typetorch kernel deploy --yes` (or the y/N prompt) saves and publishes it through a Luau Execution task, with no
    download. It needs the place setting **Allow place to be updated using Save Place API** (Creator Hub > Creations > the
    experience > Places > the place > Permissions; off by default for places made in Studio) and no active Team Create session.
