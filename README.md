@@ -109,6 +109,7 @@ flowchart LR
 | [Live events](guides/live-events.md) | scheduled changes of live values ("double cash this weekend"), signed once with `typetorch settings set game.tt.events -`, and the lift report |
 | [Notifications](guides/notifications.md) | native Roblox experience notifications: kinds in `typetorch.json`, `TypeTorch.notifications()` (`want`, `drop`, `setOff`, `onOpen`, `promptOptIn`), templates made by hand (`typetorch notify templates`), signed taps, the funnel, `typetorch notify` |
 | [Running the backend](guides/backend-operations.md) | runtime settings, backend alerts, the audit log, backups and restore, disk space, backend stats, deploys on Coolify, API docs for agents, Open Cloud key scopes |
+| [Emergency backend scale-ups](guides/emergency-scale-ups.md) | a sudden surge: what keeps working, how much one backend takes, shed load from the CLI, resize the VPS and tune DuckDB, what is planned (moving servers, Basin, several ingest servers) |
 | [API keys](guides/api-keys.md) | named backend keys with roles (`game`, `lookup`, `support`, `analyst`, `admin`) and scopes, `typetorch keys create/list/revoke` (the next CLI release), the per-player support endpoints, the event allow-list, per-key rate limit and audit, built-in env tokens |
 | [Security model](guides/security.md) | who can do what, dev access (`access push`), the backend, devtools for devs only, keys, signing, remote Studios, never publish secrets |
 | [Troubleshooting](guides/troubleshooting.md) | real errors and their fixes |
