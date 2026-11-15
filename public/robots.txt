@@ -1,4 +1,10 @@
+# TypeTorch docs. Everyone, people and AI crawlers alike, is welcome to read and index them.
 User-agent: *
 Allow: /
+
+# For LLMs and agents: the docs index (llmstxt.org) and every page in one file.
+# Every page is also Markdown: add .md to its URL, or send Accept: text/markdown.
+# https://www.typetorch.dev/llms.txt
+# https://www.typetorch.dev/llms-full.txt
 
 Sitemap: https://www.typetorch.dev/sitemap.xml

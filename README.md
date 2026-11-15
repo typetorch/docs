@@ -131,7 +131,12 @@ flowchart LR
   ```
 
   Then say "migrate this project to typetorch", or run `/typetorch:typetorch-migrate`.
-- [llms.txt](llms.txt): an index of these docs for LLMs.
+- [llms.txt](llms.txt): an index of these docs for LLMs, served at
+  [www.typetorch.dev/llms.txt](https://www.typetorch.dev/llms.txt) with every link pointing at a Markdown page.
+  [www.typetorch.dev/llms-full.txt](https://www.typetorch.dev/llms-full.txt) is every page in one file.
+- Every page of the site is also Markdown: add `.md` to its URL
+  ([/guides/analytics.md](https://www.typetorch.dev/guides/analytics.md)), or request the page with
+  `Accept: text/markdown`. Each page also has **Copy page as Markdown** and **View as Markdown** buttons.
 
 ## Repositories
 

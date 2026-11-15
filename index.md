@@ -1,6 +1,7 @@
 ---
 layout: home
 title: TypeTorch
+description: TypeTorch is a roblox-ts framework and toolchain that hot-swaps every live Roblox server to a new build in seconds, without restarts, while players stay in the game.
 titleTemplate: Update live Roblox games without restarting their servers
 
 hero:
@@ -14,6 +15,9 @@ hero:
     - theme: brand
       text: Get started
       link: /getting-started/fresh-setup
+    - theme: alt
+      text: Live demo
+      link: https://demo.typetorch.dev
     - theme: alt
       text: Migrate
       link: /getting-started/migrate

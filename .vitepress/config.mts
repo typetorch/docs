@@ -1,12 +1,13 @@
 import { copyFile, cp, mkdir } from "node:fs/promises";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, posix, relative, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type HeadConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
 import type { Plugin } from "vite";
-import { SIDEBAR } from "./sidebar";
+import { SIDEBAR, githubSlug } from "./sidebar";
+import { firstParagraph, gitDatesOf, pageHead, routeOf, sidebarPages, sitemapPriority, writeAgentFiles } from "./agents";
 
 const SITE_URL = "https://www.typetorch.dev";
 const GITHUB_ORG = "https://github.com/typetorch";
@@ -192,9 +193,9 @@ function relativeHtmlImagesPlugin(md: import("markdown-it")) {
 // a number, "_", "-" or a space dropped, spaces turned into "-". VitePress's default turns "." and "(" into
 // "-" and puts "_" before a leading digit, so links such as settings.md#join-data-backendanalyticsjoindata
 // or fresh-setup.md#6-the-open-cloud-api-key-owner that work on GitHub would miss their heading here.
-function githubSlug(text: string): string {
-	return text.trim().toLowerCase().replace(/[^\p{L}\p{M}\p{N}\p{Pc}\- ]/gu, "").replace(/ /g, "-");
-}
+// The function lives in sidebar.ts, which also uses it for the headings it lists under each page.
+
+const SIDEBAR_PAGES = sidebarPages(SIDEBAR);
 
 const config = withMermaid(
 	defineConfig({
@@ -218,26 +219,49 @@ const config = withMermaid(
 		// Dead links fail the build. Reference pages are exempt (see rewriteLinksPlugin);
 		// localhost URLs in examples are not dead links.
 		ignoreDeadLinks: [/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/],
-		sitemap: { hostname: SITE_URL },
+		sitemap: {
+			hostname: SITE_URL,
+			// lastmod from git, priorities by section, no 404 page.
+			transformItems: (items) =>
+				items
+					.filter((item) => !/(^|\/)404(\.html)?$/.test(item.url) && !item.url.startsWith("brand/"))
+					.map((item) => {
+						const route = item.url.replace(/^\//, "").replace(/\.html$/, "").replace(/\/$/, "");
+						const src = Object.entries(rewrites).find(([, to]) => routeOf(to) === route)?.[0] ?? (route === "" ? "index.md" : `${route}.md`);
+						const dates = gitDatesOf(root, src);
+						return {
+							...item,
+							...(dates ? { lastmod: dates.modified } : {}),
+							changefreq: route === "" ? "daily" : "weekly",
+							priority: sitemapPriority(route),
+						};
+					}),
+		},
 		head: [
 			["link", { rel: "icon", href: "/favicon.ico", sizes: "48x48" }],
 			["link", { rel: "icon", href: "/brand/typetorch.svg", type: "image/svg+xml" }],
 			["link", { rel: "apple-touch-icon", href: "/brand/typetorch-180.png" }],
 			["meta", { name: "theme-color", content: "#e8590c" }],
-			["meta", { property: "og:type", content: "website" }],
 			["meta", { property: "og:site_name", content: TITLE }],
-			["meta", { property: "og:image", content: `${SITE_URL}/brand/typetorch-512.png` }],
-			["meta", { name: "twitter:card", content: "summary" }],
+			["meta", { property: "og:locale", content: "en_US" }],
+			["meta", { property: "og:image", content: `${SITE_URL}/og.png` }],
+			["meta", { property: "og:image:width", content: "1200" }],
+			["meta", { property: "og:image:height", content: "630" }],
+			["meta", { property: "og:image:alt", content: "TypeTorch: update live Roblox games without restarting their servers" }],
+			["meta", { name: "twitter:card", content: "summary_large_image" }],
+			["meta", { name: "twitter:image", content: `${SITE_URL}/og.png` }],
+			["meta", { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1" }],
 		],
+		// Each page's description: its front matter's, else its first paragraph (for search results and link cards).
+		transformPageData(pageData) {
+			if (pageData.frontmatter.description || pageData.frontmatter.layout === "home") return;
+			const file = join(root, pageData.filePath);
+			if (!existsSync(file)) return;
+			const text = firstParagraph(readFileSync(file, "utf8"));
+			if (text) pageData.description = text;
+		},
 		transformHead({ pageData, title, description }) {
-			const path = pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, "");
-			const head: HeadConfig[] = [
-				["meta", { property: "og:title", content: title }],
-				["meta", { property: "og:description", content: description || DESCRIPTION }],
-				["meta", { property: "og:url", content: `${SITE_URL}/${path}` }],
-				["link", { rel: "canonical", href: `${SITE_URL}/${path}` }],
-			];
-			return head;
+			return pageHead({ pageData, title, description, siteTitle: TITLE, siteDescription: DESCRIPTION, root, sidebar: SIDEBAR_PAGES });
 		},
 		markdown: {
 			// Shiki has no gitignore grammar; its comments and patterns read fine as ini.
@@ -255,6 +279,17 @@ const config = withMermaid(
 				{ text: "Docs", link: "/docs", activeMatch: "^/(docs|getting-started|agents)(/|$)" },
 				{ text: "Guides", link: "/guides/runtime-api", activeMatch: "^/guides/" },
 				{ text: "Reference", link: "/reference/cli", activeMatch: "^/reference/" },
+				{
+					text: "For agents",
+					activeMatch: "^/agents/",
+					items: [
+						{ text: "llms.txt (index)", link: `${SITE_URL}/llms.txt`, target: "_blank" },
+						{ text: "llms-full.txt (all docs)", link: `${SITE_URL}/llms-full.txt`, target: "_blank" },
+						{ text: "Agent playbook", link: "/agents/AGENTS" },
+						{ text: "Claude Code skill", link: "/agents/skills/typetorch-migrate/SKILL" },
+					],
+				},
+				{ text: "Demo", link: "https://demo.typetorch.dev" },
 				{ text: "GitHub", link: GITHUB_ORG },
 			],
 			sidebar: SIDEBAR,
@@ -293,6 +328,15 @@ const config = withMermaid(
 					filter: (file) => statSync(file).isDirectory() || !!MIME[extname(file)],
 				});
 			}
+			// Agents: every page as Markdown, llms.txt with links to it, llms-full.txt (after the plain llms.txt copy).
+			await writeAgentFiles({
+				root,
+				outDir: out,
+				pages: siteConfig.pages,
+				rewrites: siteConfig.rewrites.map as Record<string, string>,
+				sidebar: SIDEBAR_PAGES,
+				siteDescription: DESCRIPTION,
+			});
 		},
 		mermaid: {},
 	}),
