@@ -35,3 +35,14 @@
 	justify-content: center;
 	overflow-x: auto;
 }
+
+/* Screenshots of the explorer (the live demo): a frame so the white UI stands out on the page. */
+.vp-doc img[src*="/screenshots/"] {
+	border: 1px solid var(--vp-c-divider);
+	border-radius: 8px;
+	box-shadow: var(--vp-shadow-2);
+}
+.home-demo {
+	max-width: 1152px;
+	margin: 0 auto;
+}

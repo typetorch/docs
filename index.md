@@ -54,3 +54,15 @@ features:
     link: /guides/fleet-and-alerts
     linkText: Live servers and alerts
 ---
+
+<div class="home-demo">
+
+## See the backend explorer
+
+The optional backend comes with a web explorer for live servers, deploys, errors and your own analytics.
+Try it in the [live demo](https://demo.typetorch.dev): anonymized sample data from a real game, running entirely in
+your browser, with you signed in as an owner.
+
+[![The explorer's Overview page in the live demo: players, sessions and playtime per day, with deploy markers](/screenshots/overview.png)](https://demo.typetorch.dev)
+
+</div>
