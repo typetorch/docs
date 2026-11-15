@@ -27,8 +27,8 @@ async function copy() {
 </script>
 
 <template>
-	<div v-if="show" class="tt-page-actions" aria-label="This page for AI agents">
-		<button type="button" @click="copy">{{ state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : "Copy page as Markdown" }}</button>
+	<div v-if="show" class="tt-page-actions" role="group" aria-label="This page for AI agents">
+		<button type="button" aria-live="polite" @click="copy">{{ state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : "Copy page as Markdown" }}</button>
 		<a :href="mdUrl" target="_blank" rel="noopener">View as Markdown</a>
 		<a href="/llms.txt" target="_blank" rel="noopener">llms.txt</a>
 	</div>

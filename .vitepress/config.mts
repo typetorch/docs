@@ -7,7 +7,7 @@ import { defineConfig, type HeadConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
 import type { Plugin } from "vite";
 import { SIDEBAR, githubSlug } from "./sidebar";
-import { firstParagraph, gitDatesOf, pageHead, routeOf, sidebarPages, sitemapPriority, writeAgentFiles } from "./agents";
+import { DESCRIPTIONS, firstParagraph, gitDatesOf, isUnlisted, pageHead, routeOf, shorten, sidebarPages, sitemapPriority, writeAgentFiles } from "./agents";
 
 const SITE_URL = "https://www.typetorch.dev";
 const GITHUB_ORG = "https://github.com/typetorch";
@@ -224,9 +224,9 @@ const config = withMermaid(
 			// lastmod from git, priorities by section, no 404 page.
 			transformItems: (items) =>
 				items
-					.filter((item) => !/(^|\/)404(\.html)?$/.test(item.url) && !item.url.startsWith("brand/"))
-					.map((item) => {
-						const route = item.url.replace(/^\//, "").replace(/\.html$/, "").replace(/\/$/, "");
+					.map((item) => ({ item, route: item.url.replace(/^\//, "").replace(/\.html$/, "").replace(/\/$/, "") }))
+					.filter(({ route }) => !isUnlisted(route))
+					.map(({ item, route }) => {
 						const src = Object.entries(rewrites).find(([, to]) => routeOf(to) === route)?.[0] ?? (route === "" ? "index.md" : `${route}.md`);
 						const dates = gitDatesOf(root, src);
 						return {
@@ -250,14 +250,20 @@ const config = withMermaid(
 			["meta", { property: "og:image:alt", content: "TypeTorch: update live Roblox games without restarting their servers" }],
 			["meta", { name: "twitter:card", content: "summary_large_image" }],
 			["meta", { name: "twitter:image", content: `${SITE_URL}/og.png` }],
+			["meta", { name: "twitter:image:alt", content: "TypeTorch: update live Roblox games without restarting their servers" }],
 			["meta", { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1" }],
 		],
-		// Each page's description: its front matter's, else its first paragraph (for search results and link cards).
+		// Each page's description (search results and link cards): its front matter's (shortened: a skill's is long),
+		// else DESCRIPTIONS, else its first paragraph.
 		transformPageData(pageData) {
-			if (pageData.frontmatter.description || pageData.frontmatter.layout === "home") return;
+			const own = pageData.frontmatter.description;
+			if (typeof own === "string") {
+				pageData.description = shorten(own.replace(/\s+/g, " ").trim(), 200);
+				return;
+			}
+			if (pageData.frontmatter.layout === "home") return;
 			const file = join(root, pageData.filePath);
-			if (!existsSync(file)) return;
-			const text = firstParagraph(readFileSync(file, "utf8"));
+			const text = DESCRIPTIONS[pageData.filePath] ?? (existsSync(file) ? firstParagraph(readFileSync(file, "utf8")) : "");
 			if (text) pageData.description = text;
 		},
 		transformHead({ pageData, title, description }) {

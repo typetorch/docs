@@ -10,7 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 import type { DefaultTheme, HeadConfig, PageData } from "vitepress";
 
 export const SITE_URL = "https://www.typetorch.dev";
@@ -40,35 +40,108 @@ function stripMarkdown(text: string): string {
 		.trim();
 }
 
-/** The first real paragraph of a Markdown file (no headings, images, tables, quotes, lists, code), ~160 chars. */
+/**
+ * Descriptions for pages whose first paragraph doesn't describe them (it opens with code, a usage note or a lead-in),
+ * by source path. Kept here, not in front matter, so the files stay clean on GitHub (it renders front matter as a
+ * table). Front matter still wins when a page has it.
+ */
+export const DESCRIPTIONS: Record<string, string> = {
+	"README.md":
+		"The TypeTorch docs: how hot-swap deploys work, getting started (a fresh game or migrating a roblox-ts game), the guides, the package reference and releases.",
+	"guides/deploy-and-rollback.md":
+		"How typetorch deploy builds, uploads, cloud-tests, signs and hot-swaps a build onto live servers, and how rollouts, automatic rollback, promote and pins work.",
+	"guides/security.md":
+		"Who can do what in a TypeTorch game (owners, devs, agents, players), what protects prod builds, the backend, keys and tokens, and why games never use CI.",
+	"guides/runtime-api.md":
+		"The TypeTorch runtime API: the running generation, swap events, persist and playerState, modules and Dependency, roles, cross-server messages, live config.",
+	"guides/from-flamework.md":
+		"Move a Flamework 1.x game to TypeTorch: the typetorch migrate codemod, the createFlameworkCompat networking layer, and the full Flamework-to-TypeTorch mapping.",
+	"guides/player-data.md":
+		"Player data stays game code: a swap-safe pattern for ProfileStore and ProfileService that keeps sessions alive across hot swaps, plus receipts and shutdown.",
+};
+
+/** Shortens text to at most `max` characters: at a sentence end when one falls in the second half, else at a word. */
+export function shorten(text: string, max = 160): string {
+	if (text.length <= max) return text;
+	const head = text.slice(0, max);
+	const sentence = Math.max(...[". ", "! ", "? "].map((end) => head.lastIndexOf(end)));
+	if (sentence >= max / 2) return head.slice(0, sentence + 1);
+	const cut = head.slice(0, max - 1);
+	const word = cut.lastIndexOf(" ");
+	return `${cut.slice(0, word >= max - 40 ? word : max - 1).replace(/[\s,;:(–-]+$/, "")}…`;
+}
+
+/** The text a list item starts with, as a label: its bold lead ("**User macros.** ...") or its first clause. */
+function listLabel(item: string): string {
+	const bold = item.match(/^\*\*(.+?)\*\*/);
+	const text = stripMarkdown(bold ? bold[1] : item.split(/[:;(]| - | — /)[0]);
+	return text.replace(/[.:,;\s]+$/, "");
+}
+
+/**
+ * The first real paragraph of a Markdown file, ~160 chars: no headings, images, tables, quotes (notices, "Status:"
+ * banners), code, or text inside lists. A lead-in ending in ":" is joined with the labels of the list after it
+ * ("It does three things: User macros, Class metadata, Debug macros."). Pages it can't describe well get a
+ * description in front matter or in DESCRIPTIONS.
+ */
 export function firstParagraph(markdown: string, max = 160): string {
-	const body = markdown.replace(/^---\n[\s\S]*?\n---\n/, "");
+	const body = markdown.replace(/^---\n[\s\S]*?\n---\n/, "").replace(/<!--[\s\S]*?-->/g, "");
+	type Block = { kind: "p" | "li"; text: string };
+	const blocks: Block[] = [];
 	let fence = false;
-	const paras: string[] = [];
 	let cur: string[] = [];
+	let kind: Block["kind"] = "p";
+	const flush = () => {
+		if (cur.length) blocks.push({ kind, text: cur.join(" ") });
+		cur = [];
+		kind = "p";
+	};
 	for (const line of body.split(/\r?\n/)) {
-		if (/^\s{0,3}(```|~~~)/.test(line)) {
+		if (/^\s*(```|~~~)/.test(line)) {
+			flush();
 			fence = !fence;
 			continue;
 		}
 		if (fence) continue;
 		if (!line.trim()) {
-			if (cur.length) paras.push(cur.join(" "));
-			cur = [];
+			flush();
 			continue;
 		}
-		if (/^\s*(#|>|\||!\[|<img|<p|<\/|<div|[-*+] |\d+\. )/.test(line)) {
-			if (cur.length) paras.push(cur.join(" "));
-			cur = [];
+		const item = line.match(/^([-*+]|\d+[.)]) +(.*)$/);
+		if (item) {
+			flush();
+			kind = "li";
+			cur.push(item[2].trim());
+			continue;
+		}
+		// Headings, quotes, tables, images, HTML blocks: never a description.
+		if (/^\s{0,3}(#|>|\||!\[|<)/.test(line)) {
+			flush();
+			blocks.push({ kind: "p", text: "" });
+			continue;
+		}
+		// An indented line that doesn't continue a paragraph belongs to a list item or is code.
+		if (!cur.length && /^(\s{2,}|\t)/.test(line)) {
+			blocks.push({ kind: "li", text: "" });
 			continue;
 		}
 		cur.push(line.trim());
 	}
-	if (cur.length) paras.push(cur.join(" "));
-	const text = paras.map(stripMarkdown).find((p) => p.length >= 40) ?? "";
-	if (text.length <= max) return text;
-	const cut = text.slice(0, max - 1);
-	return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 20))}…`;
+	flush();
+	for (let i = 0; i < blocks.length; i++) {
+		const block = blocks[i];
+		if (block.kind !== "p") continue;
+		let text = stripMarkdown(block.text);
+		if (text.length < 40) continue;
+		if (text.endsWith(":")) {
+			const labels: string[] = [];
+			for (let j = i + 1; j < blocks.length && blocks[j].kind === "li"; j++) if (blocks[j].text) labels.push(listLabel(blocks[j].text));
+			if (!labels.length) continue;
+			text = `${text} ${labels.join(", ")}.`;
+		}
+		return shorten(text, max);
+	}
+	return "";
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -125,28 +198,38 @@ export interface HeadInput {
 	sidebar: SidebarEntry[];
 }
 
+/** Pages that are built but not part of the docs (kept out of the sitemap, llms-full.txt and search results). */
+export function isUnlisted(route: string): boolean {
+	return route === "404" || route.startsWith("brand/");
+}
+
 export function pageHead({ pageData, title, description, siteTitle, siteDescription, root, sidebar }: HeadInput): HeadConfig[] {
 	const route = routeOf(pageData.relativePath);
 	const url = `${SITE_URL}/${route}`;
 	const desc = description || siteDescription;
 	const isHome = route === "";
-	const is404 = pageData.relativePath === "404.md" || pageData.isNotFound;
+	// Open Graph and the article headline take the page's own title; og:site_name carries "TypeTorch".
+	const pageTitle = isHome ? title : pageData.title || title;
 	const head: HeadConfig[] = [
-		["link", { rel: "canonical", href: url }],
-		["meta", { property: "og:title", content: title }],
+		// VitePress 1.6 writes its own description tag without escaping quotes (a description with "..." breaks the
+		// attribute); one from transformHead replaces it and is escaped.
+		["meta", { name: "description", content: desc }],
+		["meta", { property: "og:title", content: pageTitle }],
 		["meta", { property: "og:description", content: desc }],
-		["meta", { property: "og:url", content: url }],
-		["meta", { property: "og:type", content: isHome ? "website" : "article" }],
-		["meta", { name: "twitter:title", content: title }],
+		["meta", { name: "twitter:title", content: pageTitle }],
 		["meta", { name: "twitter:description", content: desc }],
 	];
-	if (is404) {
+	// The 404 page answers every missing URL: no canonical, no URL of its own, no alternates.
+	if (pageData.isNotFound || route === "404") {
 		head.push(["meta", { name: "robots", content: "noindex" }]);
 		return head;
 	}
-	// The Markdown twin of this page, for agents.
-	head.push(["link", { rel: "alternate", type: "text/markdown", href: `/${markdownPathOf(route)}`, title: "This page as Markdown" }]);
-	head.push(["link", { rel: "alternate", type: "text/plain", href: "/llms.txt", title: "llms.txt" }]);
+	head.unshift(["link", { rel: "canonical", href: url }]);
+	head.push(["meta", { property: "og:url", content: url }], ["meta", { property: "og:type", content: isHome ? "website" : "article" }]);
+	if (isUnlisted(route)) head.push(["meta", { name: "robots", content: "noindex, follow" }]);
+	// For agents: the Markdown twin of this page (the home page's is llms.txt, served as text/plain).
+	if (isHome) head.push(["link", { rel: "alternate", type: "text/plain", href: "/llms.txt", title: "llms.txt" }]);
+	else head.push(["link", { rel: "alternate", type: "text/markdown", href: `/${markdownPathOf(route)}`, title: "This page as Markdown" }]);
 
 	const dates = gitDatesOf(root, pageData.filePath);
 	if (dates && !isHome) {
@@ -154,10 +237,12 @@ export function pageHead({ pageData, title, description, siteTitle, siteDescript
 		head.push(["meta", { property: "article:modified_time", content: dates.modified }]);
 	}
 
+	const publisher = { "@type": "Organization", "@id": `${SITE_URL}/#organization`, name: "TypeTorch", url: `${SITE_URL}/`, logo: `${SITE_URL}/brand/typetorch-512.png`, sameAs: ["https://github.com/typetorch"] };
 	const graph: object[] = [];
 	if (isHome) {
 		graph.push(
-			{ "@type": "WebSite", "@id": `${SITE_URL}/#website`, url: `${SITE_URL}/`, name: siteTitle, description: siteDescription, inLanguage: "en" },
+			publisher,
+			{ "@type": "WebSite", "@id": `${SITE_URL}/#website`, url: `${SITE_URL}/`, name: siteTitle, description: siteDescription, inLanguage: "en", publisher: { "@id": publisher["@id"] } },
 			{
 				"@type": "SoftwareApplication",
 				"@id": `${SITE_URL}/#software`,
@@ -171,7 +256,7 @@ export function pageHead({ pageData, title, description, siteTitle, siteDescript
 				license: "https://opensource.org/licenses/MIT",
 				isAccessibleForFree: true,
 				offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-				codeRepository: "https://github.com/typetorch",
+				publisher: { "@id": publisher["@id"] },
 				sameAs: ["https://github.com/typetorch", "https://www.npmjs.com/package/@typetorch/cli"],
 			},
 		);
@@ -180,19 +265,24 @@ export function pageHead({ pageData, title, description, siteTitle, siteDescript
 		graph.push({
 			"@type": "TechArticle",
 			"@id": `${url}#article`,
-			headline: title,
+			headline: pageTitle.length > 110 ? `${pageTitle.slice(0, 109)}…` : pageTitle,
 			description: desc,
 			url,
+			mainEntityOfPage: url,
 			inLanguage: "en",
-			isPartOf: { "@id": `${SITE_URL}/#website` },
-			about: { "@type": "SoftwareApplication", name: "TypeTorch", url: `${SITE_URL}/` },
+			isPartOf: { "@type": "WebSite", "@id": `${SITE_URL}/#website`, name: siteTitle, url: `${SITE_URL}/` },
+			about: { "@type": "SoftwareApplication", "@id": `${SITE_URL}/#software`, name: "TypeTorch" },
+			author: publisher,
+			publisher,
 			image: `${SITE_URL}/og.png`,
+			...(entry?.group ? { articleSection: entry.group } : {}),
 			...(dates ? { datePublished: dates.created, dateModified: dates.modified } : {}),
 			encoding: { "@type": "MediaObject", encodingFormat: "text/markdown", contentUrl: `${SITE_URL}/${markdownPathOf(route)}` },
 		});
-		const crumbs = [{ name: "TypeTorch", item: `${SITE_URL}/` }];
-		if (entry?.group) crumbs.push({ name: entry.group, item: `${SITE_URL}/docs` });
-		crumbs.push({ name: entry?.text || title, item: url });
+		// Home > Docs > page (the sidebar groups have no page of their own to link to).
+		const crumbs = [{ name: siteTitle, item: `${SITE_URL}/` }];
+		if (route !== "docs") crumbs.push({ name: "Docs", item: `${SITE_URL}/docs` });
+		crumbs.push({ name: route === "docs" ? "Docs" : entry?.text || pageTitle, item: url });
 		graph.push({
 			"@type": "BreadcrumbList",
 			itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: c.item })),
@@ -237,6 +327,45 @@ export interface MarkdownBuild {
 	siteDescription: string;
 }
 
+const FRONT_MATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
+// The "Generated by scripts/sync-reference.ts ..." note at the top of the reference pages: for maintainers only.
+const GENERATED_NOTE = /^<!-- Generated by [^\n]*-->\r?\n(\r?\n)?/;
+
+/**
+ * Rewrites the relative links and images of one page (outside code) to absolute URLs, for llms-full.txt, where they
+ * would otherwise resolve against /llms-full.txt. Page links point at the Markdown twins.
+ */
+export function absolutizeLinks(text: string, src: string, route: string, routeOfSource: (src: string) => string | undefined): string {
+	const resolveHref = (href: string): string => {
+		if (/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) return href;
+		if (href.startsWith("#")) return `${SITE_URL}/${route}.md${href}`;
+		const [, path = "", rest = ""] = href.match(/^([^?#]*)(.*)$/) ?? [];
+		const target = path.startsWith("/") ? path.slice(1) : posix.normalize(posix.join(posix.dirname(src), path));
+		const page = target.endsWith(".md") ? routeOfSource(target) : undefined;
+		return page !== undefined ? `${SITE_URL}/${page}.md${rest}` : `${SITE_URL}/${target.replace(/^(\.\.\/)+/, "")}${rest}`;
+	};
+	const prose = (line: string) =>
+		line
+			.split(/(`+[^`]*`+)/)
+			.map((part, i) =>
+				i % 2
+					? part
+					: part
+							.replace(/(\]\()([^)\s]+)/g, (_m, pre: string, href: string) => pre + resolveHref(href))
+							.replace(/(<(?:img|a|source)\b[^>]*?\b(?:src|href)=)(["'])([^"']+)\2/gi, (_m, pre: string, q: string, href: string) => `${pre}${q}${resolveHref(href)}${q}`),
+			)
+			.join("");
+	let fence = false;
+	return text
+		.split("\n")
+		.map((line) => {
+			if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+			else if (!fence) return prose(line);
+			return line;
+		})
+		.join("\n");
+}
+
 export async function writeAgentFiles({ root, outDir, pages, rewrites, sidebar, siteDescription }: MarkdownBuild): Promise<void> {
 	const routes = new Set<string>();
 	const sources = new Map<string, string>();
@@ -246,16 +375,20 @@ export async function writeAgentFiles({ root, outDir, pages, rewrites, sidebar, 
 		routes.add(route);
 		sources.set(route, src);
 	}
+	const routeBySource = new Map([...sources].map(([route, src]) => [src, route]));
 
 	const header = (route: string, src: string) =>
-		`<!-- ${SITE_URL}/${route} (Markdown: ${SITE_URL}/${route}.md, source: https://github.com/typetorch/${
+		`<!-- ${SITE_URL}/${route} as Markdown. Source: https://github.com/typetorch/${
 			src.startsWith("reference/") ? `${src.slice("reference/".length, -3)}/blob/main/README.md` : `docs/blob/main/${src}`
-		}, index: ${SITE_URL}/llms.txt) -->\n\n`;
+		}. All pages: ${SITE_URL}/llms.txt -->\n\n`;
 
-	// The Markdown twins: /<route>.md, plus the repo paths they link to (README.md for ../README.md links).
+	// The Markdown twins: /<route>.md, plus the repo paths they link to (README.md for ../README.md links). Relative
+	// links keep working because the files sit at their repo paths. Skill files keep their front matter (name,
+	// description), so the file can be installed as it is.
 	for (const [route, src] of sources) {
 		const text = await readFile(join(root, src), "utf8");
-		const body = header(route, src) + text.replace(/^---\n[\s\S]*?\n---\n/, "");
+		const front = src.startsWith("agents/skills/") ? (text.match(FRONT_MATTER)?.[0] ?? "") : "";
+		const body = front + (front ? "\n" : "") + header(route, src) + text.replace(FRONT_MATTER, "").replace(GENERATED_NOTE, "");
 		for (const path of new Set([`${route}.md`, src])) {
 			const dest = join(outDir, path);
 			await mkdir(dirname(dest), { recursive: true });
@@ -263,26 +396,32 @@ export async function writeAgentFiles({ root, outDir, pages, rewrites, sidebar, 
 		}
 	}
 
-	// llms.txt: the repo's file, page links pointed at the Markdown twins, plus how to get the rest.
+	// llms.txt (llmstxt.org): the repo's file, page links pointed at the Markdown twins, then the pages it doesn't
+	// list and how to get the rest, both before "## Optional" (which stays last: agents may skip it).
 	const llmsSource = existsSync(join(root, "llms.txt")) ? readFileSync(join(root, "llms.txt"), "utf8") : `# TypeTorch\n\n> ${siteDescription}\n`;
-	let llms = llmsLinksToMarkdown(llmsSource, routes);
+	const llms = llmsLinksToMarkdown(llmsSource, routes).trimEnd();
 	const listed = new Set([...llms.matchAll(/\(https:\/\/www\.typetorch\.dev\/([^)\s#]+?)\.md[#)]/g)].map((m) => m[1]));
 	const missing = sidebar.filter((e) => e.route && !listed.has(e.route) && routes.has(e.route));
-	if (missing.length) {
-		llms += `\n## More pages\n\n${missing.map((e) => `- [${e.text}](${SITE_URL}/${e.route}.md): ${e.group}`).join("\n")}\n`;
-	}
-	llms += `\n## For agents\n\n- [All docs in one file](${SITE_URL}/llms-full.txt): every page below in sidebar order, as Markdown\n- Any page as Markdown: add \`.md\` to its URL (${SITE_URL}/guides/analytics.md), or request it with \`Accept: text/markdown\`\n- [Sitemap](${SITE_URL}/sitemap.xml)\n`;
-	await writeFile(join(outDir, "llms.txt"), llms);
+	let extra = "";
+	if (missing.length) extra += `## More pages\n\n${missing.map((e) => `- [${e.text}](${SITE_URL}/${e.route}.md): ${e.group}`).join("\n")}\n\n`;
+	extra +=
+		`## For agents\n\n` +
+		`- [All docs in one file](${SITE_URL}/llms-full.txt): every page linked here, in the sidebar's order, as Markdown\n` +
+		`- [Any page as Markdown](${SITE_URL}/guides/analytics.md): add \`.md\` to a page's URL, or request the page with \`Accept: text/markdown\`\n` +
+		`- [Sitemap](${SITE_URL}/sitemap.xml): every HTML page with its last change\n\n`;
+	const optional = llms.search(/^## Optional\s*$/m);
+	await writeFile(join(outDir, "llms.txt"), optional >= 0 ? `${llms.slice(0, optional)}${extra}${llms.slice(optional)}\n` : `${llms}\n\n${extra.trimEnd()}\n`);
 
-	// llms-full.txt: every sidebar page (then any other page) in order.
-	const order = [...sidebar.map((e) => e.route).filter((r) => sources.has(r)), ...[...sources.keys()].filter((r) => !sidebar.some((e) => e.route === r))];
+	// llms-full.txt: every sidebar page, then any other listed page, in order; links made absolute.
+	const order = [...sidebar.map((e) => e.route).filter((r) => sources.has(r)), ...[...sources.keys()].filter((r) => !isUnlisted(r) && !sidebar.some((e) => e.route === r))];
 	const parts: string[] = [
 		`# TypeTorch docs (full)\n\n> ${siteDescription} Every page of ${SITE_URL} in one file, in the sidebar's order. Index: ${SITE_URL}/llms.txt\n`,
 	];
 	for (const route of order) {
 		const src = sources.get(route)!;
-		const text = (await readFile(join(root, src), "utf8")).replace(/^---\n[\s\S]*?\n---\n/, "");
-		parts.push(`\n\n---\n\n<!-- page: ${SITE_URL}/${route} -->\n\n${text.trim()}\n`);
+		const text = (await readFile(join(root, src), "utf8")).replace(FRONT_MATTER, "").replace(GENERATED_NOTE, "");
+		const body = absolutizeLinks(text.trim(), src, route, (s) => routeBySource.get(s));
+		parts.push(`\n\n---\n\n<!-- page: ${SITE_URL}/${route} (Markdown: ${SITE_URL}/${route}.md) -->\n\n${body}\n`);
 	}
 	await writeFile(join(outDir, "llms-full.txt"), parts.join(""));
 }
