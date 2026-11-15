@@ -7,6 +7,12 @@ as the CLI and your scripts, and it changes nothing on a game server.
 - The Docker image builds it. From a checkout: `bun run web:install` and `bun run web:build` (into `web/dist`).
 - `TYPETORCH_EXPLORER=off` serves the API only.
 - Everything below is on the backend's main branch (the backend is unversioned: it runs from a checkout or its image).
+- Try it without a backend: the [live demo](https://demo.typetorch.dev) runs the explorer in your browser on anonymized
+  sample data, with you signed in as an owner. Changes stay in your browser.
+
+![The Overview page: players, sessions, playtime and deploy markers](/screenshots/overview.png)
+
+![The Fleet page: live servers with their branch, build, players, health, TPS, memory and kernel](/screenshots/fleet.png)
 
 Contents: [Sign in and roles](#sign-in-and-roles) · [Pages](#pages) · [The filter bar](#the-filter-bar) ·
 [Command palette](#command-palette) · [Compare and explain](#compare-and-explain) ·

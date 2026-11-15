@@ -93,6 +93,10 @@ format is in the backend README's [Maps](https://github.com/typetorch/backend#ma
 
 Four tabs. Their state is in the URL next to the filter bar's (`tab`, `map`, `layers`, `view`, `sid`, `win`).
 
+![The Map layers tab: new players' positions as a heatmap on the game's exported map](/screenshots/recordings.png)
+
+Try it in the [live demo](https://demo.typetorch.dev/recordings).
+
 | Tab | What it shows |
 |---|---|
 | **Map layers** | pick a map and toggle layers: positions, idle spots, deaths, spawns, screens opened and closed, button presses, prompts, quits, and every positioned event kind in the range. Per-layer value chips (screen names, button paths, an event split by a prop such as `cause`), zone and screen filters, heatmap or dots. Click a cell for the sessions with a point of the first picked layer there |
