@@ -15,7 +15,8 @@
 //  never gets a reference page.
 //
 //  Each page's "## " headings are added under it automatically (withToc below),
-//  always shown (no collapse toggle). Nothing to maintain by hand.
+//  folded: clicking a page opens its headings (the page you're on is always open),
+//  and its arrow folds or unfolds them. Nothing to maintain by hand.
 // ============================================================================
 
 import { existsSync, readFileSync } from "node:fs";
@@ -136,14 +137,14 @@ export function tocOf(markdown: string, link: string): DefaultTheme.SidebarItem[
 	return out;
 }
 
-/** Puts each page's headings under it, always open: no `collapsed`, so VitePress shows no toggle. */
+/** Puts each page's headings under it, folded until the page is opened (VitePress unfolds the active page). */
 function withToc(group: DefaultTheme.SidebarItem): DefaultTheme.SidebarItem {
 	return {
 		...group,
 		items: group.items?.map((item) => {
 			if (!item.link || item.items) return item;
 			const toc = pageToc(item.link);
-			return toc.length ? { ...item, items: toc } : item;
+			return toc.length ? { ...item, collapsed: true, items: toc } : item;
 		}),
 	};
 }
