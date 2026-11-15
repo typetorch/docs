@@ -197,6 +197,7 @@ export const OPERATE: DefaultTheme.SidebarItem = {
 		{ text: "Live events", link: "/guides/live-events" },
 		{ text: "Notifications", link: "/guides/notifications" },
 		{ text: "Running the backend", link: "/guides/backend-operations" },
+		{ text: "Emergency scale-ups", link: "/guides/emergency-scale-ups" },
 		{ text: "API keys", link: "/guides/api-keys" },
 		{ text: "Security", link: "/guides/security" },
 		{ text: "Troubleshooting", link: "/guides/troubleshooting" },
