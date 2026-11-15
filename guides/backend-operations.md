@@ -69,7 +69,7 @@ and a disk filling up. They go to the Fleet page's alerts and the same webhook. 
   it last fired, and the raised, deduped and throttled counts since the start.
 - They need the fleet part (`TYPETORCH_PARTS` includes `fleet`, the default).
 - Two more come from the optional ingest queue, on the main server (`TYPETORCH_ROLE=main`): `queue_bucket_down`
-  (critical, when the queue bucket can't be reached for a minute) and `queue_file_bad` (a queued file that can't be
+  (critical, when the queue bucket can't be reached for a minute) and `queue_file_bad` (warning, a queued file that can't be
   loaded, skipped for 10 minutes). [Several ingest servers](emergency-scale-ups.md#5-several-ingest-servers-optional).
 
 ## Audit log
