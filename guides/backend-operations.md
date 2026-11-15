@@ -12,8 +12,8 @@ explorer pages named here (Settings, Backend stats, Audit log) are under **Admin
 
 Contents: [Environment](#environment) · [Runtime settings](#runtime-settings) · [Backend alerts](#backend-alerts) ·
 [Audit log](#audit-log) · [Backups and restore](#backups-and-restore) · [Disk space](#disk-space) ·
-[Backend stats](#backend-stats) · [Deploys on Coolify](#deploys-on-coolify) · [API docs for agents](#api-docs-for-agents) ·
-[Open Cloud key scopes](#open-cloud-key-scopes)
+[Moving the backend](#moving-the-backend) · [Backend stats](#backend-stats) · [Deploys on Coolify](#deploys-on-coolify) ·
+[API docs for agents](#api-docs-for-agents) · [Open Cloud key scopes](#open-cloud-key-scopes)
 
 ## Environment
 
@@ -40,7 +40,7 @@ back. A change applies to the next request; nothing restarts.
 | Alerts | the alert webhook (a secret: never shown again), its format, the levels sent; **Send test alert** (3 a minute) |
 | Backend alerts | the master switch, repeat window, hourly cap, and per rule on / off, level and thresholds ([below](#backend-alerts)) |
 | Access | viewers (Roblox UserIds with the read-only web role), the admin allow list, the admin token login |
-| Rate limits | ingest per address and per server, error logs per address, new servers per minute |
+| Rate limits | ingest per address and per server, error logs per address, new servers per minute, and the busy 503's limits (raw backlog, requests in flight; [Emergency scale-ups](emergency-scale-ups.md#first-the-game-keeps-running)) |
 | Retention | analytics history, raw archives, error logs, the audit log, the deploy history; error kinds and rows per day; error drop rules (the Errors page edits them) |
 | API keys | requests a minute per [named key](api-keys.md), the events support keys may read |
 | Notifications | pause, dry run, the send rate, the daily cap clock, when presence goes stale, per-kind switches ([Notifications](notifications.md)) |
@@ -68,6 +68,9 @@ and a disk filling up. They go to the Fleet page's alerts and the same webhook. 
 - `GET /v1/admin/alert-rules` (admin) answers each rule's state (`ok`, `waiting`, `firing`, `off`, `unavailable`), when
   it last fired, and the raised, deduped and throttled counts since the start.
 - They need the fleet part (`TYPETORCH_PARTS` includes `fleet`, the default).
+- Two more come from the optional ingest queue, on the main server (`TYPETORCH_ROLE=main`): `queue_bucket_down`
+  (critical, when the queue bucket can't be reached for a minute) and `queue_file_bad` (a queued file that can't be
+  loaded, skipped for 10 minutes). [Several ingest servers](emergency-scale-ups.md#5-several-ingest-servers-optional).
 
 ## Audit log
 
@@ -118,6 +121,19 @@ Overview's Storage card and the Settings page's **Backups and disk** card, in `G
 `GET /v1/admin/backups`, and in `/healthz` for the admin token. With the fleet part on, a `disk_low` alert goes out
 like any fleet alert. To make room: shorter retention on the Settings page, fewer local backups, or a bigger volume.
 
+## Moving the backend
+
+The steps for a new server, moving analytics to Cloudflare Basin and back, and several ingest servers are in
+[Emergency scale-ups](emergency-scale-ups.md#3-move-to-another-server). The operator facts:
+
+- **Export API** (`/v1/admin/export/*`): read-only, one export at a time, 120 requests a minute. It takes the env admin
+  token as a Bearer only: no browser session, no web role, no named key, no game key.
+- **Migration** (`/v1/admin/migrate`): `GET` (the status) is for the admin role. Starting, pausing, resuming, cancelling
+  or resolving a page is `POST`, and it takes the env admin token only (a named key gets `403`).
+- **Both servers run the same backend version**, because one version pins one DuckDB. Update the old server first.
+- **Never copy the data folder** to move a server. The move copies rows through the APIs, and a backup is the safe copy
+  ([Backups and restore](#backups-and-restore)).
+
 ## Backend stats
 
 The **Backend stats** page (`GET /v1/admin/stats?window=1m|5m|15m|1h`, admin) shows the backend process itself, like
@@ -131,6 +147,17 @@ Roblox's Performance tab for a game server:
 It updates every 2 s (Pause stops it). Everything is in memory and bounded; long-held streams and long-polls are counted
 as requests but left out of the latency percentiles.
 
+The same numbers are in `GET /v1/admin/stats?window=1m|5m|15m|1h` (admin). Two blocks were added for the busy 503 and the
+ingest queue:
+
+- `ingest`: `busy` (refusals since the start), `inflight` (ingest requests being handled now) and `lastBusyAt`.
+- `queue` (only when `TYPETORCH_ROLE` isn't `all`): `role`, `pendingFiles`, `pendingBytes`, `lastLoadAt`, `files`,
+  `errors`, `lastError`, `lastErrorAt`, `bucket`, `truncated`, `identities`. A node reports its own numbers in its
+  `GET /healthz` with the admin token (`queue`, `ingest`).
+
+Details: [Several ingest servers](https://github.com/typetorch/backend#several-ingest-servers-optional) and
+[Limits and the busy 503](https://github.com/typetorch/backend#limits-and-the-busy-503) in the backend README.
+
 ## Deploys on Coolify
 
 Rolling updates work: deploy as usual. DuckDB lets one process open the database, so the two containers hand over:
@@ -142,8 +169,8 @@ Rolling updates work: deploy as usual. DuckDB lets one process open the database
    SQLite close.
 3. The new container opens DuckDB within a second and takes over.
 
-Game servers ride over the gap: the framework re-sends a batch that got 503 with a backoff, and the kernel's fleet sender
-retries. Details: [Deploys on Coolify (rolling updates)](https://github.com/typetorch/backend#deploys-on-coolify-rolling-updates).
+Game servers ride over the gap: the framework re-sends a batch that got 503 after at least its `Retry-After` (framework
+0.7.2+; older ones use their own backoff), and the kernel's fleet sender retries. Details: [Deploys on Coolify (rolling updates)](https://github.com/typetorch/backend#deploys-on-coolify-rolling-updates).
 
 ## API docs for agents
 

@@ -164,6 +164,10 @@ Each rule, level and threshold is editable on the explorer's Settings page (runt
 environment: `TYPETORCH_BACKEND_ALERTS=off` turns all off, `TYPETORCH_ALERT_<RULE>=off` one rule (for example
 `TYPETORCH_ALERT_CCU_DROP=off`). The same rule and subject is raised once per 180 minutes
 (`TYPETORCH_BACKEND_ALERTS_REPEAT_MINUTES`), and at most 12 backend alerts an hour (`TYPETORCH_BACKEND_ALERTS_PER_HOUR`).
+Two more come from the optional ingest queue, on the main server only (`TYPETORCH_ROLE=main`, [Several ingest servers](emergency-scale-ups.md#5-several-ingest-servers-optional)):
+`queue_bucket_down` (critical) when the queue bucket can't be reached for a minute, and `queue_file_bad` when a queued
+file can't be loaded (that file is skipped for 10 minutes). They are not in the rules table above.
+
 Rules that compare with "before" wait for enough volume, so a small test place stays quiet. Details:
 [Running the backend](backend-operations.md#backend-alerts) and the
 [backend README](https://github.com/typetorch/backend#backend-alerts).

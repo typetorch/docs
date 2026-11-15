@@ -24,6 +24,13 @@ A role is a fixed set of scopes:
 | `analyst` | `analytics:sql`, `analytics:query`, `identity:resolve` | notebooks and dashboards over the analytics data |
 | `admin` | all | everything the admin token can do, except replacing the owner list (`PUT /v1/access`) and the trust-link signing keys (`PUT /v1/access/keys`): those stay with the admin token |
 
+A named `admin` key can't use two things. They take the backend's env admin token (`TYPETORCH_ADMIN_TOKEN`) only, and a
+named key gets `403`:
+
+- the **export API** (`/v1/admin/export/*`), which a new server reads from the old one,
+- starting or steering a **migration** (`POST /v1/admin/migrate`, `typetorch backend migrate`): see
+  [Move to another server](emergency-scale-ups.md#3-move-to-another-server).
+
 What each scope opens:
 
 | Scope | Routes |
