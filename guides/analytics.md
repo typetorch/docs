@@ -276,6 +276,9 @@ Node 20+, DuckDB inside the process (no database server).
 
 - **Raw files first.** Each accepted batch is appended to a raw file and answered at once. A loader moves raw files
   into DuckDB every 5 s. A spike fills files, never the database, and nothing accepted is lost on a restart.
+- **Busy answer.** While the loader is behind, an event batch gets `503` with a `Retry-After` of 10 to 30 s, before the
+  body is read. Framework 0.7.2+ waits at least that long before it sends the batch again. The limits and the Settings
+  page are in [Running the backend](backend-operations.md#runtime-settings).
 - **One Parquet file per day.** After midnight UTC each finished day is written as a compressed Parquet file (exact
   duplicates dropped), then rollups run. Queries read today's DuckDB file plus the day files in range. Old data goes
   by deleting old day files (`TYPETORCH_KEEP_DAYS`, 400 by default).
@@ -297,8 +300,11 @@ Done once, in your own Cloudflare account (Workers Paid plan and R2). The backen
    `basin/recordings.schema.json`. HTTP endpoint on, authentication on, Data Catalog (Iceberg), roll interval 60 s.
 2. Create a **send-only** API token (Basin Pipelines Send). Game servers get this one.
 3. Keep the R2 token (for Basin SQL), your account id and the bucket on your PC only.
-4. No CLI command writes this sink (since CLI 0.9): `typetorch backend setup` makes the game send to the backend
-   instead. A Basin sink already in the record ([settings](#settings-the-analytics-field)) stays there until you run it.
+4. Point the game at it with CLI 0.19.0+: `bun run typetorch backend setup --analytics basin --events <events stream url>
+   --recordings <recordings stream url>`, with the send token as `BASIN_SEND_TOKEN` in the game's `.env`. Switch back with
+   `--analytics duckdb`. A `backend setup` without `--analytics` keeps the sink the record already has
+   ([settings](#settings-the-analytics-field)). Moving the history between Basin and a server:
+   [Analytics to Basin and back](emergency-scale-ups.md#4-analytics-to-basin-and-back).
 
 Know these before you start:
 
@@ -319,8 +325,12 @@ with no deploy or place publish.
   `<url>/v1/ingest` with the game key, and the dials come from `backend.analytics` (`flushSeconds`, `recordShare`,
   `recordSeconds`, `positions`, `techEvery`, `experiments`, and the join data dials `joinData` and `joinLaunchPrefix`:
   [Settings](settings.md#the-analytics-dials-backendanalytics)).
-- **Basin, and older frameworks:** the `analytics` field below. `backend setup` keeps deriving it from `backend` for
-  frameworks before 0.4; a Basin sink is always read from it.
+- **Separate ingest servers (framework 0.7.2+):** with `backend.ingest` in the record, events go to `<ingest>/v1/ingest`
+  with the same key, and everything else stays on `backend.url`. Set it with `backend setup --ingest <url>` (CLI 0.19.0+).
+  [Several ingest servers](emergency-scale-ups.md#5-several-ingest-servers-optional).
+- **Basin, and older frameworks:** the `analytics` field below. `backend setup --analytics basin` writes a Basin sink
+  there. Without that flag `backend setup` keeps the sink that is already in the record, and it keeps deriving the
+  field from `backend` for frameworks before 0.4. A Basin sink is always read from this field.
 
 ```json
 {
@@ -354,7 +364,10 @@ with no deploy or place publish.
 bun run typetorch backend setup --url https://backend.example.com --flush-seconds 15 --record-share 1
 ```
 
-It derives this section from `backend` and keeps the other fields (`techEvery`, `experiments`). `typetorch experiment`
+It derives this section from `backend` and keeps the other fields (`techEvery`, `experiments`). With
+`--analytics basin --events <url> --recordings <url>` it writes a Basin sink instead (`backend` = `basin`, the two stream
+URLs, and the send token from `BASIN_SEND_TOKEN`; the record's `backend` keeps pointing at the server for the fleet).
+`--analytics duckdb` writes the server sink back. `typetorch experiment`
 writes the experiment overrides ([below](#experiments)). No command sets `techEvery`, `recordSeconds`, `positions` or
 the join data dials yet (`backend setup` keeps whatever is already in `backend.analytics`), and `settings set analytics`
 only points to `backend setup`. Read it back with `bun run typetorch settings get

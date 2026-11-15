@@ -36,6 +36,8 @@ is the same command.
 - [Deploy on Coolify](#deploy-on-coolify)
 - [Audit log](#audit-log)
 - [Backups and restore](#backups-and-restore) ([Disk space](#disk-space))
+- [Move to another server](#move-to-another-server) (the export API, the migration job, the runbook; [to Basin and back](#move-analytics-to-basin-and-back))
+- [Several ingest servers (optional)](#several-ingest-servers-optional) (past one core of ingest: ingest nodes, a queue bucket, one DuckDB)
 - [The event bus](#the-event-bus)
 - [Error logs](#error-logs)
 - [The explorer](#the-explorer)
@@ -150,6 +152,12 @@ See [Runtime settings](#runtime-settings-the-settings-page).
 | `TYPETORCH_HANDOVER_SECONDS` | `600` | Rolling deploys: how long a new server waits for the old one to let go of DuckDB before it gives up and exits 1 (see [Deploys on Coolify](#deploys-on-coolify-rolling-updates)). |
 | `TYPETORCH_MAX_BODY`, `TYPETORCH_MAX_INFLATE` | 2 MB, 16 MB | Ingest body caps (gzip, inflated). |
 | `TYPETORCH_IP_PER_MINUTE`, `TYPETORCH_JOB_PER_MINUTE` | `6000`, `60` | Ingest rate limits per address and per JobId. |
+| `TYPETORCH_BUSY_BYTES`, `TYPETORCH_BUSY_REQUESTS` | 512 MB, `256` | [The busy 503](#limits-and-the-busy-503): ingest answers `503` + `Retry-After` while `raw/incoming` holds more than this many bytes, or more than this many ingest requests are in flight (`0` = off). Also on the Settings page. |
+| `TYPETORCH_ROLE` | `all` | [Several ingest servers](#several-ingest-servers-optional) (optional): `all` is one server with everything (no bucket); `main` also loads the ingest nodes' files from the queue bucket; `ingest` only takes game batches and writes them to the bucket. |
+| `TYPETORCH_QUEUE_BUCKET`, `TYPETORCH_QUEUE_ENDPOINT`, `TYPETORCH_QUEUE_ACCESS_KEY_ID`, `TYPETORCH_QUEUE_SECRET_ACCESS_KEY`, `TYPETORCH_QUEUE_PREFIX`, `TYPETORCH_QUEUE_REGION` | none, `incoming/`, none | The queue bucket (S3 API, e.g. R2: endpoint `https://<account id>.r2.cloudflarestorage.com`) for `main` and `ingest` (the first four required there); ignored with a warning when the role is `all`. The secret is never printed. `REGION` only for an S3 bucket outside `us-east-1` (R2: leave it). |
+| `TYPETORCH_MAIN_URL`, `TYPETORCH_INGEST_ROTATE_SECONDS` | none, `5` | Ingest nodes: the main server's address (the erased pids come from it) and the seconds between the Parquet files they upload (also at 64 MB). |
+| `TYPETORCH_MIGRATE_ROWS_PER_SECOND` | `20000` | The [migration job](#move-to-another-server)'s default rows per second (a `start` may name its own). |
+| `CLOUDFLARE_ACCOUNT_ID`, `BASIN_BUCKET`, `BASIN_SQL_TOKEN`, `BASIN_NAMESPACE` | unset, `typetorch` | Optional Basin SQL read settings (the `TT_BASIN_*` names work too): with them a [move to Basin](#move-analytics-to-basin-and-back) compares each day's row count in Basin. Never logged or returned. |
 | `TYPETORCH_NEW_JOBS_PER_MINUTE` | `2000` | Never-seen JobIds per minute the fleet API lets in, and (counted on their own) the error logs. |
 | `TYPETORCH_SQLITE` | `<data dir>/fleet.sqlite` | The SQLite file (fleet, identities, error logs). |
 | `TYPETORCH_GEOIP`, `TYPETORCH_GEOIP_ASN` | `dbip` in production (`NODE_ENV=production`, as in the image), else `off` | [Game server locations](#game-server-addresses-and-locations): `dbip` downloads DB-IP's free City Lite and ASN Lite databases into `<data dir>/geoip/` and refreshes them monthly; a path uses that City `.mmdb` file as it is (e.g. MaxMind GeoLite2, kept fresh by `geoipupdate`; `TYPETORCH_GEOIP_ASN` names an ASN one); `off` shows no locations. Lookups never leave the server. |
@@ -200,6 +208,8 @@ as noted for the token login).
 | Viewers (`webViewers`) | `TYPETORCH_WEB_VIEWERS` | up to 200 Roblox UserIds who sign in with Roblox as read-only viewers (the web role); a viewer taken off the list is signed out at once |
 | Ingest per address (`ipPerMinute`) | `TYPETORCH_IP_PER_MINUTE` | 100 to 1,000,000 a minute |
 | Ingest per server (`jobPerMinute`) | `TYPETORCH_JOB_PER_MINUTE` | 10 to 100,000 a minute |
+| Busy: raw backlog (`busyBytes`) | `TYPETORCH_BUSY_BYTES` | 1 MB to 1 TB in bytes, or 0 = off ([the busy 503](#limits-and-the-busy-503)) |
+| Busy: requests in flight (`busyRequests`) | `TYPETORCH_BUSY_REQUESTS` | 1 to 100,000, or 0 = off |
 | Error logs per address (`errorsIpPerMinute`) | `TYPETORCH_ERRORS_IP_PER_MINUTE` | 60 to 1,000,000 a minute |
 | New servers per minute (`fleetNewJobsPerMinute`) | `TYPETORCH_NEW_JOBS_PER_MINUTE` | 100 to 1,000,000 a minute |
 | Analytics history (`keepDays`) | `TYPETORCH_KEEP_DAYS` | 7 to 36,500 days, or 0 = forever (applied at the nightly export) |
@@ -444,8 +454,8 @@ Revoked and expired keys answer 401 like unknown ones; `last_used_at` is written
 | `admin` | all |
 
 - A key is a Bearer only; it never opens an explorer session. Admin keys act like the admin token, except the owner list
-  (`PUT /v1/access`) and the trust-link signing keys (`PUT /v1/access/keys`): those take the env admin token only (403 for a
-  named key). Analyst keys read like the web role within their scopes.
+  (`PUT /v1/access`), the trust-link signing keys (`PUT /v1/access/keys`), the export API (`/v1/admin/export/*`) and
+  starting or steering a migration (`POST /v1/admin/migrate`): those take the env admin token only (403 for a named key). Analyst keys read like the web role within their scopes.
 - The CLI's `typetorch keys create | list | revoke` ship in the next CLI release (after 0.18.1); the routes work today.
 - Rate limit: runtime setting `keys.ratePerMinute` (`TYPETORCH_KEYS_RATE_PER_MINUTE`, default 120) per key, `429 { error: "rate_limited" }` + Retry-After;
   game keys keep the ingest limits; the env tokens keep theirs.
@@ -601,7 +611,7 @@ scope, and a key outside its role's scopes gets `403 { error: "forbidden", need 
 
 | Route | Role | What |
 |---|---|---|
-| `POST /v1/ingest` | game | gzip JSON `{ events, recordings, identities? }`. Appended to a raw file, then `202 { accepted, rejected }` |
+| `POST /v1/ingest` | game | gzip JSON `{ events, recordings, identities? }`. Appended to a raw file, then `202 { accepted, rejected }`; `503 { busy: true }` + `Retry-After` while the backend is behind ([the busy 503](#limits-and-the-busy-503)) |
 | `POST /v1/errors` | game | error logs (see [Error logs](#error-logs)) |
 | `POST /v1/identity` | game | pid <-> UserId rows from Basin games |
 | `POST /v1/fleet/heartbeat`, `report`, `alert`, `closing`, `bundle`, `deploy`, `mark` | game | the kernel's fleet posts (`bundle`: a [debug bundle](#debug-bundles-and-offline-history)) and the CLI's release start, chart marks (`mark`: `j = "cli"` only) and alerts |
@@ -656,7 +666,9 @@ scope, and a key outside its role's scopes gets `403 { error: "forbidden", need 
 | `GET /v1/admin/audit` | admin | the [audit log](#audit-log), newest first: `?actor=&action=&outcome=&since=&until=&before=&limit=&facets=1` |
 | `GET /v1/admin/backups`, `POST /v1/admin/backups` | admin | [backups](#backups-and-restore): the schedule, the local backups and the [disk](#disk-space); `POST` makes one now (2 a minute with the download) |
 | `POST /v1/admin/backups/download` | admin | a tar of a fresh backup, streamed (without the webhook URL and `instance.key`) |
-| `GET /v1/admin/stats?window=1m\|5m\|15m\|1h` | admin | the server's own metrics for the explorer's **Backend stats** page: requests, DuckDB statements, rows in and loaded, SQLite reads and writes per second (the last 10 s), request latency p50 / p90 / p99, memory, CPU and event loop lag, per second for 2 minutes and per minute for an hour, and per route group over `window` (default `5m`) |
+| `GET /v1/admin/stats?window=1m\|5m\|15m\|1h` | admin | the server's own metrics for the explorer's **Backend stats** page: requests, DuckDB statements, rows in and loaded, SQLite reads and writes per second (the last 10 s), request latency p50 / p90 / p99, memory, CPU and event loop lag, per second for 2 minutes and per minute for an hour, and per route group over `window` (default `5m`); `ingest: { busy, inflight, lastBusyAt }` (busy 503s since the start, ingest requests in flight) |
+| `GET /v1/admin/export/manifest`, `rows`, `hash` (`GET` or `POST`), `fleet`, `erased` | admin token only (a Bearer: not a session, not the web role) | the [export API](#the-export-api-every-backend): what a new server pulls when it [moves](#move-to-another-server); read-only, one at a time, 120 a minute |
+| `GET /v1/admin/migrate`, `POST /v1/admin/migrate` | admin | the [migration job](#the-migration-job-the-new-server): its status and per-day report; `start` (from a server, from Basin, to Basin) / `pause` / `resume` / `cancel` / `resolve` (audited as `migrate.<action>`, never with a token) |
 | `GET` / `PUT /v1/notify/config`, `GET /v1/notify/status`, `PUT /v1/notify/keys`, `POST /v1/notify/test`, `POST /v1/notify/send` | admin | [experience notifications](#experience-notifications): the pushed config, the queue and switches (never a key), the signing keys, a test send (bypasses the caps), a one-off send |
 | `GET /v1/notify/user?uid=\|pid=\|name=` | admin | one player's notifications: consent (prompt checks / shown / closed, inferred state and when, mute), every send with its open and play, the intents |
 | `GET /v1/notify/recent?limit=&kind=` | admin | the newest sends of everyone (1..500, default 100), with the cached name, the player's opt-in state and the send's params |
@@ -850,6 +862,286 @@ room again (a restart does not repeat an open one). To make room: shorter retent
 recordings, error logs, the audit log), fewer local backups (`TYPETORCH_BACKUP_KEEP`), or a bigger volume. The local
 backups are hard links, so they cost little until the day files they share are pruned.
 
+## Move to another server
+
+Plans/35 A. A move never copies the data folder (file systems are fragile during migrations): the new server is set up
+first, the game switches to it, then the history moves over slowly, row by row through the two servers' APIs, and is
+checked day by day. The old server is only read; you turn it off when the report says every day matches.
+
+```
+1. new server up, empty      2. game switches to it          3. history moves over, verified per day
+   new URL, the old keys        typetorch backend setup         new ──pull──► old (read-only export API)
+                                --url <new>; servers follow     old stays up until every day matches
+                                within 5-55 s
+```
+
+**Both servers need this version** (the old one serves the export API, the new one runs the job), and the same DuckDB
+version (the per-day hash is DuckDB's `hash()`; one backend version pins one DuckDB).
+
+### Runbook
+
+1. Update the old server to this version (it gains the export API). Deploy the backend on the new machine (Coolify, or
+   [the systemd recipe](#run-it-on-a-vps-without-docker)) with **its own URL** and **the old keys** (`TYPETORCH_API_KEY`,
+   `TYPETORCH_ADMIN_TOKEN`, the same as the old server's), so nothing else changes.
+2. `typetorch backend setup --url <new>` (the keys are already in the game repo's `.env`). The signed record moves every game
+   server within a minute (they read it at least every 55 s). The old server keeps its address and takes in what servers
+   had in flight.
+3. Switch the Roblox **erasure webhook** to `<new>/v1/erasure` (Creator Hub > Webhooks; same secret). From now on an
+   erasure reaches the new server, and it covers rows imported later too.
+4. Start the move on the new server: `typetorch backend migrate --from <old>` (the old admin token from
+   `TYPETORCH_OLD_ADMIN_TOKEN` in the env or `.env`, never a flag), or `POST /v1/admin/migrate` (below), or the Settings page's
+   **Migration** card. Watch `typetorch backend migrate status`, the card, or `GET /v1/admin/migrate`.
+5. When the report is all `match`: keep a last [backup](#backups-and-restore) of the old server, then turn it off. The public
+   domain can move to the new server later.
+
+Not moved: the raw archives (the same rows again), `devices.json` (trust your browsers again: `typetorch backend bless`),
+`instance.key` (the new server has its own: Sign in with typetorch.dev needs **Add project** again for the new fingerprint),
+the alert webhook URL (enter it again on the Settings page), the admin allow list and the token login (guarded settings: set
+them again on purpose), the named API keys (`typetorch keys create` again), notifications (`notify.db`).
+
+### The export API (every backend)
+
+Read-only: it reads the day files and the live tables through the warehouse's read connections (never the writer, never
+`live.duckdb` for writing), and SQLite through plain SELECTs. **The admin token as a Bearer only**: a browser session (even
+an owner's), the web role, any named API key (even an admin one) and the game key are refused. One export request at a time (`429` +
+`Retry-After` otherwise) and 120 a minute. Rows of erased players are left out of every answer. Its working files (a
+sorted copy of a day's live rows, a page on its way out) are in `<data dir>/export/` and deleted after use.
+
+| Route | Answer |
+|---|---|
+| `GET /v1/admin/export/manifest` | `{ version: 1, server: { instance, now }, tables: { events: [{ day, rows, hash }], recordings: [...] }, live: { day, rows, lastRt }, fleet: { <table>: { rows, maxId } }, erased }`. `day` = `YYYY-MM-DD` (UTC); `hash` = the decimal string of `bit_xor(hash(<every stored column>))`, order-free, so either side computes it. Days of the day files plus the live rows (a day with both shows their sum). A day file's numbers are cached while it is unchanged. |
+| `GET /v1/admin/export/rows?table=events\|recordings&day=&page=&size=` | gzip NDJSON (`application/x-ndjson`, `content-encoding: gzip`) in the stored row format with `rt`; `x-typetorch-rows`, `x-typetorch-pages`, `x-typetorch-last-page: 1` on the last page. `size` 1 to 50,000. The day file comes first in its own order (a page is a range of its row numbers: stable, a day file is immutable), then the day's live rows ordered by every column. |
+| `GET /v1/admin/export/hash?table=&day=&exclude=a,b` (or `POST` with `{ exclude: [...] }`, up to 100,000 pids) | `{ rows, hash }` of the day without those pids (the new server's erasures since). |
+| `GET /v1/admin/export/fleet?table=&after=&size=` | `{ rows, next }`: pages (1 to 5,000 rows) of `deploys`, `marks`, `reports`, `alerts`, `server_metrics`, `error_kinds`, `error_counts`, `error_jobs`, `error_pids`, `identities`, `saved_queries`, `audit_log`. The cursor is the rowid (the integer key); the three `WITHOUT ROWID` error tables page by position. |
+| `GET /v1/admin/export/erased` | `{ pids }` |
+
+### The migration job (the new server)
+
+`POST /v1/admin/migrate` (admin; a cookie request also needs `X-TypeTorch: 1`):
+
+```json
+{ "action": "start", "from": { "kind": "backend", "url": "https://old.example.com", "token": "<old admin token>" }, "rowsPerSecond": 20000 }
+{ "action": "start", "from": { "kind": "basin", "accountId": "<32 hex>", "bucket": "<R2 bucket>", "token": "<BASIN_SQL_TOKEN>", "namespace": "typetorch" } }
+{ "action": "start", "to": { "kind": "basin", "events": "https://<id>.ingest.cloudflare.com", "recordings": "https://<id>.ingest.cloudflare.com", "token": "<BASIN_SEND_TOKEN>" } }
+{ "action": "pause" }  { "action": "resume" }  { "action": "cancel" }
+{ "action": "resolve", "page": "<page id>", "choice": "resend" | "skip" }
+```
+
+The Basin directions are described in [Move analytics to Basin and back](#move-analytics-to-basin-and-back).
+
+Every answer, and `GET /v1/admin/migrate`, is the status:
+
+```json
+{ "state": "idle|running|paused|waiting|done|failed|cancelled|needs_decision",
+  "direction": "from-backend|from-basin|to-basin",
+  "source": { "kind": "backend", "url": "https://old.example.com" } | { "kind": "basin", "bucket": "...", "namespace": "typetorch" } | { "kind": "local" },
+  "target": { "kind": "basin", "events": "...", "recordings": "..." },   (to-basin only)
+  "startedAt": 0, "finishedAt": null, "rowsPerSecond": 20000, "rowsDone": 0, "rowsTotal": 0,
+  "steps": [{ "name": "erased|identities|fleet|events|recordings|live|rollups|verify", "state": "pending|running|done|failed", "done": 0, "total": 0, "note": "" }],
+  "days": [{ "table": "events", "day": "2026-11-14", "state": "pending|importing|match|missing|differs|duplicates|sent", "rowsSource": 0, "rowsTarget": 0, "note": "" }],
+  "waitingFor": null, "decision": null | { "page", "table", "day", "rows", "why", "question" }, "error": null }
+```
+
+`from.url` (and a Basin stream URL) is https (plain http only on this machine: the token would cross the network in
+clear); redirects are refused. One job at a time: a second `start` while one runs, waits or is paused is `409`. `resume` also restarts a `failed` job from where it
+stopped. `cancel` keeps what was already imported (the old server is never touched either way). `start` again after
+`done` (same old server) takes what changed since: day files merge without duplicates, the SQLite tables go on from their
+cursors.
+
+**The order.**
+
+| Step | What |
+|---|---|
+| `erased`, `identities` | The old server's erased pids are applied here first (their rows are then dropped at import), then pid <-> UserId, so an erasure that reaches this server during the move finds the pids and covers imported rows too. |
+| `fleet` | Deploys (by seq: this server's own releases since the cutover stay), marks, reports, alerts, server metrics, error logs (counts added up), saved queries (a name this server already has wins), the audit log; then the runtime settings the old server's Settings page saved, unless this server saved its own (never the webhook URL, the admin allow list or the token login). Each page and its cursor commit in one SQLite transaction: exactly once. |
+| `events`, `recordings` | Newest day first, in pages (50,000 events, 1,000 recording chunks). Pages are staged in `<data dir>/migrate/` and merged into the day file by the nightly export's **late-row merge** (old file + the rows -> exact duplicates dropped, sorted, a temp file, renamed) as one warehouse job, so it never races the loader, the nightly export or an erasure, and rows never pass through `live.duckdb`. A long day merges every million rows. Re-running a page or a day changes nothing. Days older than this server's analytics history setting (`keepDays`) are skipped. |
+| `live` | Once the old server has received nothing for 10 minutes (`live.lastRt`; state `waiting` meanwhile), the days that changed since they were imported (its live rows, late rows, its nightly export) are imported again. |
+| `rollups` | Rebuilt here from the imported day files (finished days), then `players.parquet`; never copied. |
+| `verify` | The old server's manifest once more, every day checked again. |
+
+**Verify, per day.** Days before the cutover (the first day this server held rows of its own when the job started) must
+have the same `(rows, hash)` as the old server's, minus the pids erased here since (the old server computes that hash).
+The cutover days also hold new rows: checked as a superset, every old row must be here (an anti-join on the contract
+columns, page by page; the note says how many rows only this server has). The report: `match`, `missing` (`missing <n>`),
+`differs`. A day that fails is imported again once, then left for you.
+
+**Throttle.** At most `rowsPerSecond` rows a second (`TYPETORCH_MIGRATE_ROWS_PER_SECOND`, default 20,000: about 5 minutes for
+6 million rows). Live ingest comes first: the job waits while the loader is behind (raw files older than two loader ticks)
+and while a query runs (up to 30 s at a time). The old server's own limits (one export at a time, 120 a minute) are waited
+out.
+
+**Survives anything.** The state (the source, the old token, a cursor per SQLite table and per day, each day's result) is in
+the SQLite file (`migrate_job`, `migrate_days`, `migrate_cursors`); a crash or a redeploy of either server resumes at the
+last page. **The old token** is sealed (AES-256-GCM under a key derived from `instance.key`; the job makes the instance key
+on first use when Sign in with typetorch.dev is off), never echoed, logged or written to the audit log (the redactor knows
+it); it is dropped when the job ends or is cancelled. A backup leaves `instance.key` out: a job restored from a backup asks
+to be started again.
+
+**Visible.** The Settings page's **Migration** card (progress per step, the days still to go, the per-day report, pause /
+resume / cancel, a start form), a banner on the analytics pages ("History before <day> still importing", so a half-empty
+chart doesn't read as a traffic drop; owners only), and `typetorch backend migrate status`.
+
+## Move analytics to Basin and back
+
+Plans/35 B, on the same job: the analytics history (events and recordings) moves between this server's day files and
+Cloudflare Basin, row by row, checked per day. The fleet API (heartbeats, deploys, error logs, identities, settings) stays
+on the server either way: a Basin game still has a backend for it. Nothing is deleted on either side; Basin can't delete.
+
+**Why no row is lost or doubled at the switch.** The game sends each row to one sink: the one its signed record names
+when it flushes (game servers follow a new record within 5-55 s, and their queued rows go to the new sink). So the rows on
+the server and the rows in Basin never overlap, and the job moves *every* row the source holds, not a time range: rows
+the game sent just before the switch are on the old side only and come over with the rest.
+
+### To Basin (empty a server into Basin)
+
+1. Set up Basin ([Cloudflare Basin setup](#cloudflare-basin-setup)): the two streams, the tables, a send token.
+2. **Switch the sink first:** `typetorch backend setup --analytics basin --events <stream url> --recordings <stream url>`
+   (the send token as `BASIN_SEND_TOKEN` in the game repo's `.env`). The record keeps `backend` = this server for the
+   fleet API. From a minute later the game's analytics go to Basin; what was in flight still reaches this server.
+3. Optional, for the count check: set `CLOUDFLARE_ACCOUNT_ID`, `BASIN_BUCKET` and `BASIN_SQL_TOKEN` (and `BASIN_NAMESPACE`
+   if not `typetorch`) on this server (Coolify env) and redeploy.
+4. `typetorch backend migrate --to-basin` (the record's Basin streams unless `--events` / `--recordings`; it runs on the
+   record's `backend.url`, this server). The job **waits until this server has received no analytics row for 10 minutes**
+   and everything received is loaded (state `waiting`, saying so), so a forgotten step 2 never sends a half day.
+5. Watch `typetorch backend migrate status`. A page cut off mid-send stops it in `needs_decision` (below):
+   `typetorch backend migrate resolve <page> resend|skip`.
+6. When every day is `match` (or `sent` without read settings): keep a [backup](#backups-and-restore); the analytics part
+   can then be turned off (`TYPETORCH_PARTS=fleet`), the data folder stays.
+
+How it sends: newest day first. Each day is first copied to a stable snapshot (`<data dir>/migrate/basin/`: the day file and
+the day's live rows, erased players left out, exact duplicates collapsed as the nightly export does, sorted by every column, so
+a crash rebuilds the same file), then posted to the table's stream as JSON arrays of at most 4 MB (Basin takes 5 MB) and
+10,000 rows, the contract columns only (Basin has no `rt`), `Authorization: Bearer <send token>`. Basin can't dedupe or delete,
+so every page is written down as `sending` (with its id) **before** the POST and `sent` after the 2xx. A page still `sending`
+when the job starts again (the server stopped mid-send), or a POST that got no answer at all (a timeout: Basin may have taken
+it), puts the job in `needs_decision` with `decision: { page, table, day, rows, why }`; `resolve` with `resend` sends it again
+(nothing lost; Basin may hold it twice, and verify says so) or `skip` (nothing doubled; its rows may be missing, and verify
+says so). `429` and `5xx` are retried with backoff (Basin took nothing), as is a connection that never opened; any other
+`4xx` stops the job with the page back to unsent. Rows that reach this server after their day was sent (a game server on an
+old record) go in a later part of that day (rows with a newer `rt`; the `live` step). `erased`, `identities`, `fleet` and
+`rollups` are done as "not applicable". A second `start` to the same streams goes on where the last one stopped (days sent
+stay sent); to other streams it starts over.
+
+### From Basin (bring a Basin game's history to a server)
+
+1. The server up with the analytics part (`TYPETORCH_PARTS=analytics,fleet`, the default).
+2. **Switch the sink first:** `typetorch backend setup --analytics duckdb`. The game's analytics go to this server within a
+   minute.
+3. `typetorch backend migrate --from-basin` (`CLOUDFLARE_ACCOUNT_ID`, `BASIN_BUCKET`, `BASIN_SQL_TOKEN`, `BASIN_NAMESPACE`
+   from the game repo's `.env`; the token needs Basin SQL read, Basin Catalog read and R2 storage read). It runs on the record's
+   `backend.url`.
+4. When every day is `match`: the Basin tables can stay as a backup or go (the job only reads them).
+
+How it reads: through the Basin SQL API (no DuckDB extension, nothing downloaded). Basin SQL caps a query at 10,000 rows,
+has no OFFSET, and bills what it scans, so: one per-day count query per table (it reads `t` only); a day over five pages of
+rows is cut into time windows of about five pages (an hour histogram, a minute histogram for a big hour); inside a window,
+pages of 10,000 events (250 recording chunks) go by keyset: `ORDER BY t, h` where `h` is the md5 of every column, from the
+last `(t, h)` on, skipping the copies of the last row already taken, so exact duplicates in Basin are counted, never lost or
+read twice at a page edge (a row with more copies than a page is counted in one query). Basin rows have no `rt`: each gets
+the time this server received it, the import, as the ingest path stamps every row (a row that came twice keeps the first).
+Pages are staged and merged into the day files by the same late-row merge as a move from a server; this server's erased
+players are left out of every imported row. The `live` step waits for Basin's roll delay (10 minutes from the start: rows
+sent just before the switch become readable late); `verify` counts every day in Basin again and imports a day that grew once
+more. `erased`, `identities` and `fleet` are done as "not applicable".
+
+### What is verified
+
+| Direction | Checked per day | Not checked |
+|---|---|---|
+| From Basin | The rows read equal Basin's `COUNT(*)` for the day (counted again at the end); every row read is in the day file afterwards (an anti-join on the contract columns, without erased players); a day before this server's own rows began holds no more rows than Basin has. `match`, `missing`, `differs` (rows Basin holds that don't fit the row format are not imported and make the day `differs`). | A hash against Basin (Basin SQL can't compute DuckDB's `hash()`). Exact duplicates in Basin collapse here; the note counts the rows not kept (duplicates or erased players). |
+| To Basin, with read settings | Basin's `COUNT(*)` for the day, minus what Basin held of that day before the job sent anything, against the rows sent (polled every 30 s until it is reached or 10 minutes after the last send): `match`, `missing <n>`, `duplicates` (more rows than were sent, e.g. a resent page). Days from the start day on (the game sends to Basin too) and days Basin already had rows of are checked as a superset. | Row contents in Basin (counts only); which rows are missing or doubled. |
+| To Basin, without read settings | Each page's 2xx. The day ends `sent`. | Anything in Basin. |
+
+**Costs.** Basin SQL bills the bytes each query scans, with a 10 MB minimum per query (check Cloudflare's current price).
+From Basin: two count queries, a histogram per big day, and about one page query per 10,000 events (250 recording chunks),
+each scanning its window from the cursor on: every row is scanned a few times. `rowsPerSecond` paces it. To Basin: Pipelines
+bills what it takes in; with read settings, the verify step adds two count queries per check (they read `t` only).
+
+## Several ingest servers (optional)
+
+Plans/35 C. **Most games never need this: one server (the default, `TYPETORCH_ROLE` unset) runs ingest, DuckDB, the fleet
+and the explorer together, and nothing here changes it.** With no role set the backend reads no bucket setting, starts no
+queue work and behaves exactly as before.
+
+**When you need it:** past what one core ingests. One backend takes about 10,000 events a second on one core
+([Load tests](#load-tests)); at the rates two live games showed (0.17-0.58 event rows per player-second) that is roughly
+17k-60k players online. Before that, [shed load or resize the machine](https://www.typetorch.dev/guides/emergency-scale-ups).
+Past a few hundred thousand players online, move analytics to [Basin](#cloudflare-basin-setup) instead.
+
+```
+Roblox servers ── events ──► load balancer / DNS ─► ingest node x N   (auth, limits, validate; raw file before the 202)
+      │            (backend.ingest)                        │ a Parquet file per table every 5 s, uploaded, then deleted locally
+      │                                                    ▼
+      │                                            queue bucket (S3 API, e.g. R2): <prefix>events/, recordings/, identities/
+      │                                                    │
+      └── heartbeats, errors, deploys ──► main server ◄────┘ each loader tick: list, download, load with its own rows, delete
+          (backend.url)                   fleet (SQLite), error logs, the explorer, the ONE DuckDB
+```
+
+- **Ingest nodes** (`TYPETORCH_ROLE=ingest`) serve only `POST /v1/ingest`, `POST /v1/identity`, `GET /v1/auth/check` (the
+  game key answers role `game`) and `/healthz`; anything else is a `404` saying "this is an ingest node; the explorer and the
+  fleet API are on the main server". The same validation, body caps, rate limits (`TYPETORCH_IP_PER_MINUTE`,
+  `TYPETORCH_JOB_PER_MINUTE`: **per node**, so each takes the full limit) and [busy 503](#limits-and-the-busy-503) (its
+  backlog: rows accepted and not yet in the bucket) as a server. An accepted batch is on the node's disk before the `202`.
+  Every `TYPETORCH_INGEST_ROTATE_SECONDS` (5, or at 64 MB) the raw files are closed and written as one Parquet file per table
+  (identity rows: NDJSON), uploaded to `<prefix><table>/<node>-<ms>-<n>.parquet`, and deleted only after the bucket
+  confirmed the upload. A crash, a full disk or a bucket outage leaves the files on the node; the next rotation (or start)
+  uploads them again under the same key. The node id is made once per data folder (`data/ingest/node-id`).
+- **Erasure on the nodes:** each node pulls the erased pids from the main server every minute (`GET
+  <TYPETORCH_MAIN_URL>/v1/admin/export/erased`, the admin token, no redirects followed) and drops their rows and identity
+  rows; the list is kept on disk, so a node whose main server is down keeps working on the last one. The main server filters
+  again at load, so a row a node took in the minute before it heard of an erasure never lands.
+- **The main server** (`TYPETORCH_ROLE=main`) is a normal server (it takes ingest too, from game servers still pointed at
+  it) whose loader also lists the bucket each tick, downloads up to 64 files / 256 MB, loads them **in the same transaction**
+  as its own raw files, upserts the identity files into the identity table, then deletes them from the bucket. The keys it
+  committed are remembered (`live.loaded_remote`, 2 days), so a file still in the bucket after a crash or a failed delete is
+  only deleted, never loaded twice; a row that still arrives twice is an exact duplicate, which the nightly export drops.
+  Its busy 503 counts the bucket backlog it has seen. A bucket it can't reach never stops its own ingest: the files wait,
+  the Backend stats page says so, and a `queue_bucket_down` backend alert (critical) is raised after a minute. A file it
+  can't load (not Parquet, a schema from another version) is skipped for 10 minutes with a `queue_file_bad` alert.
+- **Stats:** `GET /v1/admin/stats` on the main server gains `queue: { role, pendingFiles, pendingBytes, lastLoadAt, files,
+  errors, lastError, lastErrorAt, bucket, truncated, identities }` (only when the role isn't `all`); the explorer's
+  **Backend stats** page shows it. A node's numbers are in its `GET /healthz` with the admin token (`queue`, `ingest`).
+- **Not on a node:** no `live.duckdb`, no day files, no nightly jobs, no explorer, no fleet, no named API keys (only
+  `TYPETORCH_API_KEY` / `TYPETORCH_API_KEY_PREVIOUS` are accepted there). DuckDB only writes the Parquet files.
+- **Bun only:** the bucket client is Bun's built-in `S3Client` (no extra dependency); the Docker image runs Bun.
+
+### Setting it up
+
+1. **A bucket** with the S3 API, e.g. Cloudflare R2: create a bucket (`tt-queue`) and an API token with Object Read & Write
+   on it (its access key id and secret). No lifecycle rule is needed: the main server deletes what it loaded.
+2. **The main server**: your existing backend, plus `TYPETORCH_ROLE=main` and the four bucket settings. Redeploy it first.
+3. **The ingest nodes**: the same image, each with its own volume (`/data`; one node per data folder: a rolling deploy's
+   new container waits for the old one, as the main server does), and:
+
+   | Variable | Main | Ingest node |
+   |---|---|---|
+   | `TYPETORCH_ROLE` | `main` | `ingest` |
+   | `TYPETORCH_API_KEY`, `TYPETORCH_ADMIN_TOKEN` | as now | **the same values** as the main server (the node checks the game key and pulls the erased pids with the admin token) |
+   | `TYPETORCH_QUEUE_BUCKET`, `TYPETORCH_QUEUE_ENDPOINT`, `TYPETORCH_QUEUE_ACCESS_KEY_ID`, `TYPETORCH_QUEUE_SECRET_ACCESS_KEY` | required | required |
+   | `TYPETORCH_QUEUE_PREFIX` | optional (`incoming/`) | the same as the main server |
+   | `TYPETORCH_MAIN_URL` | - | required: the main server's address, e.g. `https://backend.example.com` |
+   | `TYPETORCH_INGEST_ROTATE_SECONDS` | - | optional (`5`) |
+   | `TYPETORCH_TRUST_PROXY`, `TYPETORCH_TRUSTED_PROXIES`, `TYPETORCH_CLOUDFLARE` | as now | as for the main server (the rate limits are per client address) |
+
+   `TYPETORCH_ROLE=main` or `ingest` without the bucket settings (or a node without `TYPETORCH_MAIN_URL`) refuses to start
+   and says which variable is missing; the values are never printed. Bucket settings on a server without a role are ignored
+   with a warning.
+4. **One address for the nodes**: a load balancer, or DNS round-robin (several A records), in front of them, e.g.
+   `https://ingest.example.com`. Nodes keep no shared state, so any request may go to any node.
+5. **Point the game at it** (CLI 0.19, framework 0.7.2): `typetorch backend setup --ingest https://ingest.example.com`. It
+   checks `/healthz` and the game key there, and writes `backend.ingest` into the signed record: game servers send events to
+   the ingest address and everything else to `backend.url` within a minute. `--ingest none` moves events back to the main
+   server; without the flag the record's ingest address is kept.
+6. Watch the main server's **Backend stats** page (the queue tiles) and each node's `/healthz` with the admin token.
+
+**On Coolify:** a node is a **Dockerfile** app on this repo (every variable reaches it; the compose file lists only the
+usual ones), with a persistent storage at `/data` and its own domain or a shared one behind your load balancer. Its health
+check is the same `GET /healthz`. The main server keeps its app; add the role and bucket variables to it (with **Docker
+Compose**, add a line per variable to `compose.yaml`'s `environment`, or switch it to the Dockerfile resource). To go back to
+one server: `typetorch backend setup --ingest none`, wait for the bucket to empty (the queue tiles), stop the nodes, remove
+`TYPETORCH_ROLE` and the bucket settings from the main server.
+
 ## The event bus
 
 `src/bus.ts`: in-process publish/subscribe, no broker. Ingest publishes on five topics; subscribers consume them.
@@ -1035,12 +1327,12 @@ reached it (drop-offs: their last step and when; playtime funnels: their playtim
 
 `web/` (Vite, React, shadcn/ui; history kept from its own repo with `git subtree`). `bun run web:install` and `bun run
 web:build` build it into `web/dist`, and the backend serves it at `/` (the Docker image builds it for you). Pages: Overview,
-Roblox, Retention (two tabs over the join-day cohorts: **Players back**, and **Revenue (LTV)**: the `ltv` query's revenue per player, Robux paid per player or payer share at D0 to D30 (`?view=revenue&ltv=revenue|robux|payers`), heat cells, the day in progress orange, a weighted average row; with the Audience filters it answers "did this campaign pay back"), **Demographics** (who plays: Roblox's age, gender, language, country, platform and OS cards over the filter bar's full UTC days, its device, new / returning and country filters sent as Roblox's Platform / IsNewUser / Country (country matched on Roblox's own values: the ISO code or the English name; a country Roblox doesn't report is listed as not applied); and from our join events country, language, device, Roblox account age and Premium, every filter applying), Funnels, Players (the list, with a **Risk** column from `churn`, and under it one player's detail: Roblox profile card, Spending, Playtime,
+Roblox, **Session time** (Creator Hub's Session time Explore view from the `session-time` query: average session time per step, weighted or Roblox-style (the mean of the device lines), by device, playtime, playtime per player and sessions, counted when sessions end or start, rejoins merged on request, client-side smoothing, a length histogram and the step rows; the Roblox page's Realtime card links to it with the same filters), Retention (two tabs over the join-day cohorts: **Players back**, and **Revenue (LTV)**: the `ltv` query's revenue per player, Robux paid per player or payer share at D0 to D30 (`?view=revenue&ltv=revenue|robux|payers`), heat cells, the day in progress orange, a weighted average row; with the Audience filters it answers "did this campaign pay back"), **Demographics** (who plays: Roblox's age, gender, language, country, platform and OS cards over the filter bar's full UTC days, its device, new / returning and country filters sent as Roblox's Platform / IsNewUser / Country (country matched on Roblox's own values: the ISO code or the English name; a country Roblox doesn't report is listed as not applied); and from our join events country, language, device, Roblox account age and Premium, every filter applying), Funnels, Players (the list, with a **Risk** column from `churn`, and under it one player's detail: Roblox profile card, Spending, Playtime,
 Sessions, Timeline and Errors views; the Timeline shows each join row's raw join data `jd`, plans/30, collapsed, with a truncated badge), Flow, Experiments, First session, **Recordings**, **Economy**, **Monetization**, Events, Fleet, **Errors**, **Performance**, Query, **Settings** (the
 runtime settings: grouped fields with their source, Reset to env, Send test alert, the recent changes; see
 [Runtime settings](#runtime-settings-the-settings-page)) and **Backend stats** (the server process itself, below). The sidebar groups them (Overview; Players & gameplay: Players,
 Events, Funnels, Flow, Retention, Demographics, Notifications, Feedback, First session, Recordings, Maps, Economy, Monetization, Live events,
-Experiments, Roblox; Observe & troubleshoot: Fleet, Live map, Deploys, Errors, Performance; Data: Query; Admin: Settings, Backend stats and
+Experiments, Session time, Roblox; Observe & troubleshoot: Fleet, Live map, Deploys, Errors, Performance; Data: Query; Admin: Settings, Backend stats and
 Audit log, owners only), with a place card on top (the game's name, live players and icon: `GET /v1/place`, also the tab title), the
 TypeTorch Dashboard link at the bottom while Sign in with typetorch.dev is on, and at its foot who is signed in (Roblox
 name and avatar, or "admin token") with a Sign out button. A light / dark / system theme toggle sits in the header. **Ctrl+K**
@@ -1318,7 +1610,8 @@ const { servers } = await fleet.servers({ branch: "prod" });
 | `values` | the branches, artifacts (newest first), channels and devices seen in the range, for filter pickers | 30 days |
 | `events` | the newest rows, optionally of one `kind` / `name` / `pid` (`limit` up to 1,000); `fleet` rows come without props | 7 days |
 | `benchmarks` | the last `days` (7) full UTC days vs the `days` before, as Creator Hub defines them ([Roblox parity](#roblox-parity)): DAU, MAU (the 30 days ending on the period's last day), new users, average session time, playtime per DAU, D1/D7/D30 (cohorts by first play date, the latest `days` whose day 1 / 7 / 30 is over), payer conversion, ARPPU, ARPDAU, Robux spent and revenue (`creatorShare`, 0.7), qualified first sessions (ours: first sessions reaching `qualifiedMinutes`); each retention rate says whether the events cover its cohort days (`history`: complete, partial or none, with `dataFrom`) | ends at `to` |
-| `realtime` | concurrent users per hour from fleet heartbeats (per minute, summed over servers, Studio left out; `ccuDays` 7): the peak minute and the average, and now; `devices`: concurrent players by device class from sessions (live now: an event in the last 3 minutes and no leave; per hour the average and the peak minute); session time, client errors per session (tech/error from clients), client fps, server memory: the last `hours` (24) vs the hours before | 7 days |
+| `realtime` | concurrent users per hour from fleet heartbeats (per minute, summed over servers, Studio left out; `ccuDays` 7): the peak minute and the average, and now; `devices`: concurrent players by device class from sessions (live now: an event in the last 3 minutes and no leave; per hour the average and the peak minute); sessions, players, new players and playtime (sessions that started in the window), session time (sessions that ended in the window, full length, counted when they end as Creator Hub's Session time chart does: a leave row or 10 minutes without events; `mergeGapMinutes` 0-30, default 0, joins a player's rejoins less than that apart), client errors per session (tech/error from clients), client fps, server memory: the last `hours` (24) vs the hours before | 7 days |
+| `session-time` | Creator Hub's Session time chart: per step (`bucketMinutes` 1, 5, 15, 60 or 1440; default the explorer's step for the range; at most 2000 steps) the average length of the sessions that are over and ended in it (`by: end`, default; full length, the start may be before the range) or started in it (`by: start`): weighted (`avgMinutes`) and Roblox-style (`robloxTotal`: the mean of the device averages, unknown devices left out), per device, playtime, players and playtime per player, empty steps with nulls; `mergeGapMinutes` (0-30, 0 = off) joins a player's sessions closer than that (rejoins, teleports); `summary` (sessions, players, weighted and median length, `robloxHeadline` = the mean of the non-empty steps' Roblox-style total, `weightedMinuteMean`, playtime, playtime per player, running) and the same for the period before (`previous`), `devices` busiest first, a length `histogram` (<30s to 60m+) | 1 day |
 | `trends` | per UTC day (or `bucketHours` 12 / 6 hours) up to now, the running day or bucket last with `partial: true` (D1 null in 12 / 6 h buckets), `window`-bucket (7) moving averages of new users, DAU, session time, playtime per DAU, Robux, revenue and D1 (ratios: the mean of the daily values), in total and per join source (session/join `from`; past `maxSources` folded into `other`) | 28 days |
 | `perf-client` | client fps, memory and ping (tech/client) over time and per group: `by` = `none`, `dev` (device class), `input`, `screen` (viewport short side: `<400`, `400-599`, `600-799`, `800-1079`, `1080+`), `branch`, `art`; p10 (the plain 10th percentile), p50, p90 / p99 on the bad side, avg, n; the busiest `maxGroups` (8, at most 20). Step: the window's (`windowBucketMs`), or `bucketMinutes` (1-1440), or about `buckets` (10-400). At most 92 days and 400 steps | 7 days |
 | `perf-server` | server TPS (`hb`), physics FPS, memory (tech/server) and players (each server's average per step, summed), the same way; `by` = `none`, `branch`, `art` (server rows have no player: device, new/returning and variant filters don't apply) | 7 days |
@@ -1436,6 +1729,14 @@ join sources are the game's own (no Home / Search split), and the qualified firs
 play-through rate starts at the impression, so that card takes no benchmark). A retention card whose cohort days are
 older than the events says "not enough history" (`history: none`) instead of 0 of 0; one whose window the events start
 inside is `partial`. Creator Hub's own numbers settle a day or more after a day ends; ours don't wait.
+Session time in `realtime` and `session-time` counts a session when it ends, as Creator Hub's Performance > Session time
+chart does (each session in the minute it ended, per platform, with a Total line; the headline is the mean of the Total
+line's minutes): averaging the sessions that *started* in a short window and are over is biased short (the long ones
+are still running, and sessions that started earlier but ended in it are missed). A session is over with a leave row or
+after 10 minutes without events. Roblox doesn't publish how its Total line (it isn't the plain mean of the platform
+lines, nor always the weighted mean) or its smoothing is computed; `session-time` gives both a weighted total and the
+mean of the device averages, and merging a player's rejoins less than 5 minutes apart (`mergeGapMinutes`) came closest
+to Creator Hub's 7-day number on one game (suggestive, not confirmed).
 
 Example output (the test fixture: 300 players over 21 days; arrays cut to two items):
 
@@ -1647,12 +1948,33 @@ How it works:
   (`TYPETORCH_KEEP_DAYS` 400, raw archives `TYPETORCH_RAW_KEEP_DAYS` 14), and a rewrite of `live.duckdb`
   when it passes `TYPETORCH_COMPACT_MB` (DuckDB doesn't reliably give space back after deletes).
 - **Queries** read today's file plus only the day files in the range.
-- **Limits:** body 2 MB gzip / 16 MB inflated, 6,000 requests a minute per IP, 60 per JobId, a query timeout of
+- **Limits** ([Limits and the busy 503](#limits-and-the-busy-503)): body 2 MB gzip / 16 MB inflated, 6,000 requests a minute per IP, 60 per JobId, a query timeout of
   60 s, 2 queries at once. DuckDB: `memory_limit` 400MB, 2 threads, spill folder `data/tmp`.
 - **One process per data folder.** The server keeps `data/lock.duckdb` (empty) and `live.duckdb` attached while it runs;
   the nightly jobs and the loader use that same DuckDB instance, ad-hoc SQL its own read-only one on
   `data/sql/sandbox.duckdb` (never `live.duckdb`). Another server on the folder waits for it (a deploy's handover,
   [Deploys on Coolify](#deploys-on-coolify-rolling-updates)); the scripts (`report`, `loadtest`) go through HTTP.
+
+### Limits and the busy 503
+
+| Limit | Default | Answer |
+|---|---|---|
+| Body | 2 MB gzip, 16 MB inflated (`TYPETORCH_MAX_BODY`, `TYPETORCH_MAX_INFLATE`) | `413` |
+| Per address | 6,000 requests a minute (`ipPerMinute`) | `429` + `Retry-After` |
+| Per game server (JobId) | 60 requests a minute (`jobPerMinute`) | `429` + `Retry-After` |
+| Raw backlog | 512 MB waiting in `raw/incoming` (`busyBytes`, `TYPETORCH_BUSY_BYTES`, `0` = off) | `503` busy |
+| Requests in flight | 256 ingest requests at once (`busyRequests`, `TYPETORCH_BUSY_REQUESTS`, `0` = off) | `503` busy |
+
+**The busy 503** (plans/35 D). Without it an overloaded backend only answers slower, until Roblox's HTTP calls time out and
+every game server retries at once. Now `POST /v1/ingest` answers `503 { "error": "busy: ...", "busy": true }` with
+`Retry-After: <10-30>` (jittered, so the retries spread out) **before it reads the body**, while the loader is behind (the
+raw files waiting for it hold more than `busyBytes`; measured at most once a second) or more than `busyRequests` ingest
+requests are being handled. Game servers keep a 503'd batch in their queue and back off (framework 0.7.2 waits at least the
+`Retry-After`). It is checked after the game key and before the rate limits (a refusal doesn't use up the address's
+budget). **Only ingest is refused this way**: heartbeats, deploy reports, alerts, error logs and identities never are.
+`GET /v1/admin/stats` counts it (`ingest.busy` since the start, `ingest.inflight` now, `ingest.lastBusyAt`); the explorer's
+Overview shows a note while it refused in the last minute, and Backend stats the counters. Both limits are runtime settings
+(Settings page, "Rate limits"): raise them when the disk and the loader can take more, lower `busyBytes` on a small disk.
 
 **Right to Erasure.** In Creator Hub > Webhooks, add `https://<your host>/v1/erasure` for "Right to erasure request"
 with a secret (`ROBLOX_WEBHOOK_SECRET`). The server checks `roblox-signature` (`t=<unix s>,v1=<base64
@@ -2446,6 +2768,25 @@ What it means for a 1 GB VPS: 1,000 players online is about 10 million events a 
 under what one core ingests. Memory stays under ~600 MB including the nightly export, because DuckDB holds to its
 400MB cap and spills; a flow graph over many days is the slowest query. Real props make bigger Parquet files than
 these synthetic ones.
+
+**Ingest nodes** ([Several ingest servers](#several-ingest-servers-optional)): `bun scripts/loadtest.ts analytics --rate
+<n> --ingest-nodes 2` starts a main server, two nodes (rotating every 2 s) and an in-process fake S3 bucket, and sends the
+batches round-robin to the nodes; it waits until nothing is left on a node, in the bucket or in the main server's raw files.
+Measured 2026-11-15 on a 4-core i5-4210U laptop (Linux, Bun 1.4.4), everything (client, servers, fake bucket) on the same 4
+cores, so this checks correctness and overhead, not scale-out (that needs the nodes on their own machines):
+
+| 30 s, batches of 250 | Latency p50 / p95 / p99 / max | Peak RSS (main / node) | Catch-up after | Rows loaded |
+|---|---|---|---|---|
+| 10,000 events/s, one server | 4.5 / 11 / 20 / 37 ms | 278 MB | 2.1 s | 299,750 of 299,750 |
+| 10,000 events/s, main + 2 nodes | 5.2 / 18 / 40 / 94 ms | 221 / 174 MB | 4.2 s | 299,750 of 299,750 |
+| 20,000 events/s, one server | 5.4 / 39 / 139 / 240 ms | 436 MB | 2.1 s (loader lag peak 8 s) | 599,750 of 599,750 |
+| 20,000 events/s, main + 2 nodes | 5.6 / 40 / 129 / 211 ms | 385 / 215 MB | 3.9 s | 599,750 of 599,750 |
+
+No errors; at most 4 files waited in the bucket at once, none were left. Through the nodes a row reaches DuckDB a few
+seconds later (a rotation, an upload, a loader tick), and the main server parses Parquet instead of JSON for those rows.
+
+A sudden surge (shed load from the CLI, resize the VPS, tune DuckDB for a bigger machine): [Emergency backend
+scale-ups](https://www.typetorch.dev/guides/emergency-scale-ups).
 
 ## Development
 
