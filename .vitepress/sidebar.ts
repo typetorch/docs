@@ -152,6 +152,7 @@ export const GETTING_STARTED: DefaultTheme.SidebarItem = {
 	text: "Getting started",
 	items: [
 		{ text: "Overview", link: "/docs" },
+		{ text: "Is TypeTorch for me?", link: "/getting-started/is-it-for-me" },
 		{ text: "Fresh setup", link: "/getting-started/fresh-setup" },
 		{ text: "Migrate an existing game", link: "/getting-started/migrate" },
 		{ text: "Coming from Flamework", link: "/guides/from-flamework" },

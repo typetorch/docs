@@ -18,6 +18,9 @@ These docs are also a website: **[www.typetorch.dev](https://www.typetorch.dev)*
 
 ## Get started
 
+Not sure TypeTorch fits you or your game? Read **[Is TypeTorch for me?](getting-started/is-it-for-me.md)** first
+(short answer: it's built for AI agents and for developers who know git).
+
 Pick one path:
 
 | You have | Start here | Time |

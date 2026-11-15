@@ -16,6 +16,9 @@ hero:
       text: Get started
       link: /getting-started/fresh-setup
     - theme: alt
+      text: Is it for me?
+      link: /getting-started/is-it-for-me
+    - theme: alt
       text: Live demo
       link: https://demo.typetorch.dev
     - theme: alt
