@@ -6,8 +6,9 @@ dropped when the generation stops, so a swap never leaves one behind. Each `on*`
 to a trove.
 
 Inside a module, `this.ctx` has the basics too: `realm`, `artifact`, `branch`, `channel`, `generation`, `build` (the
-compiled-in git info), `persist` and `playerState`. `this.ctx` is attached right after the constructor: use it from
-`onInit` on, never in a field initializer (`private state = this.ctx.persist(...)` fails).
+compiled-in git info), `kernel` (the raw generation API), `persist` and `playerState`. `this.ctx` is attached right
+after the constructor: use it from `onInit` on, never in a field initializer (`private state = this.ctx.persist(...)`
+fails).
 
 ## Modules: `TypeTorch.module` and `Dependency`
 
@@ -40,7 +41,9 @@ TypeTorch.running; // false in edit mode (UI Labs stories): identity has default
 TypeTorch.artifact; // { id, commit, commitHash, branch, channel, builtAt, seq, assetId }
 TypeTorch.generation; // 1, 2, 3... per server (or client)
 TypeTorch.branch;
-TypeTorch.channel; // effective channel: "prod" on every public server, and where the branch or the build is prod
+TypeTorch.channel; // the rules: "prod" on every public server, and where the branch or the build is prod
+TypeTorch.rules; // kernel 0.3.9: the same value by name
+TypeTorch.branchChannel; // kernel 0.3.9: what the branch itself is ("prod" or "dev"), for display
 TypeTorch.serverType; // "public" | "private" | "reserved" | "studio"
 TypeTorch.isPinned();
 TypeTorch.kernelVersion;
@@ -49,6 +52,13 @@ TypeTorch.jobId;
 TypeTorch.isStudio;
 TypeTorch.features; // what the running kernel supports
 ```
+
+`channel` and `rules` are what the server enforces: a dev branch on a public server is `"dev"` in `branchChannel` and
+`"prod"` in `channel`. Split data store names by `channel`. On kernels before 0.3.9 `branchChannel` equals `channel`.
+See [Branches and channels](branches-and-channels.md).
+
+`TypeTorch.features` has one boolean per kernel feature: `kernelStart`, `updatePending`, `devChanged`, `artifacts`,
+`requestReload`, `messaging`, `settings`, `runDetached` and `liveDebug`. All are `false` outside a running kernel.
 
 ## How this generation started
 
@@ -164,8 +174,7 @@ TypeTorch.requestReload(player); // owners only: reload this server to its branc
 ```
 
 Don't call `branches()` or `artifacts()` per player or per frame. A build's `channel` in these lists is the build's
-own (a promoted build keeps it); from the next kernel release each branch also carries `branchChannel`, the branch's
-own channel.
+own (a promoted build keeps it). On kernel 0.5.4+ each branch also carries `branchChannel`, the branch's own channel.
 
 ## Cross-server (server only)
 
@@ -213,6 +222,68 @@ TypeTorch.settings(); // the whole verified settings record: holds tokens, never
 ```
 
 Kernel 0.3.8+. See [Settings](settings.md).
+
+### Live events
+
+```ts
+const events = TypeTorch.liveEvents();
+events.active(); // LiveEvent[] running now: { id, name, startsAt, endsAt, set }
+events.upcoming(); // not started yet, in start order
+this.trove.add(events.onChanged((active) => this.showBanner(active)));
+```
+
+Framework 0.7.1, server only. A live event is a scheduled change of `game` values: the signed record's
+`game["tt.events"]` (`{ v: 1, events: [{ id, name, start, end, set }] }`, unix seconds, UTC), made on the explorer's
+Live events page and signed with `typetorch settings set game.tt.events -`. While an event runs (`start <= now < end`
+on this server's clock) its `set` values replace the record's values for `liveConfig`, so `get()` and `onChanged` switch
+at the start and end times by themselves. No message is needed, and an event still ends when the backend is down. Two
+events that set the same key at once: the later start wins. At most 64 events are read. `liveEvents()` is for game UI
+("Double cash ends in 3h"); `liveConfig` already follows the schedule. See [Live events](live-events.md) and
+[Reserved game keys](settings.md#reserved-game-keys).
+
+## Live debug (server only)
+
+```ts
+import { fleet, remoteDebug, TypeTorch } from "@typetorch/framework";
+
+// A button on the explorer's server page (op game.round_state). It must be read-only.
+this.trove.add(remoteDebug.command("round_state", () => ({ kind: "kv", items: { round: this.round } }), { label: "Round" }));
+// A stream sampled while someone watches the server page; "points" draw on the live map.
+this.trove.add(
+	remoteDebug.stream("loot", () => ({ points: this.chests.map((c) => ({ x: c.X, y: c.Y, z: c.Z })) }), { hz: 1, kind: "points" }),
+);
+// A custom column on the Fleet page, read on every heartbeat.
+this.trove.add(fleet.column("current_map", () => this.mapName, { label: "Map", type: "string" }));
+fleet.columnsChanged(); // a heartbeat soon (the kernel sends at most one per 10 s)
+```
+
+Framework 0.7.1 with kernel 0.5.7 (`TypeTorch.features.liveDebug`; `TypeTorch.remoteDebug` and `TypeTorch.fleet` are
+the same objects).
+
+- **Commands** run when an owner presses the button on `/servers/<JobId>`, through remote debug's checks: owners only,
+  30 a minute, a 10 s deadline, args at most 2 KB of JSON, the answer at most 200 KB and scrubbed of secrets. The
+  kernel can't check what a handler does: read-only is your promise, and the explorer labels them game-defined. An
+  answer `{ kind: "table", columns, rows }` draws as a table, `{ kind: "kv", items }` as key-value pairs, anything
+  else as JSON.
+- **Streams** are sampled at `hz` (0.2 to 4) only while someone watches the server page; a sample is at most 16 KB of
+  JSON. `kind: "points"` values (`{ points: [{ x, y, z, label?, color? }] }`) draw as markers on the live map.
+- **Columns** ride every heartbeat: a string of at most 64 characters, a number, a boolean or nothing. They are stored
+  with the server row: never put player names, UserIds or other personal data in a column.
+- Getters and samplers run on kernel threads under pcall with a short deadline: keep them cheap and don't yield.
+- Names match `^[a-z][a-z0-9_]{0,31}$`. At most 16 columns, 32 commands and 8 streams; labels at most 40 characters,
+  descriptions 200. A bad name or option, a duplicate or one past a limit throws at once. Each call returns a remover
+  for the trove. A client throws.
+- On older kernels, and in edit mode, every call is accepted and checked, and nothing reaches the backend.
+
+See [Live debug](live-debug.md) and
+[Errors, debug bundles and remote debug](fleet-and-alerts.md#errors-debug-bundles-and-remote-debug).
+
+## Notifications and feedback
+
+- `TypeTorch.notifications()`: native Roblox experience notifications through the backend (server: `want`, `drop`,
+  `setOff`, `onOpen`; client: `promptOptIn`). See [Notifications](notifications.md).
+- `TypeTorch.feedback()` (server only, framework 0.7.0): `submit(player, { rating?, text?, topic?, ctx? })` checks and
+  writes one `feedback` analytics row. See [Player feedback](feedback.md).
 
 ## Loading screens
 

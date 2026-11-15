@@ -70,11 +70,12 @@ Declare the scale once. The settings record's `game.feedback` wins (live, no dep
 | `scale.id` | `"stars5"` | 1-32 of `[a-z0-9_]`, stamped on every row |
 | `scale.type` | `"stars"` | `thumbs` (0 / 1), `stars` or `scale` (1..steps) |
 | `scale.steps` | `5` | 2..10; thumbs is always 2 |
-| `scale.labels` | none | one per step, lowest first (thumbs: e.g. `["Down", "Up"]`) |
+| `scale.labels` | none | exactly one per step, lowest first, 1-32 characters each (thumbs: e.g. `["Down", "Up"]`) |
 | `maxText` | `1000` | characters of text kept (1..2000) |
-| `rate.perMinute` / `rate.perDay` | `2` / `20` | accepted submits per player |
+| `rate.perMinute` / `rate.perDay` | `2` / `20` | accepted submits per player (1..1000 each) |
 
-An invalid `game.feedback` disables feedback and warns once (an invalid `configure` throws).
+`game.feedback` set to `false` turns feedback off, like `"enabled": false`. An invalid `game.feedback` disables
+feedback and warns once (an invalid `configure` throws).
 
 **Changing the scale later:** give the new scale a new `id`. Every row carries its own scale (`scale`, `type`, `steps`,
 `label`), so old rows keep rendering as they were, and the page shows one distribution per scale. Averages and the
@@ -98,7 +99,8 @@ in the framework's `src/analytics/SCHEMA.md`.
 
 ## The Feedback page
 
-In the explorer next to Notifications, with the same range picker:
+In the [explorer](explorer.md) next to Notifications. Like Notifications, it has its own range picker instead of the
+shared filter bar:
 
 - **Distribution** per scale: thumbs as up / down shares; stars and scales as a histogram with the step labels and the
   average.

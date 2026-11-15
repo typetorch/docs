@@ -5,7 +5,10 @@ Run your **local** code in Studio with the real kernel, the dev menu and DataSto
 itself: no Connect button, and a save reaches a running playtest without Stop + Play.
 
 - Needs kernel 0.3.1+ in `node_modules/@typetorch/kernel` for the local payload, and **kernel 0.5.4+** for live reload
-  in a playtest. CLI 0.11+ for `typetorch serve` (0.12 for `--remote` and `--claude`).
+  in a playtest. CLI 0.11+ for `typetorch serve` (0.12+ for the `--remote` tunnel and pairing link, 0.12.2+ for the
+  `live` script default and Rojo's restarts below, 0.15+ for the hot asset Diff). The template's `@typetorch/cli`
+  range (`^0.9.1`) stays on 0.9.x: `bun add -d @typetorch/cli@latest` gets the current release. Studio plugin 0.7.1 is
+  the latest release.
 - Deploy messages never reach Studio playtests, so Studio doesn't follow your deploys. The kernel mounts your compiled
   code straight from `ServerStorage.TypeTorchDev.Payload`, which Rojo syncs.
 
@@ -19,9 +22,9 @@ itself: no Connect button, and a save reaches a running playtest without Stop + 
   `%LOCALAPPDATA%\Roblox\Plugins`), then restart Studio or reload plugins. From a checkout of
   [typetorch/studio-plugin](https://github.com/typetorch/studio-plugin):
   `bun run typetorch studio install-plugin --from ../studio-plugin` builds it into the same folder with Rojo. The plugin
-  is not on npm, and the Creator Store can't take plugin uploads from the release pipeline yet, so the GitHub release is
-  the way to install it. It carries Rojo's own sync (7.7.0-rc.1, the version `rokit.toml` pins), so you don't need the
-  stock Rojo plugin; if you keep it, connect only one of the two at a time.
+  is not on npm. There is also a [Creator Store copy](https://create.roblox.com/store/asset/135066807179101/TypeTorch),
+  but it is updated by hand and can lag behind the GitHub release. It carries Rojo's own sync (7.7.0-rc.1, the version
+  `rokit.toml` pins), so you don't need the stock Rojo plugin; if you keep it, connect only one of the two at a time.
 - **Game Settings > Security > Enable Studio Access to API Services**, so DataStores work in a playtest.
 - The first time the plugin probes `typetorch serve`, Studio asks to allow its HTTP requests to localhost: allow it.
 
@@ -33,15 +36,21 @@ In the game folder:
 bun run typetorch serve
 ```
 
-It starts, and restarts when they exit:
+It starts, and restarts when they exit (after 0.5 s, doubling up to 10 s while a child keeps crashing):
 
 - **watch**: the game's `watch` script (else `rbxtsc -w`). Compile errors are kept for `serve status` and the plugin's
   panel. `--no-watch` leaves compiling to your editor.
 - **rojo**: `rojo serve studio.project.json` (else `default.project.json`; `--project <file>`) on Rojo's port 34872 or
-  the next free one (`--port`).
-- **extra scripts**: `--with <a,b>` runs those `package.json` scripts with `bun run`; `--live` is `--with live`.
+  the next free one (`--port`). If another process holds the port when Rojo (re)starts, Rojo moves to the next free
+  one and the plugin follows. Rojo can't follow a `$path` folder (`out/server`, ...) that is deleted and recreated, as a deploy's
+  clean build does, so serve restarts Rojo when that happens; `serve status` shows it.
+- **live**: the game's `live` script from `package.json`, when it has one. On by default; `--no-live` turns it off.
+- **extra scripts**: `--with <a,b>` runs those `package.json` scripts with `bun run`.
 - **the control API** on `127.0.0.1`, the first free port of 34880-34887 (loopback only, no browser can call it).
-  `.typetorch/serve.json` (git-ignored) records the port while it runs.
+  `.typetorch/serve.json` (git-ignored) records the port, and the children's process ids, while it runs.
+
+A serve that was killed (kill -9, a closed SSH session) leaves its children running, and that Rojo keeps its port. The
+next `serve` (or `serve status`) stops them on Linux; on Windows and macOS it names them so you can stop them.
 
 Open a place of your experience in Studio. The plugin finds the serve whose `typetorch.json` `universeId` matches the
 place and syncs; another experience's place or an unpublished file syncs only after **Connect anyway** in its panel.
@@ -52,8 +61,9 @@ payload", and `/tt status` says "local payload". The artifact id is `local-<HHMM
 attribute of `ServerStorage.TypeTorchDev`), dev channel.
 
 Ctrl+C, or `bun run typetorch serve stop` from another terminal, stops everything. Other subcommands:
-`serve status` (children, attached Studios, sync state, compile errors), `serve restart <watch|rojo|script>` and
-`serve logs [--studio] [--follow]` (`--studio`: Studio's Output, as the plugin forwards it).
+`serve status` (children, attached Studios, sync state, compile errors), `serve restart <watch|rojo|claude|script>` and
+`serve logs [--studio] [--since <seq>] [--limit <n>] [--follow]` (`--studio`: Studio's Output, as the plugin forwards
+it).
 
 The two-terminal loop still works: `bun run watch` and `bun run studio` (`rojo serve studio.project.json`) with the stock
 Rojo plugin, but nothing reloads a running playtest then.
@@ -70,20 +80,32 @@ Rojo plugin, but nothing reloads a running playtest then.
   uploaded build; Reload comes back to the local copy.
 - To boot the branch head instead, delete `ServerStorage.TypeTorchDev.Payload` (with the sync disconnected).
 - In Studio everyone is a dev with the owner role, so kick and ban can't be tried there.
-- A dropped connection or a restarted `serve` reconnects with a full resync. "Auto-connect: on" in the panel turns it off
-  per place.
+- A dropped connection or a restarted `serve` reconnects with a full resync. Until then the panel says
+  **Disconnected** (red) with how long ago, and keeps retrying. "Auto-connect: on" in the panel turns it off per place.
+- In a playtest the toolbar and the panel stay (on the client in Play, the server in Run), with only the status,
+  playtest and compile cards: pairing and hot assets act on the edit session.
 
 ## Hot assets from the panel
 
 The plugin's **Hot assets** card does [hot assets](hot-assets.md) without publishing the place first: select models or
-UI, **Add** marks them (`TypeTorchAsset`, a key from the name or the name box), **Remove** unmarks them. Each marked
-instance shows as new, changed, up to date, or what a sync would refuse.
+UI, **Add** marks them (`TypeTorchAsset`, a key from the name or the name box; with one hot asset selected, a new
+name turns Add into **Rename**), **Remove** unmarks them. Each marked instance shows as new, changed, up to date, or
+what a sync would refuse.
 
-- **Check** runs `typetorch assets status` on the plugin's export of the open place (no key needed).
+- **Check** runs `typetorch assets status` on the plugin's export of the open place (locally, no key needed).
 - **Upload** runs `typetorch assets sync` on it.
-- **Publish to dev** runs `assets sync --deploy dev` (`serve --dev-branch <b>` picks another dev branch; a prod-channel
-  branch is refused). The deploy follows your `approval` policy like any other: with `"approval": "all"` it becomes a
-  proposal for `typetorch approve`.
+- **Publish to dev** runs `assets sync --deploy dev` (`serve --dev-branch <b>` picks another dev branch, and the
+  button is named after it; a prod-channel branch is refused). The deploy follows your `approval` policy like any
+  other: with `"approval": "all"` it becomes a proposal for `typetorch approve`.
+- **Diff** (CLI 0.15.0+), on each new, changed or removed row after a check: the instances added, removed or changed
+  inside that asset, with old and new property values (at most 30 instances and 8 properties each). The old side is
+  the copy of the lockfile's version that `assets status` and `sync` keep in the state dir
+  (`.typetorch/hot-assets/<hash>.rbxm`); for a lockfile synced on another machine the diff only summarizes the new
+  export, until a sync here. With an older CLI the button stays hidden.
+
+A button shows only when it has work. While the panel is open in edit mode and a serve is attached, the check also
+runs by itself every 30 seconds (never while a job runs, never with nothing marked), and once after every
+(re)connect. It sends a job to serve only when the place or the lockfile changed since the last check.
 
 They run inside `serve` with its keys from the game repo's `.env` (progress in `serve logs`). Because the export comes
 from the open place, the lockfile records place version 0 for changed entries; the next sync from a published place
@@ -101,6 +123,9 @@ bun run typetorch studio play              # start a playtest (--run: Run mode, 
 bun run typetorch studio logs --follow     # Studio's Output, edit and playtest
 bun run typetorch studio stop              # end the playtest
 ```
+
+`--target <id|edit|server|client>` picks the Studio (default: the edit DataModel; `stop`: the playtest server), and
+`--timeout <s>` how long to wait for its answer (default 20).
 
 The plugin keeps listening for these while its sync is down, so an agent can always get Studio back. When no Studio is
 attached at all, run this in Studio's command bar (or the Roblox Studio MCP's `execute_luau`) and the plugin reconnects:
@@ -121,8 +146,9 @@ game:GetService("ServerStorage"):SetAttribute("TypeTorchReconnect", os.time())
    `cloudflared` is installed when it's missing).
 2. Once the tunnel answers, serve prints a **one-time pairing link** (valid 15 minutes): the tunnel URL with the code
    after a `#`. `serve status` shows it again; `typetorch serve pair` makes a new one.
-3. The other person pastes the link into the plugin's **Remote server** card. Their Studio stays paired for 30 days
-   (`serve devices` lists devices, `serve unpair --name <device>` or `--all` revokes them). **Use local serve** goes back.
+3. The other person pastes the link into the plugin's **Server** card and presses **Pair**. Their Studio stays paired
+   for 30 days (`serve devices` lists devices, `serve unpair --name <device>` or `--all` revokes them). **Use this
+   computer's serve** goes back.
 
 - A quick tunnel's address changes when cloudflared restarts; serve then prints a new link. For a fixed address, run
   your own named tunnel to `http://localhost:34890` and pass `--url https://<your tunnel>`; `--no-tunnel` opens none and
@@ -135,8 +161,11 @@ game:GetService("ServerStorage"):SetAttribute("TypeTorchReconnect", os.time())
 
 ## Claude in Studio
 
-`bun run typetorch serve --claude` also runs [remote-claude](remote-claude.md#from-studio-serve---claude) on this machine
+`bun run typetorch serve --claude` also runs [remote-claude](remote-claude.md#from-studio) on this machine
 (no tunnel), and the plugin's **Claude** button opens a chat with Claude Code, like the in-game DEV > Claude tab.
+Code mode only: Claude edits a copy of your branch, and you **Apply** the change into this checkout (Rojo syncs it to
+Studio), **Deploy** it to the dev branch, or **Discard** it. With CLI 0.12.2+ this needs `@typetorch/dev-server` 0.4.0,
+which is not on npm yet (see [From Studio](remote-claude.md#from-studio)).
 
 ## Don't publish that session
 

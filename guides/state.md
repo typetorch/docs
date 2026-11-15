@@ -11,8 +11,14 @@ value, on the server and on every client. Three things keep state across swaps:
 3. **Each client asks for a full state in its controller's `onStart`**, so it hydrates after every join and after its
    own swap. Until the answer arrives, its atoms keep the values it had before the swap (from its own `persist`).
 
-Written for charm 0.10 and charm-sync 0.3, the pair most roblox-ts games use. With other versions, or another sync
-library, the TypeTorch lines are the same.
+Written for charm 0.10 and charm-sync 0.3, the pair most roblox-ts games use. charm-sync 0.4 (which needs charm 0.11)
+replaced the `CharmSync.server(...)` / `CharmSync.client(...)` objects with module functions (`server.connect`,
+`client.patch`, ...), so adapt the charm-sync calls below if you use it. With other versions, or another sync library,
+the TypeTorch lines are the same.
+
+Without charm-sync, the same rule holds: the [template](https://github.com/typetorch/template)'s
+`RushStateController` keeps client atoms on the controller instance (fresh each generation), fills them from network
+events, and asks the server for a snapshot after every join and after its own swap.
 
 ## The atoms
 

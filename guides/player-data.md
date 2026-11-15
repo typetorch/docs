@@ -633,6 +633,9 @@ within 30 s.
   older code against data the newer code may already have touched.
 - **Keep DataStore budgets in mind:** a swap must not trigger a reload of every player.
 - **Receipts are recorded where the data is saved**, before `PurchaseGranted`, never only in `persist`.
+- **Per-player values you don't save** (cooldowns, a round's checkpoint): `this.ctx.playerState("cooldowns.v1",
+  (player) => init)` (or `TypeTorch.playerState`) keeps them across swaps, keyed by UserId, and drops a player's entry
+  only when they really leave. Plain data only, like `persist` ([Runtime API](runtime-api.md)).
 - **Small data without sessions** works inside the payload too: read once per join, write with `UpdateAsync` when it
   changes, and keep unfinished writes in `persist` so the next generation retries them. The template's `BestService`
   (personal bests) does exactly this. Its `ShopService` records coin pack receipts in a DataStore before it grants

@@ -57,21 +57,37 @@ contents for each.
 
 1. **Bun** as the package manager (delete other lockfiles after `bun install`).
 2. **`rokit.toml`**: `rojo = "rojo-rbx/rojo@7.7.0-rc.1"` and `lune = "lune-org/lune@0.10.5"`, then `rokit install`.
+   Add darklua for the [production pack](../guides/deploy-and-rollback.md#production-pack) (CLI 0.17+):
+   `rokit add seaofvoices/darklua`. Without it every `typetorch build`, `upload` and `deploy` warns that the payload isn't
+   minified.
 3. **`package.json`**: the template's dependencies (`@typetorch/framework`, `@typetorch/kernel`, `@rbxts/t`,
-   `@rbxts/trove`, `rbxts-transform-debug` 2.2.0), dev dependencies (`@typetorch/transformer`, `@typetorch/cli`,
-   `@typetorch/dev-server`, roblox-ts 3, TypeScript 5.5.3), `overrides`, and its scripts `build`, `watch`, `studio`
-   and `"typetorch": "typetorch"`. All `@typetorch/*` packages come from npm. Copy `scripts/build-info.ts` from the
-   template (`build` and `watch` run it), then `bun install`.
+   `@rbxts/trove`), dev dependencies (`@typetorch/transformer`, `@typetorch/cli`, `@typetorch/dev-server`, roblox-ts 3,
+   TypeScript 5.5.3, `@rbxts/types`, `@rbxts/compiler-types`), `overrides`, and its scripts `build`, `watch`, `studio`
+   and `"typetorch": "typetorch"`. All `@typetorch/*` packages come from npm. The template's version pins are behind
+   npm today (CLI 0.9.1, transformer 0.2.1, framework 0.5.0), so take the newest:
+
+   ```sh
+   bun add @typetorch/framework@latest @typetorch/kernel@latest
+   bun add -d @typetorch/transformer@latest @typetorch/cli@latest @typetorch/dev-server@latest
+   ```
+
+   Leave out the template's `rbxts-transform-debug`: `@typetorch/transformer` 0.3+ has the debug macros itself
+   ([Debug macros](#debug-macros) below). Copy `scripts/build-info.ts` from the template (`build` and `watch` run it)
+   and change its import line to `@typetorch/transformer/macros`, then `bun install`.
 4. **`tsconfig.json`**: `include` only `src`; `"typeRoots": ["node_modules/@rbxts", "node_modules/@typetorch"]`;
-   `"types": ["types", "compiler-types"]`; `plugins`: `rbxts-transform-debug` first, then
-   `{ "transform": "@typetorch/transformer" }`.
-5. **`default.project.json`** becomes the **payload**: a Rojo `Model` with `Server`, `Shared`, `Client` and `include`
+   `"types": ["types", "compiler-types"]`; `plugins`: only `{ "transform": "@typetorch/transformer" }` (transformer
+   0.3+; with 0.2, `rbxts-transform-debug` came first).
+5. Optional: **goblox**, a Go port of roblox-ts that compiles several times faster. `bun add -d goblox`, and
+   `typetorch build` (CLI 0.16+) uses it from then on ([Compiler](../guides/deploy-and-rollback.md#compiler)). It runs
+   only `@typetorch/transformer` and ignores every other tsconfig plugin. End the `build` script with `goblox` instead
+   of `rbxtsc`; otherwise each build warns and runs goblox directly, without the script's other steps.
+6. **`default.project.json`** becomes the **payload**: a Rojo `Model` with `Server`, `Shared`, `Client` and `include`
    (copy the template's; it maps `@rbxts` and only `@typetorch/framework`). Keep your old project as
    `legacy.project.json` until the migration is done.
-6. **`studio.project.json`** from the template, for [testing in Studio](../guides/studio-testing.md).
-7. **`.gitignore`**: `out/`, `include/`, `.typetorch/`, `src/shared/build.ts`, `.payload.gen.project.json`,
+7. **`studio.project.json`** from the template, for [testing in Studio](../guides/studio-testing.md).
+8. **`.gitignore`**: `out/`, `include/`, `.typetorch/`, `src/shared/build.ts`, `.payload.gen.project.json`,
    `.tsconfig.typetorch.json`, `.env`, `.env.*`.
-8. **`typetorch.json`**: see [fresh setup step 5](fresh-setup.md#5-typetorchjson). After you add or change
+9. **`typetorch.json`**: see [fresh setup step 5](fresh-setup.md#5-typetorchjson). After you add or change
    `members`, `revoked` or `devBadgeId`, run `bun run typetorch access push`: servers (kernel 0.3.8+) see the lists only
    after that ([who gets the dev menu](fresh-setup.md#11-the-dev-menu-and-who-gets-it)).
 
@@ -81,6 +97,36 @@ building with framework or kernel changes that aren't on npm yet; to use that, c
 
 **Check:** `bun run build` compiles. A Flamework game doesn't yet: every `@flamework/core` import fails with "You can
 only use npm scopes that are listed in your typeRoots". That's expected; section 4 fixes it.
+
+### Debug macros
+
+`$print`, `$warn`, `$error`, `$assert` and `$dbg` add the source position (`[src/file.ts:12]`) in dev builds. Prod
+builds compile them out: `$print`, `$warn` and `$dbg` to nothing (`$dbg(x)` to `x`), `$assert` and `$error` to the
+plain call without the position. `$nameof`, `$file`, `$package`, `$git` and `$compileTime` always expand.
+
+```ts
+import { $print, $warn, $assert } from "@typetorch/transformer/macros";
+```
+
+- They come from `@typetorch/transformer` 0.3+. The transformer drops the import, so nothing reaches the Luau output.
+- Every `typetorch build` sets `TYPETORCH_DEBUG_MACROS` (`1` for dev, `0` for prod) and `TYPETORCH_CHANNEL` in the
+  compile environment. The plugin option `debugMacros: false` turns the debug macros off too.
+- The CLI (0.12.2+) writes `src/shared/build.ts` with `import { $compileTime, $git } from "@typetorch/transformer/macros"`
+  when the installed transformer has them, else from `rbxts-transform-debug`. The template's `scripts/build-info.ts`
+  (what `bun run build` and `watch` run without the CLI) still writes the `rbxts-transform-debug` import: change that
+  one line in your copy.
+- Plain `print` and `warn` keep working, and reach prod builds as they are.
+
+**A game already on `rbxts-transform-debug`** (the setup before transformer 0.3) moves in three steps:
+
+1. Remove the `rbxts-transform-debug` plugin from `tsconfig.json`. The transformer also expands calls imported from
+   `rbxts-transform-debug`, so the build still works.
+2. Rewrite the imports: `"rbxts-transform-debug"` to `"@typetorch/transformer/macros"`, in `src/` and in
+   `scripts/build-info.ts`.
+3. `bun remove rbxts-transform-debug`. While it is installed, prod builds with rbxtsc add the CLI's own strip
+   transformer (`.typetorch/strip-debug-macros.cjs`); without it the transformer strips its own macros.
+
+Not carried over from `rbxts-transform-debug`: `$dbg`'s custom handler and `$keysof`.
 
 ### Coming from Flamework
 
@@ -963,7 +1009,9 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 
 ## Checklist
 
-- [ ] roblox-ts project on Bun; `rokit.toml` pins Rojo 7.7.0-rc.1 and Lune
+- [ ] roblox-ts project on Bun; `rokit.toml` pins Rojo 7.7.0-rc.1, Lune and darklua
+- [ ] one compiler plugin, `@typetorch/transformer` 0.3+; debug macros imported from `@typetorch/transformer/macros`,
+      no `rbxts-transform-debug` left (also not in `scripts/build-info.ts`)
 - [ ] `package.json`, `tsconfig.json`, `default.project.json` (payload), `studio.project.json`, `.gitignore` match the
       template
 - [ ] `typetorch.json` with your ids, `approval`, and (after `keys init`) the signing fields; `access push` after
@@ -1017,6 +1065,7 @@ throws a few harmless ones. Then every server rolls back at once, and every depl
 | `new AnalyticsEngine()` only in a helper called on the first game event | an idle server sends nothing | create it in a low-`loadOrder` module's `onInit` |
 | A looped animation started by an event | it stops on every client swap | persist it and replay it ([section 7](#animations-cutscenes-and-minigames-across-swaps)) |
 | A per-player Map in `persist` with no leave cleanup | it grows with every player who ever joined the server | `this.ctx.playerState` (rule 2) |
+| `rbxts-transform-debug` removed, `scripts/build-info.ts` unchanged | `bun run build` fails on the generated `src/shared/build.ts`, which still imports `rbxts-transform-debug` | change the import in `scripts/build-info.ts` to `@typetorch/transformer/macros` ([Debug macros](#debug-macros)) |
 | `npx rbxtsc` in a Bun project on Windows | runs an unrelated placeholder package | `bun run build` or `bunx rbxtsc` |
 | Dev branch writes prod data | real players' data changes from a test server | split store names by `TypeTorch.channel` |
 | `kernel deploy --replace-place` on a real place | maps and Studio UI vanish from the live version | `kernel deploy --install` patches only the kernel (section 9) |

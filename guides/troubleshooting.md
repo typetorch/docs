@@ -39,9 +39,22 @@ package, which has no typings.
 rbxtsc compiles your scripts folder. Add `"include": ["./src/**/*.ts"]` to `tsconfig.json`.
 
 **`createNetwork: guards were not generated (is @typetorch/transformer in the tsconfig plugins?)`**
-The transformer isn't running. `tsconfig.json` `plugins`: `rbxts-transform-debug` first, then
-`{ "transform": "@typetorch/transformer" }`; and `@typetorch/transformer` must be in the devDependencies and installed
-(`bun install`).
+The transformer isn't running. `tsconfig.json` `plugins` must list `{ "transform": "@typetorch/transformer" }`, and
+`@typetorch/transformer` must be in the devDependencies and installed (`bun install`). Since transformer 0.3.2 the debug
+macros (`$print`, `$warn`, `$dbg`, ...) are built in (`@typetorch/transformer/macros`), so it can be the only plugin;
+a project still on `rbxts-transform-debug` lists that one first. goblox runs only `@typetorch/transformer` and ignores
+other plugins.
+
+**`darklua not found: this payload isn't minified`.**
+A warning, not an error: the build still works, unminified. Add darklua with `rokit add seaofvoices/darklua` (or set
+`TYPETORCH_DARKLUA` to its path), or build with `--no-minify`. The warning also suggests `"minify": false` in
+`typetorch.json`, but the CLI (through 0.18.1) drops that key as unknown, so it doesn't silence anything yet
+([Production pack](deploy-and-rollback.md#production-pack)).
+
+**`compiler goblox was requested (...) but goblox is not installed`.**
+`TYPETORCH_COMPILER=goblox` or `typetorch.json` `"compiler": "goblox"` asks for goblox, and an explicit request never
+falls back to rbxtsc. Run `bun add -d goblox`, or remove the setting (without it, the build uses goblox only when
+`node_modules/.bin/goblox` exists, else rbxtsc).
 
 **`You can only use npm scopes that are listed in your typeRoots` on an `@flamework/core` import.**
 TypeTorch no longer uses Flamework. Import `Service`, `Controller`, the lifecycle interfaces, `Modding`, `Reflect` and
@@ -127,9 +140,9 @@ You built on a dev branch. Deploy prod from the git branch mapped to it (`main`)
 `promote` refuses it even with `--force`: "rebuild for prod".
 
 **`refusing to deploy a dirty build to prod-channel branch "prod"` with nothing to commit.**
-Untracked files count as changes, editor swap and backup files included (`.typetorch.json.swp`, `*~`, `4913`). Close
-the editor or delete them; `git status --porcelain --untracked-files=all` lists what the CLI sees. The next CLI release
-ignores untracked editor swap and backup files (`*.swp`, `*.swo`, `*~`, `.#*`, `4913`).
+Untracked files count as changes. Commit or delete them; `git status --porcelain --untracked-files=all` lists what
+the CLI sees. CLI 0.10.3+ ignores untracked editor swap and backup files (`*.swp`, `*.swo`, `*~`, `.#*`, `4913`); on
+an older CLI close the editor or delete them.
 
 **`typetorch reject` says `proposal ... is already approved`.**
 `reject` drops pending proposals only. An approved one has gone out: roll back or deploy again instead. Proposals are
@@ -344,6 +357,18 @@ checkout: `bun run typetorch studio install-plugin --from ../studio-plugin`.
 Live reload needs kernel 0.5.4+ in `node_modules/@typetorch/kernel` (synced by `studio.project.json`) and the panel's
 "Live playtest: on". With an older kernel, Stop + Play.
 
+**`ServerStorage.TypeTorchDev.Payload has no Server.boot`** (or `Client.boot`; for an uploaded build
+`<artifact> has no Server.boot`).
+Kernel 0.5.6+ refuses a payload whose Server or Client half is empty, before it stops the running generation, so a
+live reload or Reload keeps the old code. In Studio it usually means Rojo lost `out/` (deleted and recreated, as a
+clean build does): `bun run typetorch serve restart rojo`. CLI 0.12.2+ restarts Rojo by itself when that happens. For an
+uploaded build, rebuild and deploy again.
+
+**Rojo moved to another port (`Rojo's port 34872 is taken by another process`).**
+Something else holds the port, often a Rojo that an earlier, killed serve left running. serve moves Rojo to the next
+free port and the plugin follows. The next `serve` stops such leftovers on Linux; on Windows and macOS it names them
+(`an earlier typetorch serve left rojo running (pid ...)`): stop that process.
+
 **Two sync plugins fight over the place.**
 Connect only one of the stock Rojo plugin and the TypeTorch plugin at a time.
 
@@ -353,9 +378,18 @@ Links last 15 minutes and work once; `typetorch serve pair` makes a new one. Aft
 until you make a new code. For a fixed address use your own tunnel with `serve --remote --url https://<tunnel>`.
 
 **The Studio Claude tab says "Claude isn't running" or "This typetorch serve is too old for Claude".**
-Start serve with `--claude` (CLI 0.12+), with `@typetorch/dev-server` installed and Claude Code logged in with your
-Claude.ai account. "Not on the session's user list": add the Roblox user id with `--claude-users`. The checkout must
-be on a dev-channel branch. After `serve restart claude`, check `serve logs` for the reason.
+Start serve with `--claude`, with `@typetorch/dev-server` installed and Claude Code logged in with your Claude.ai
+account. "Not on the session's user list": add the Roblox user id with `--claude-users`. serve doesn't restart Claude
+when it exits: check `serve logs` for the reason, then `serve restart claude`.
+
+**`serve logs` shows `[claude] error: unexpected argument "dev"`** (or your `--dev-branch`).
+serve (CLI 0.12.2+) starts remote-claude with `--deploy-branch <dev branch>`, which dev-server 0.3.3 and older don't know.
+It needs dev-server 0.4.0, which isn't on npm yet: run a checkout through `TYPETORCH_DEV_SERVER`
+([From Studio](remote-claude.md#from-studio)).
+
+**Claude in the Studio tab can't see the open place (its `inspect` or `find` calls time out).**
+Expected for now: serve on CLI main doesn't relay those tool requests to the plugin yet (**planned**). Claude works
+from the files; Apply the change and look in Studio.
 
 ## remote-claude
 
@@ -370,8 +404,9 @@ Codes are single-use and bound to the tunnel. Type `code` in the dev-server term
 **"Refused: Claude Code must use a subscription login" (`api_billing_refused`).**
 Run `claude auth login` with your Claude.ai account and remove `ANTHROPIC_*` variables from that terminal.
 
-**`branch ... is on the prod channel; remote-claude only runs on dev-channel branches`.**
-Switch to a dev branch (`git switch dev`).
+**`branch ... is on the prod channel; remote-claude only runs on dev-channel branches here`.**
+Switch to a dev branch (`git switch dev`). Only a local session (`--no-tunnel --no-announce`, as `serve --claude` runs
+it, dev-server 0.4.0) may use a prod-channel branch, and then deploys only to `--deploy-branch`.
 
 **Images don't show in the chat (one dim line instead).**
 Turn on Allow Mesh / Image APIs; the experience owner must be 13+ and ID-verified.

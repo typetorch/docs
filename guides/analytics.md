@@ -1,21 +1,25 @@
 # Analytics
 
 TypeTorch has its own analytics. It is optional and fully yours: your game logs what players do, your own backend
-stores it, and you query it yourself. Roblox's analytics isn't used. Every event is labelled with the build (artifact)
-that was live, so you can compare builds, experiments and devices.
+stores it, and you query it yourself. It doesn't depend on Roblox's analytics (the explorer can show Roblox's own
+numbers next to yours when the backend has an Open Cloud key). Every event is labelled with the build (artifact) that
+was live, so you can compare builds, experiments and devices.
 
 - **Write side:** `AnalyticsEngine` in `@typetorch/framework` (0.3.0+), on the server and the client.
 - **Backend, your choice:** a self-hosted **DuckDB server** (one small VPS), or **Cloudflare Basin** (no server).
 - **Read side:** the [backend](https://github.com/typetorch/backend) (`@typetorch/backend`, run from a checkout or its
   Docker image; not on npm): the queries, the DuckDB server, the fleet API, `bun run report`, and the **web explorer**
-  at the backend's URL (Overview, Roblox, Retention, Funnels, Players, Flow, Experiments, First session, Events, Errors,
-  Performance, Query; sign in with the admin token, Sign in with Roblox, or typetorch.dev).
-- **Live experiment overrides:** `typetorch experiment` (CLI 0.10.2+; [below](#experiments)).
+  at the backend's URL ([The explorer](explorer.md): its pages, filters and command palette).
+- **Live experiment overrides:** `typetorch experiment` (CLI 0.10.2+; [below](#experiments)), or prepared on the
+  explorer's Experiments page.
 
 Contents: [Using it in a game](#using-it-in-a-game) · [What is collected](#what-is-collected) ·
 [The event format](#the-event-format) · [Backends](#backends) · [Settings](#settings-the-analytics-field) ·
 [Experiments](#experiments) · [Queries](#queries) · [Node graphs](#node-graphs) · [bun run report](#bun-run-report) ·
 [Privacy](#privacy-and-right-to-erasure) · [Quick start: a local test](#quick-start-a-local-test)
+
+Related: [The explorer](explorer.md) · [Recordings and maps](recordings-and-maps.md) · [Live events](live-events.md) ·
+[Player feedback](feedback.md) · [Notifications](notifications.md)
 
 ## Using it in a game
 
@@ -61,8 +65,10 @@ const variant = analytics.experiment("onboarding", ["short", "long"]); // the sa
 - **The cloud test sends nothing** (framework after 0.3.2). In `typetorch test --cloud` (before every prod deploy)
   the engine collects as usual but never uploads: no event rows, no identity rows, no HTTP request. A prod deploy
   never adds a fake server session.
-- **Options** (all on by default): `sessions`, `tech`, `zones`, `screens`, `recording`, `fleet`. `settings` (server
-  only) replaces the [settings key](#settings-the-analytics-field), for tests.
+- **Options** (all on by default): `sessions`, `tech`, `zones`, `screens`, `recording`, `fleet`, `identity`
+  ([privacy](#privacy-and-right-to-erasure)). `positions` (framework 0.7.1+) is a list of event names that always carry
+  the player's position ([below](#positions)). `settings` (server only) replaces the
+  [settings key](#settings-the-analytics-field), for tests.
 - `analytics.stats()` (server) returns the counters (queued, sent, dropped, refused); `analytics.flush()` sends soon.
 - In edit mode (UI Labs stories) it is inert.
 - The template has a complete example: `AnalyticsService` (server) and `AnalyticsController` (client).
@@ -78,7 +84,7 @@ the player's state (`zone:Lobby|screen:Shop|activity:round`).
 
 | Group | Option | Events |
 |---|---|---|
-| Sessions | `sessions` | join and leave, session length, where they came from (direct, teleport, friend follow, share link...), device and input type, screen size, account age bucket, Premium, country, the player policy (ads, paid random items, trading, sharing, subscriptions, China, allowed links; framework 0.6.3), the device trust level (`Player.DeviceTrustLevel`, settled on the leave row; framework 0.6.3), friends in the server (one friend-list lookup per join), first visit or returning, days since the last visit |
+| Sessions | `sessions` | join and leave, session length, where they came from (direct, teleport, friend follow, share link...), device and input type, screen size, account age bucket, Premium, country, language (`locale`), the player policy (ads, paid random items, trading, sharing, subscriptions, China, allowed links; framework 0.6.3), the device trust level (`Player.DeviceTrustLevel`, settled on the leave row; framework 0.6.3), friends in the server (one friend-list lookup per join), first visit or returning, days since the last visit |
 | Tech health | `tech` | server FPS and heartbeat, client FPS, ping, memory, load time, client and server errors, hot swaps and rollbacks, and who left within 60 s of a swap |
 | Zones | `zones` | entering and leaving zones: parts or models tagged `TTZone` in the place, named by a `Name` attribute or the instance name. The smallest zone around the player wins |
 | Screens | `screens` | ScreenGuis in PlayerGui, and GuiObjects tagged `TTScreen` |
@@ -93,17 +99,42 @@ the player's state (`zone:Lobby|screen:Shop|activity:round`).
 
 ### The first-ever session, recorded in detail
 
-Only a player's first session in the game is recorded, from the start until 60 s after their first input (at most 10
-minutes). About 10 times a second it samples the character position and facing and the camera. It also records each
+Only a player's first session in the game is recorded, from the start until `recordSeconds` after their first input
+(60 s by default, 10-600; at most 10 minutes from the start; framework 0.7.1+, older frameworks always use 60 s). About
+10 times a second it samples the character position and facing and the camera. It also records each
 input (key, click, tap, gamepad button, thumbstick), each button pressed or hovered (by path, e.g.
 `Shop/Buy/Coins100`), screens opened and closed, proximity prompts, deaths and spawns, and your own `track()` events in
 that window.
 
 - Keys are never recorded while a TextBox or the chat has focus. A text box only says which box was used, never its
   text.
-- It is packed into small binary chunks (`tt-rec-1`): about 10-20 KB per new player, sent through the server.
+- It is packed into small binary chunks (`tt-rec-1`), sent through the server: about 10-20 KB per new player at the
+  default 60 s, about 55-70 KB at 300 s and 110-135 KB at 600 s. A recording also ends at 256 KB or 80 chunks.
 - `recordShare` (0 to 1) in the settings picks the share of new players who are recorded (stable per player). Turn it
   down first when volume spikes.
+- The explorer's **Recordings** page draws them on a map and replays them: [Recordings and maps](recordings-and-maps.md).
+
+### Positions
+
+Framework 0.7.1+. Game-code events (`custom`, `funnel`, `purchase`, `currency`) can carry the player's character
+position as the props `px`, `py`, `pz` (studs, rounded to 0.1; the model's PrimaryPart, else `HumanoidRootPart`). The
+explorer's map layers read exactly these keys.
+
+```ts
+// One event: the event's player (client: the local player), or any player
+analytics.track(player, "down", { cause: "fall" }, { position: true });
+
+// Every event with one of these names, whichever call logs it (at most 64 names)
+const analytics = new AnalyticsEngine({ positions: ["down", "death_final", "round_result"] });
+```
+
+- The settings' `positions` list ([below](#settings-the-analytics-field)) adds names live, without a deploy. A client
+  event logged before the server's hello doesn't know that list yet; the engine option works from the start.
+- Nothing is added without a character or root part, and props the game set itself (`px`, `py` or `pz`) are never
+  overwritten.
+- **Which map:** put the map's name in a `map` prop on some event (for example `track(player, "round_start", { map:
+  "Forest" })`). The backend files each position under the latest map event before it, and exports the models that
+  match those names ([Recordings and maps](recordings-and-maps.md)).
 
 ## The event format
 
@@ -117,7 +148,7 @@ contract, with every event and its props, is
 |---|---|
 | `v` | format version, `1` |
 | `t` | unix ms, on the game server's clock (client events are corrected) |
-| `kind` | `session`, `tech`, `zone`, `funnel`, `purchase`, `currency`, `state`, `experiment`, `custom`, `recording_meta`, `fleet`, `notify` ([below](#notification-rows)) |
+| `kind` | `session`, `tech`, `zone`, `funnel`, `purchase`, `currency`, `state`, `experiment`, `custom`, `recording_meta`, `fleet`, `notify` ([below](#notification-rows)), `feedback` ([Player feedback](feedback.md)) |
 | `name` | the event name (1-64 characters) |
 | `pid`, `sid` | random player id and session id (`""` on server-only events) |
 | `job`, `srv`, `place` | JobId, server type (`public`, `private`, `reserved`, `studio`), PlaceId |
@@ -152,7 +183,7 @@ The `session` row written when a player joins carries all of Roblox's join data 
 | `ctx`, `ctx_item`, `ctx_asset`, `ctx_outfit`, `ctx_asset_type` | GameJoinContext | JoinSource, ItemType, AssetId, OutfitId, AssetType |
 | `tp`, `tp_bytes` | TeleportData | whether there is any, and its JSON size (never the content) |
 | `age_days` | AccountAge | exact days, next to the age bucket |
-| `locale` | Player.LocaleId | |
+| `locale` | Player.LocaleId | e.g. `en-us`; the explorer's language card and `lang` filter read it. Framework 0.7.1 writes it on every join row (also with `joinData` `"off"`); 0.6.0-0.7.0 wrote it with the rest of the join data, not with `"off"` |
 | `verified` | HasVerifiedBadge | |
 | `membership` | MembershipType | its name |
 
@@ -266,8 +297,8 @@ Done once, in your own Cloudflare account (Workers Paid plan and R2). The backen
    `basin/recordings.schema.json`. HTTP endpoint on, authentication on, Data Catalog (Iceberg), roll interval 60 s.
 2. Create a **send-only** API token (Basin Pipelines Send). Game servers get this one.
 3. Keep the R2 token (for Basin SQL), your account id and the bucket on your PC only.
-4. The CLI can't write this sink in 0.9: `typetorch backend setup` makes the game send to the backend instead. A Basin
-   sink already in the record ([settings](#settings-the-analytics-field)) stays there until then.
+4. No CLI command writes this sink (since CLI 0.9): `typetorch backend setup` makes the game send to the backend
+   instead. A Basin sink already in the record ([settings](#settings-the-analytics-field)) stays there until you run it.
 
 Know these before you start:
 
@@ -286,7 +317,8 @@ with no deploy or place publish.
 
 - **DuckDB (framework 0.4+, kernel 0.4+):** the record's `backend` = `{ url, key, analytics? }` is the sink: events go to
   `<url>/v1/ingest` with the game key, and the dials come from `backend.analytics` (`flushSeconds`, `recordShare`,
-  `techEvery`, `experiments`).
+  `recordSeconds`, `positions`, `techEvery`, `experiments`, and the join data dials `joinData` and `joinLaunchPrefix`:
+  [Settings](settings.md#the-analytics-dials-backendanalytics)).
 - **Basin, and older frameworks:** the `analytics` field below. `backend setup` keeps deriving it from `backend` for
   frameworks before 0.4; a Basin sink is always read from it.
 
@@ -310,6 +342,8 @@ with no deploy or place publish.
 | `token` | the write-only token: the DuckDB ingest token, or the Basin send token. Never logged |
 | `flushSeconds` | seconds between sends, 5-300 (default 15) |
 | `recordShare` | share of new players recorded in detail, 0-1 (default 1) |
+| `recordSeconds` | seconds a first-session recording runs after the first input, 10-600 (default 60; framework 0.7.1+) |
+| `positions` | event names (1-64 characters, at most 64) whose game-code events always carry `px`, `py`, `pz`, added to the engine option ([Positions](#positions); framework 0.7.1+) |
 | `techEvery` | seconds between tech samples, 15-3600 (default 60) |
 | `experiments` | live dials per [experiment](#experiments) |
 
@@ -321,8 +355,9 @@ bun run typetorch backend setup --url https://backend.example.com --flush-second
 ```
 
 It derives this section from `backend` and keeps the other fields (`techEvery`, `experiments`). `typetorch experiment`
-writes the experiment overrides ([below](#experiments)); no command sets `techEvery`, and `settings set analytics` only
-points to `backend setup`. Read it back with `bun run typetorch settings get
+writes the experiment overrides ([below](#experiments)). No command sets `techEvery`, `recordSeconds`, `positions` or
+the join data dials yet (`backend setup` keeps whatever is already in `backend.analytics`), and `settings set analytics`
+only points to `backend setup`. Read it back with `bun run typetorch settings get
 analytics` (the token hidden), and stop sending with `bun run typetorch settings unset backend` (it drops `fleet` and
 `analytics` too). The CLI signs the record with both prod keys, and servers refuse one that doesn't verify.
 
@@ -372,7 +407,27 @@ bun run typetorch experiment unforce onboarding 123456
   (framework 0.4+), mirrored into the old `analytics.experiments`. Every change is logged to `experiments.jsonl` in the
   state dir; `settings status` lists the overrides.
 - The explorer's Experiments page shows each experiment's state, weights and forced players, and opens the players of
-  a variant.
+  a variant (`GET /v1/experiments` lists the overrides the backend knows; `GET /v1/experiments/<key>/players` the
+  players, at most 200, each `random` or `forced`).
+
+**Pick your own variant (framework 0.7.1+).** In game, the dev menu's **Server > Experiments** lists every experiment
+the game asked about for you, your variant and why (random, forced by the settings, or your pick). A button per variant
+picks it for you, Clear drops the pick; the command palette has the same as "Experiment <name>: use <variant>". Devs
+where the dev-only tools are open to them, owners everywhere ([the dev menu](dev-menu.md)); at most one change a
+second, and only ever your own variant. The pick is stored in the analytics DataStore (`dexp/<UserId>`), follows you to
+every server, wins over the settings (stop, settle, weights, `players`), and is stamped `forced` on the experiment row,
+so the results leave you out. The game sees it the next time it asks for your variant, usually your next join.
+
+**Run it from the explorer (owners).** Under an experiment's results, the **Run it** panel has Start, Stop, Clear
+override, Change split and Settle. The backend never holds the signing keys, so it can't apply the change: it checks it,
+logs it in the audit log (`experiment.prepare`) and answers the exact command to run in the game's folder, with its
+`--dry-run` twin (`POST /v1/experiments/<key>/change`):
+
+```sh
+typetorch experiment weights onboarding 3,1 --variants short,long
+```
+
+Viewers see no controls, and the route answers them 403.
 
 **Per server:** a share of servers runs a different build: a kernel A/B pin (`bun run typetorch pin <artifact>
 --branch prod --pct 10`, signed on prod; on dev branches also the dev menu's "Load a build" > Share of a branch). Events
@@ -380,34 +435,93 @@ from those servers carry the pinned artifact in `sexp`. The `experiment` query w
 with the unpinned servers. Whole-server changes need more players to show a difference.
 
 **Results** come per variant (players, returned, payers, playtime, Robux, sessions) with "how sure" in plain words:
-`long keeps more players: 99% sure` (a two-proportion test; bootstrap or Welch for averages).
+`long keeps more players: 99% sure` (a two-proportion test; bootstrap or Welch for averages). Per player they also:
+
+- **leave forced players out:** a player whose `experiment` row in the range is marked `forced` (settled, `force`, or a
+  dev's own pick) didn't get a random variant; `forcedPlayers` counts them;
+- **check the split** (sample ratio mismatch): the random assignments per variant against the override's weights, or
+  an even split, with a chi-square test. Below p = 0.001 (at least 5 players expected per variant) the page warns not
+  to trust the numbers: a variant that crashes or loses its events, a bug in when the game asks, bots, or a split
+  changed inside the range. Uneven weights need the variant's position on the rows (`vi`, framework 0.7.1+); older rows
+  are checked against an even split only;
+- **correct for several variants:** each variant is compared with the control, and with more than two variants `sure`
+  uses Holm-corrected p-values (`pAdjusted`; the test's own is `pValue`);
+- **say what the traffic can find:** `mde` / `mdeLift` (the smallest true difference these group sizes find 80% of the
+  time at 5%, the 5% split over the variants when there are more than two), `needed` (players per group for the
+  observed difference) and `days` (how long at the range's traffic until it is sure; 0 = now, `null` = no difference
+  to find).
 
 ## Queries
 
-Every query works on both backends, with the same filters: `from`, `to` (a date, ISO time or unix ms), `art`,
-`branch`, `channel`, `dev`, `players` (`"new"` or `"returning"`), `variant` (`{ experiment, variant }`), `sexp`,
-`place`.
+Every query works on both backends, with the same filters: `from`, `to` (a date, ISO time or unix ms; a date-only
+`to` includes that day), `art`, `branch`, `channel`, `dev`, `players` (`"new"` or `"returning"`), `variant`
+(`{ experiment, variant }`), `sexp`, `place`. Without `from`, a query covers its default range.
+
+**Audience filters** (player-level): `country` (ISO codes, `"US"`), `lang` (language codes without the region, `"en"`,
+from the join row's `locale`), `age` (account-age buckets `<1d`, `1-7d`, `7-30d`, `30-90d`, `90-365d`, `1-3y`, `3y+`),
+`prem` (`true` / `false`) and `source` (the join's `from`: `direct`, `teleport`, `referral`, ...). Each takes one value or
+a list. A player matches when one of their join rows in the range has all the set values, and then **all** their rows
+count, so "players from this campaign" works on every query. Queries over server or fleet rows (`perf-server`,
+`servers`, `deployReport`, the server parts of `benchmarks` and `realtime`) don't take them, as they don't take `dev`.
 
 | Query | What it answers | Default range |
 |---|---|---|
-| `overview` | players, new players, sessions, playtime, in total and per day | 30 days |
+| **Players and retention** | | |
+| `overview` | players, new players, sessions, playtime, in total and per day (per hour, 5 min or minute for windows of a day or less) | 30 days |
 | `roblox` | Roblox-style numbers: first-play bounce (first session under 60 s), qualified plays (sessions of 5 min or more), D1/D7, playtime and play days per user, payer conversion, Robux per user and per payer | 30 days |
-| `retention` | retention by join-day cohort (day 1, 3, 7, 14, 30) | 30 days |
+| `benchmarks`, `realtime`, `trends` | the Roblox page: headline numbers as Creator Hub defines them for the last full UTC days vs the days before; concurrent players (peak and average, by device); daily or 12 / 6-hour moving averages per join source | 7, 7, 28 days |
+| `retention` | retention by join-day cohort (`days`: up to 31 offsets from 1 to 90; default 1, 3, 7, 14, 30) | 30 days |
+| `ltv` | revenue per join-day cohort: cumulative Robux per player, revenue per player (after Roblox's 30%), payer share by D0 to D30 | 30 days |
+| `churn` | churn risk per player: `active`, `at_risk`, `lapsing`, `churned`, from days since the last play against their usual gap | 90 days |
+| `demographics` | who plays, from join rows: country, language, device, account age, Premium (share of players) | 28 days |
+| `explain` | why a metric moved between two windows: per segment (device, country, language, account age, Premium, join source, build, branch, new / returning), split into rate and mix effects | 7 days |
+| **Funnels and flow** | | |
 | `funnel` | one funnel step by step: reached, share of the start, from the step before, median time, the biggest drop. Without a name, the list of funnels | 30 days |
-| `timeline` | one player's sessions and events (by `pid`) | 90 days |
-| `player-graph` | one player's [node graph](#node-graphs) over all their sessions | 90 days |
+| `funnel-progress` | how far given players (`pids`, at most 500) got in each funnel | 30 days |
+| `funnel-players` | the players who reached, or dropped off at, one step (at most 200) | 30 days |
+| `playtime-funnel` | players whose playtime reached 30 s, 1 m, 3 m, 5 m, 10 m, 30 m, 1 h, 2 h (`measure`: `total` or `first` session) | 30 days |
 | `flow` | the merged graph for a group: where most players go next, and where they quit | 7 days |
-| `experiment` | per-variant numbers and how sure (`scope: "player"` or `"server"`) | 30 days |
 | `confusion` | first-session signals per zone and button: early leaves, opening and closing the same screen, walking back and forth, and from the recordings idle spots (10 s without input or movement), camera spins (360 degrees in 6 s without moving), repeated clicks (3 presses of one button within 2 s) | 14 days |
+| **One player** | | |
+| `players` | players seen in the range, most recent first, or top spenders (`sort: "robux"`); `search` = part of a pid | 30 days |
+| `timeline` | one player's sessions and events (by `pid`) | 90 days |
+| `player-graph` | one player's [node graph](#node-graphs) over all their sessions, or one (`sid`) | 90 days |
+| `player-stats` | one player's Robux, purchases, sessions and playtime per day, with each session and purchase | 30 days |
+| `player-events`, `player-summary` | the [support key](api-keys.md) views: one player's named events, and their counts and totals | 30 days |
+| **Experiments** | | |
+| `experiment` | per-variant numbers and how sure (`scope: "player"` or `"server"`), the split check and what the traffic can find | 30 days |
+| `experiment-players` | the players in one experiment: variant, `random` or `forced`, when assigned (at most 200) | 30 days |
+| **Recordings and maps** ([Recordings and maps](recordings-and-maps.md)) | | |
+| `recording-layers` | first-session recordings on a top-down map: paths, idle spots, deaths, screens, buttons, prompts, quits and positioned events | 7 days |
+| `recording-sessions`, `recording-replay` | the recorded sessions (by map cell, ending or signal), and one for the replay | 7, 30 days |
+| `quit-autopsy` | why first-session players quit: their last seconds against the players who stayed | 7 days |
+| `first-action` | seconds from spawn to the first move, screen, button, prompt and round start | 7 days |
+| `map-positions` | map names from the events' `map` prop, and positioned events per map in 0.5-4 stud cells | 7 days |
+| **Economy and revenue** | | |
+| `economy` | one currency's earned vs spent per day, the running balance, top sources and sinks | 30 days |
+| `monetization` | Robux, purchases and payers per day, revenue by product, payer conversion, ARPPU, ARPDAU, repeat purchases, first purchase of new players | 30 days |
+| `monetization-players`, `monetization-purchases` | who bought a product (or anything), and the latest purchases (at most 200) | 30 days |
+| **Notifications, feedback, live events** | | |
+| `notify-funnel`, `notify-optin`, `notify-queue`, `notify-player` | [notifications](notifications.md): the funnel per kind, the opt-in prompt, the sender per hour, one player's rows | 14, 30, 1, 400 days |
+| `feedback-summary`, `feedback-list` | [player feedback](feedback.md): the distribution per scale and trend, and the rows | 30 days |
+| `live-event-lift` | the raw numbers of a [live event](live-events.md)'s lift report | 7 days |
+| **Performance** | | |
+| `perf-client` | client fps, memory and ping over time (p10 / p50 / p90 / p99) by device, input, screen size, branch or build | 7 days |
+| `perf-server` | server TPS, physics FPS, memory and players over time, by branch or build | 7 days |
+| `perf-compare` | client and server numbers for builds side by side, or before vs after a moment | 7 days |
+| **Raw and fleet** | | |
+| `events` | the newest rows, optionally of one `kind`, `name` or `pid` (up to 1,000) | 7 days |
 | `top-events` | the most logged names per kind | 7 days |
-| `servers`, `deployReport` | fleet history from `fleet` rows (the live view is [Fleet and alerts](fleet-and-alerts.md)) | recent |
+| `values` | the branches, builds, channels and devices seen (for filter pickers) | 30 days |
+| `servers`, `deployReport` | fleet history from `fleet` rows (the live view is [Fleet and alerts](fleet-and-alerts.md)) | 1, 2 days |
 
-Run them in three ways:
+Each query's options are in the [backend README](https://github.com/typetorch/backend#queries); `GET /v1/queries` lists
+the names with a summary and the default range. Run them in three ways:
 
 - `bun run report` in the backend repo: the main ones in your terminal ([below](#bun-run-report)).
 - **HTTP** (DuckDB server): `POST /v1/query/<name>` with `Authorization: Bearer <admin token>` and the body
   `{ "filters": { "from": "2026-09-01", "dev": "phone" }, "options": { "funnel": "onboarding" } }`. The answer is
-  `{ result, ms }`.
+  `{ result, ms }`. The explorer's read-only viewers and named [API keys](api-keys.md) with the right scope can query too.
 - **Code**, on either backend (a `.ts` file in a folder with `@typetorch/backend` installed, run with `bun`):
 
   ```ts
@@ -422,7 +536,8 @@ Run them in three ways:
   `store.render(name, filters, options)` returns the SQL without running it.
 
 Useful options: `funnel` (`funnel` name), `timeline` and `player-graph` (`pid`), `flow` and `player-graph` (`facet`:
-`all`, `zone`, `screen` or `activity`; `minCount`; `maxEdges`), `experiment` (`experiment`, `scope`, `control`).
+`all`, `zone`, `screen` or `activity`; `minCount`; `maxEdges`), `experiment` (`experiment`, `scope`, `control`,
+`weights` for the split check), `explain` (`metric`, `dimension`, `baseline`).
 
 **"Is anything arriving?"** Ask the DuckDB server directly instead of waiting for a chart: `POST /v1/sql` with the
 admin token and one read-only `SELECT` over `events` and `recordings` (today's live rows included) answers in seconds.

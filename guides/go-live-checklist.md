@@ -21,7 +21,7 @@ Nothing here touches your live game until step 8, the cut-over.
 
 ## 2. Copy the game
 
-- [ ] Creator Hub: a new experience, "<Game> (TypeTorch test)". In Studio: File > Download a Copy of the live place,
+- [ ] Creator Hub: a new experience, `"<Game> (TypeTorch test)"`. In Studio: File > Download a Copy of the live place,
       then publish it into the new experience.
 - [ ] A second config for the copy, for example `typetorch.copy.json` with its ids. Pass `--config typetorch.copy.json`
       to every command for the copy. Add the copy to your Open Cloud keys, and run `keys init` and
@@ -49,10 +49,13 @@ Nothing here touches your live game until step 8, the cut-over.
       folders and the kernel's settings change. With the copy place's "Allow place to be updated using Save Place API" setting
       on (Creator Hub > Permissions; off by default for places made in Studio) it patches through Luau Execution, with no
       download. Otherwise: File > Download a Copy, note its version, and add `--place-file <file> --base <version>`.
+      If it refuses because the newest version is an unpublished Studio save, add `--base published` (or `--base latest`
+      to ship that save): [Kernel updates](deploy-and-rollback.md#kernel-updates).
 - [ ] The same command without `--dry-run` (y/N). Join: F9 shows `[TypeTorch] kernel <version>`.
-- [ ] `ServerScriptService.LoadStringEnabled` stays **off** in the live game (`bun run typetorch doctor` reports it).
-      Only a test place where you want remote-claude's `run_luau` turns it on. CLIs up to 0.7.2 turn it on during the
-      install: check it in Studio, turn it off, publish.
+- [ ] `ServerScriptService.LoadStringEnabled` stays **off** in the live game: a patch keeps the place's own value and
+      sets it only with `--loadstring` (`bun run typetorch doctor` says what `kernel deploy` will do; check the place's
+      value in Studio). Only a test place where you want remote-claude's `run_luau` turns it on. CLIs up to 0.7.2 turn
+      it on during the install: check it in Studio, turn it off, publish.
 - [ ] Remove the old game scripts in Studio, publish.
 
 ## 6. Soak on the copy (3 to 5 days)
@@ -88,8 +91,8 @@ Then run every live test on the copy:
 - [ ] **Purchases:** open a developer product prompt, deploy, buy while the swap runs. One grant, saved; rejoin: no
       second grant. Check a game pass after a swap.
 - [ ] **Kernel undo:** `bun run typetorch kernel restore --version <the version before the install>` once, then install again.
-- [ ] **Team Create:** with the copy open in Studio by someone else, `kernel deploy` stops with a 409 and publishes
-      nothing.
+- [ ] **Team Create:** with the copy open in Studio by someone else, `kernel deploy` fails at the save (the error
+      names the Team Create session; a `--place-file` publish gets a 409) and publishes nothing.
 - [ ] **Slow phone, bad connection:** a client swap finishes, no stuck loading, `/tt status` in chat answers.
 - [ ] **Fleet API restart** (and your PC, if it runs there): servers post again within 5 minutes
       (`bun run typetorch servers`). A quick tunnel gets a new URL: run `backend setup` again.

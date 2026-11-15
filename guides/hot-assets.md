@@ -43,10 +43,15 @@ bun run typetorch deploy
 4. resolves each new version's id;
 5. writes `typetorch.assets.lock.json` only when everything worked (commit it).
 
-- `status` (or `sync --dry-run`) shows what changed without uploading. `list` prints the lockfile.
+- `status` (or `sync --dry-run`) shows what changed without uploading. `list` prints the lockfile. With `--json`
+  (CLI 0.15.0+), `status` also gives a bounded diff per new, changed or removed asset (instances added, removed or
+  changed, with old and new property values), against the copy of the lockfile's version kept in the state dir
+  (`.typetorch/hot-assets/<hash>.rbxm`).
+- Moderation waits up to 600 s (`--moderation-timeout <s>`).
 - Before any upload, every problem is listed at once: bad or duplicate keys, scripts (named), nesting, a marked service.
-- `--deploy <branch>` deploys right after. For a prod-channel branch it is refused while the lockfile changes: sync,
-  commit, then deploy (prod takes only clean builds).
+- `--deploy <branch>` deploys right after (`--message`, `--propose`, `--proposed-by`, `--no-registry` and the key
+  file flags are passed on). For a prod-channel branch it is refused while the lockfile changes: sync, commit, then
+  deploy (prod takes only clean builds).
 - Every deploy stamps the lockfile into the build, so the asset list is part of the artifact (signed on prod), and a
   rollback brings back the older asset versions.
 - Needs the assets key with `asset:read`, `asset:write` and Luau Execution
@@ -61,7 +66,8 @@ The TypeTorch Studio plugin's **Hot assets** card does the same from the open pl
 `TypeTorchAsset`), then **Check** (`assets status`), **Upload** (`assets sync`) or **Publish to dev** (`assets sync
 --deploy dev`). The plugin exports the marked instances itself, so unpublished edits count (`--studio-export` on the
 CLI). Those entries record place version 0 in the lockfile, so new servers load them instead of adopting the place's
-copies, until a sync from a published place records a real version again. Commit the lockfile as usual.
+copies, until a sync from a published place records a real version again. Commit the lockfile as usual. While the
+panel is open the check repeats every 30 seconds, and each changed row has a **Diff** button (CLI 0.15.0+).
 
 ## 3. Use them in code
 

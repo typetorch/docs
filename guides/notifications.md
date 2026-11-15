@@ -62,7 +62,7 @@ A kind is a reason to notify, declared once in `typetorch.json` and pushed to th
 |---|---|
 | `text` | the notification string's text: at most 99 characters, `{placeholders}` named `a-z A-Z 0-9 _ -` (1-32 characters). You paste it into the Creator Dashboard ([Templates](#templates)); the backend checks each intent's `params` against its placeholders |
 | `template` | the notification string's message id. A kind without one is planned and counted, never sent |
-| `priority` | 0-1000, **lower wins** when several are due for one user on one day. Put event kinds (a new gift) above recurring ones (a streak reminder): a streak can go any day |
+| `priority` | 0-1000, **lower wins** when several are due for one user on one day. Put event kinds (a new gift) above recurring ones (a streak reminder): a streak can go any day. The backend also **holds the day's slot**: when a send would fill `dailyCap` before a higher-priority intent's window opens (and the cap would not free again before that window ends), nothing is planned (skipped, why `held`) and the user is looked at again when that window opens |
 | `repeat` | `once_ever` (per user, forever), `per_key` (once per intent key, e.g. per gift id), `daily` (at most once a day) |
 | `send` | `preferred_hour` (default: the user's usual play hour inside the intent's window) or `asap` (the next sender tick) |
 | `perWeek` | 1-7: a cap for `daily` kinds |
@@ -168,9 +168,32 @@ or more, back the next day; the opt-in funnel (checked, shown, closed, inferred 
 failures. Roblox's own impressions and clicks per category are in the Creator Dashboard only; TypeTorch doesn't import
 them.
 
+The page has tabs (the URL's `?tab=`):
+
+| Tab | Shows |
+|---|---|
+| Health | a status sentence, who can get notifications, opened and back next day per day, what needs attention |
+| Funnel | prompt shown, subscribed, sent, opened, played 1 minute+, back next day; sends per day; the opt-in prompt by spot |
+| Inbox (owners) | the newest sends of everyone, live, with filters, a side panel per send (its request, Roblox's answer, the join data) and the per-player view |
+| Subscribers (owners) | the opt-in list, with a CSV export |
+| Kinds | each kind's switch, by kind and day |
+| Queue & errors | the live queue, failures, planned and skipped by why, the history per hour |
+| Settings (owners) | the runtime settings `notify.*`, a test send, the pushed kinds |
+
+The read-only `web` role sees the analytics tabs only; the status, lists and controls are owner routes.
+
+**The opt-in list** (Subscribers tab; owners): Roblox has no list of opted-in players, so the backend keeps the answer it
+learned from each send. `GET /v1/notify/users?state=subscribed|not_subscribed|unknown|muted&q=&limit=&cursor=` answers
+one page (default 50, at most 200, newest first) plus the count of every state; `q` is a UserId or a name the profile
+cache knows. `format=csv` exports the filter (at most 10,000 rows, 6 exports a minute per owner).
+
+**Recent sends** (Inbox tab; owners): `GET /v1/notify/recent?limit=&kind=` answers the newest sends of everyone (default
+100, at most 500), each with the player's opt-in state, the params and the name when the profile cache knows it.
+
 **Per player**: the page also looks up one player (by UserId, pid or username, owners only; the route is
 `GET /v1/notify/user?uid=|pid=|name=`): their consent (opt-in checks, prompts and the inferred answer, with dates), the kinds they switched off (`setOff`), the
-notifications they were sent (with opened / played) and their pending intents.
+notifications they were sent (with opened / played, each send's request body and Roblox's refusal text) and their pending
+intents. The player page in the explorer has the same view (its **Notifications** button, owners only).
 
 A tap that verifies also marks the join row: `from = "notification"`, `nid`, `nk` (the kind). The session's `played`
 row gives its length, and every other row of that session shares its `sid`, so "what they did after the tap" is a join on
@@ -249,9 +272,13 @@ To recover:
 
 ## Other send failures
 
-- **401 / 403 from Roblox** (the backend's Open Cloud key is wrong or lacks `user.user-notification:write`): the backend
-  **halts all sending** and alerts; `typetorch notify status` shows `ALL SENDING HALTED (auth)`. Intents keep queueing.
-  Fix the key on the backend (`typetorch doctor` probes the same-named key here), then turn sending back on.
+- **403 from Roblox for one recipient** (an account Roblox won't notify): only that send fails for good (`failed`, code
+  `forbidden`, `final`), and the player is muted for 7 days. Other sends go on.
+- **401, or 3 403s in a row** (with no 2xx, 400, 404 or 429 in between; the backend's Open Cloud key is wrong or lacks
+  `user.user-notification:write`): the backend **halts all sending** and alerts; `typetorch notify status` shows
+  `ALL SENDING HALTED (auth)`. The send that hit it is put back (`cancelled`), and intents keep queueing. Fix the key on
+  the backend (`typetorch doctor` probes the same-named key here), then turn sending back on (`typetorch notify resume`,
+  the Settings page's `notify.enabled`, or a `notify push`).
 - **400 other than "not opted in"** (a bad request for that one notification): it fails for good (`failed`, `final`),
   with no retry.
 - **400 `INVALID_ARGUMENT` "… contains words blocked by the text filter"**: Roblox filtered the rendered text (the template

@@ -22,6 +22,10 @@ approving. You finish with a numbered "What you need to do" list that tells them
 > **npm setup checked on 2026-10-05** with template `756e78c` (every `@typetorch/*` package from npm: framework 0.2.0,
 > kernel 0.3.1, transformer 0.2.0, cli 0.6.0, dev-server 0.2.0): a fresh clone built with `bun install`,
 > `bun run build` and `bun run typetorch build`, and so did a copy without `scripts/packages.ts` and its two scripts.
+>
+> **Updated on 2026-11-15 from the code, not re-run:** the toolchain steps now use `@typetorch/transformer` 0.3+ as
+> the only compiler plugin (its own debug macros, no `rbxts-transform-debug`), darklua for the production pack, and
+> the newest npm versions instead of the template's pins.
 
 ## Rules (read first, apply always)
 
@@ -53,7 +57,9 @@ approving. You finish with a numbered "What you need to do" list that tells them
    (`typetorch test --cloud`, automatic before prod deploys), `onStop` at server shutdown (kernel 0.3.2), the fleet API
    (`typetorch servers`, `report`, `alerts`) and the optional `AnalyticsEngine` (framework 0.3.0; its backend is
    `@typetorch/backend`, a git repo, not on npm). The Studio loop: `typetorch serve` (CLI 0.11+) with the Studio plugin,
-   live reload in a playtest (kernel 0.5.4+), `typetorch studio ...` and `typetorch mcp` for agents. Owners switching any server in place needs kernel 0.3.4 and
+   live reload in a playtest (kernel 0.5.4+), `typetorch studio ...` and `typetorch mcp` for agents. The debug macros
+   from `@typetorch/transformer/macros` (transformer 0.3+). Optional build tools: goblox (`bun add -d goblox`, CLI
+   0.16+) and darklua for the production pack (CLI 0.17+). Owners switching any server in place needs kernel 0.3.4 and
    framework 0.3.2 (both on npm). Dev access lists through `typetorch access push` need kernel 0.3.8 on the servers
    (the signed settings record; 0.3.6-0.3.7 read the old ConfigService key). Cross-server messages
    (`TypeTorch.messaging`), `TypeTorch.servers()`, `TypeTorch.liveConfig` and the loading screen signals need kernel
@@ -138,8 +144,11 @@ If it is missing, clone it from the game folder (ask first if your environment n
 git clone https://github.com/typetorch/template ../template
 ```
 
-**The template decides the toolchain.** Its `package.json`, `tsconfig.json`, `default.project.json` and
-`studio.project.json` always match the framework of the same date. Copy from them; don't type versions from memory.
+**The template decides the file layout, npm decides the versions.** Copy its `default.project.json`,
+`studio.project.json`, `scripts/build-info.ts` and the shape of its `package.json` and `tsconfig.json`. Its version
+pins are behind npm today (framework 0.5.0, kernel 0.5.1, CLI 0.9.1, transformer 0.2.1, dev-server 0.2.3) and it still
+uses `rbxts-transform-debug`, so take the `@typetorch/*` versions from npm with `@latest` (3.3) and the compiler
+plugin from 3.4. Don't type versions from memory.
 
 - **Today:** no Flamework. `@typetorch/framework` and `@typetorch/kernel` are dependencies; `@typetorch/transformer`
   (the compiler plugin), `@typetorch/cli` and `@typetorch/dev-server` are devDependencies, all from npm. `Modding`,
@@ -165,7 +174,12 @@ git clone https://github.com/typetorch/template ../template
   lune = "lune-org/lune@0.10.5"
   ```
 
-  Run `rokit install`; check `rojo --version` prints `7.7.0-rc.1` inside the repo.
+  Run `rokit install`; check `rojo --version` prints `7.7.0-rc.1` inside the repo. Then `rokit add seaofvoices/darklua`
+  (it pins the newest darklua in `rokit.toml`): `typetorch build`, `upload` and `deploy` pack the payload with it
+  (CLI 0.17+) and warn `darklua not found: this payload isn't minified` without it.
+- **goblox** (optional, only if the user asks): `bun add -d goblox`. `typetorch build` then compiles with it instead of
+  rbxtsc (CLI 0.16+); end the `build` script with `goblox` (3.3). It runs only `@typetorch/transformer` and ignores
+  every other tsconfig plugin.
 
 ### 3.3 package.json
 
@@ -179,11 +193,20 @@ own packages):
 "typetorch": "typetorch"
 ```
 
-- `build` must end with `rbxtsc` (the CLI appends `-p` for prod builds).
-- Today the template's dependencies include `@typetorch/framework` and `@typetorch/kernel`, and its devDependencies
-  `@typetorch/transformer`, `@typetorch/cli` and `@typetorch/dev-server`, all npm versions (`^x.y.z`); also
-  `@rbxts/t` (generated guards import it), `@rbxts/trove`, `rbxts-transform-debug` `2.2.0` exactly, roblox-ts 3,
-  TypeScript `5.5.3` (also in `overrides`).
+- `build` must end with the compiler, `rbxtsc` (or `goblox` when the game uses it): the CLI appends `-p <tsconfig>` for
+  prod builds, and runs the compiler directly, with a warning, when the script ends with something else.
+- Dependencies: `@typetorch/framework`, `@typetorch/kernel`, `@rbxts/t` (generated guards import it), `@rbxts/trove`,
+  `@rbxts/services`. devDependencies: `@typetorch/transformer`, `@typetorch/cli`, `@typetorch/dev-server`, roblox-ts 3,
+  `@rbxts/types`, `@rbxts/compiler-types`, TypeScript `5.5.3` (also in `overrides`). Take the TypeTorch ones from npm,
+  not the template's pins:
+
+  ```sh
+  bun add @typetorch/framework@latest @typetorch/kernel@latest
+  bun add -d @typetorch/transformer@latest @typetorch/cli@latest @typetorch/dev-server@latest
+  ```
+
+- Don't add `rbxts-transform-debug` (the template still lists it): `@typetorch/transformer` 0.3+ declares the same
+  macros in `@typetorch/transformer/macros`. If the game already uses it, see 4.9.
 - Leave out the template's `packages` and `postinstall` scripts (the optional local override, 3.1). A `postinstall`
   without `scripts/packages.ts` makes `bun install` fail.
 - Remove packages the migration replaces (Knit, `@rbxts/net`, all `@flamework/*`, `rbxts-transformer-flamework`) once
@@ -200,8 +223,23 @@ bun install
 
 PowerShell: `New-Item -ItemType Directory -Force scripts` and `Copy-Item <from> <to>` instead of `mkdir -p` and `cp`.
 
-**Check:** `node_modules/@typetorch/framework/out/init.luau`, `node_modules/@typetorch/kernel/place.project.json` and
-`node_modules/@typetorch/transformer/out/index.js` exist, and `bun run typetorch --help` prints
+The template's `studio.project.json` lists the kernel's server files one by one and misses `RemoteDebug`, `Bundle` and
+`LiveDebug`: a playtest then warns `TypeTorchKernel.<name> is missing` and runs without them. In the copy, add the three
+under `ServerScriptService.TypeTorchKernel` as `node_modules/@typetorch/kernel/place.project.json` maps them, with the
+`node_modules/@typetorch/kernel/` prefix.
+
+In the copied `scripts/build-info.ts`, change the one import line it writes into `src/shared/build.ts`:
+
+```ts
+'import { $compileTime, $git } from "@typetorch/transformer/macros";',
+```
+
+(the template's copy says `"rbxts-transform-debug"`; without that package `bun run build` and `watch` fail on
+`build.ts`). `typetorch build` writes `build.ts` itself and picks the import on its own (CLI 0.12.2+).
+
+**Check:** `node_modules/@typetorch/framework/out/init.luau`, `node_modules/@typetorch/kernel/place.project.json`,
+`node_modules/@typetorch/transformer/out/index.js` and `node_modules/@typetorch/transformer/macros.d.ts` exist, and
+`bun run typetorch --help` prints
 `typetorch <version>: hot-swap roblox-ts game code on live Roblox servers`.
 
 ### 3.4 tsconfig.json
@@ -212,9 +250,9 @@ Keep the project's options; take these from the template:
 - `"experimentalDecorators": true`, `"rootDir": "src"`, `"outDir": "out"`.
 - `"typeRoots": ["node_modules/@rbxts", "node_modules/@typetorch"]` (drop `node_modules/@flamework`).
 - `"types": ["types", "compiler-types"]`. Without it the `@typetorch` type root pulls in the kernel package: TS2688.
-- `plugins` exactly in the template's order: `{ "transform": "rbxts-transform-debug", "environmentRequires": {} }`,
-  then `{ "transform": "@typetorch/transformer" }`. Remove `rbxts-transformer-flamework`. Keep other transformers the
-  project uses after these two.
+- `plugins`: `{ "transform": "@typetorch/transformer" }` first. Remove `rbxts-transformer-flamework` and
+  `rbxts-transform-debug` (transformer 0.3+ expands its macros). Keep other transformers the project uses after it
+  (goblox ignores them).
 
 ### 3.5 The payload project
 
@@ -525,8 +563,14 @@ backend (a DuckDB server or Cloudflare Basin, tokens, the settings key) is a use
 
 ### 4.9 Logging (optional)
 
-`$print`, `$warn`, `$assert` from `rbxts-transform-debug` add `[file:line]` in dev builds and are removed from prod
-builds. Plain `print`/`warn` keep working.
+`$print`, `$warn`, `$error`, `$assert` and `$dbg` from `@typetorch/transformer/macros` add `[src/file.ts:line]` in dev
+builds; prod builds drop `$print`/`$warn`/`$dbg` and keep `$assert`/`$error` without the position. Plain `print`/`warn`
+keep working (and stay in prod builds).
+
+A game that already imports them from `rbxts-transform-debug`: remove that plugin from `tsconfig.json` (the transformer
+expands calls through its declarations too), rewrite the imports to `@typetorch/transformer/macros` (in `src/` and
+`scripts/build-info.ts`), then `bun remove rbxts-transform-debug`. `bun run build` after each. Details:
+[migrate: Debug macros](../getting-started/migrate.md#debug-macros).
 
 ## Step 5: Run local checks
 
@@ -600,7 +644,8 @@ End with this list, filled in for the project (drop what doesn't apply). Also ap
    - DataStore `universe-datastores.objects:read`, `:create` and `:update` (the shared deploy number: every machine
      takes `#seq` from the game's DataStore; and the signed settings record: `access push`, `backend setup`,
      `settings ...`)
-   - place publishing (`universe-places` write; the CLI says `universe.place:write`), only for `kernel deploy`
+   - place publishing (`universe-places` write; the CLI says `universe.place:write`), only when `kernel deploy`
+     publishes a file: `--replace-place` (a new place), `--place-file`, `kernel restore <file>`
    Set an expiry and, if you can, an IP allowlist. No `universe:write` / `universe:read` (TypeTorch keeps nothing in
    ConfigService since kernel 0.3.8). Don't ask for `legacy-asset:manage` (place downloads): Creator Hub doesn't offer
    it for API keys today. Deploys work without it: `kernel deploy` patches the place through Luau Execution when the place allows saving through
@@ -721,7 +766,8 @@ kernel lives in the place, so it changes with a place publish and new servers. T
 
 ## Fresh setup path
 
-No game yet ("set up typetorch" in an empty folder):
+No game yet ("set up typetorch" in an empty folder). The user's own path is `bunx @typetorch/cli init` (it asks for
+keys and publishes, so it is never yours to run: name it in the final list). Without it:
 
 1. From the workspace folder:
 
@@ -733,7 +779,17 @@ No game yet ("set up typetorch" in an empty folder):
    rokit install
    ```
 
-   `bun install` gets every `@typetorch/*` package from npm; the template already has the `typetorch` script.
+   `bun install` gets every `@typetorch/*` package from npm, at the template's (old) pins; the template already has
+   the `typetorch` script. Then take the newest versions and darklua (3.2, 3.3):
+
+   ```sh
+   bun add @typetorch/framework@latest @typetorch/kernel@latest
+   bun add -d @typetorch/transformer@latest @typetorch/cli@latest @typetorch/dev-server@latest
+   rokit add seaofvoices/darklua
+   ```
+
+   The template's code imports its macros from `rbxts-transform-debug` and its tsconfig runs that plugin before
+   `@typetorch/transformer`; transformer 0.3 accepts both. Leave it, or move it as in 4.9.
 2. In `typetorch.json`: the user's ids (or placeholders `1`), `members` `{}` unless given, and **delete**
    `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey` (they are the template's).
 3. Step 5 checks, commit.
@@ -741,8 +797,11 @@ No game yet ("set up typetorch" in an empty folder):
 
 ## Optional: Claude Code
 
-- Install the skill (works once `typetorch/claude-plugin` is on GitHub): `/plugin marketplace add typetorch/claude-plugin`,
-  then `/plugin install typetorch@typetorch`. Run it with `/typetorch:typetorch-migrate`.
+- Install the skill: `/plugin marketplace add typetorch/claude-plugin`, then `/plugin install typetorch@typetorch`.
+  Run it with `/typetorch:typetorch-migrate`. `typetorch init` adds the marketplace itself when it starts Claude Code.
+- The CLI is also an MCP server for the Studio loop: `claude mcp add typetorch -- bunx typetorch mcp` in the game repo
+  (tools: `serve_status`, `serve_start`, `serve_stop`, `serve_logs`, `studio_logs`, `studio_reconnect`, `studio_play`,
+  `studio_stop`). Same limits as Step 5 item 7.
 - Plan mode fits Steps 1 and 2. Allow `bun run build` and `bun run typetorch build`; keep every Roblox-facing command
   on ask or deny.
 - remote-claude runs only on a Claude subscription login, never an API key.

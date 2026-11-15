@@ -13,8 +13,9 @@ Claude can act on your running server ("jump me", "give me 100 coins") or change
 - `cloudflared` (installed with winget on Windows when missing; macOS: `brew install cloudflared`). The tunnel is an
   account-free Cloudflare Quick Tunnel.
 - The [dev-server](https://github.com/typetorch/dev-server): Node 20+ or Bun 1.3+. The template has
-  `@typetorch/dev-server` in its dev dependencies, so `bun install` gets it. Without it: npx (see below), or a checkout
-  next to your game (`bun install` in it).
+  `@typetorch/dev-server` in its dev dependencies, so `bun install` gets it. Its range may hold you on an older minor
+  version (`^0.2.3` stays on 0.2.x): `bun add -d @typetorch/dev-server@latest` gets the current release. Without it:
+  npx (see below), or a checkout next to your game (`bun install` in it).
 - An Open Cloud key with `universe-messaging-service:publish`: `OPENCLOUD_DEPLOY_KEY`, else the shared
   `OPENCLOUD_API_KEY` (or `ROBLOX_API_KEY`, its alias). The dev-server tells game servers where the session is with it.
   It finds the key the same way the CLI does: the real environment, then the game repo's `.env` (next to
@@ -67,9 +68,11 @@ for up to 3 hours. Each code pairs one user on one server once; the next code pr
 
 Useful flags: `--branch <name>`, `--max-prompts <n>` (default 50), `--no-deploy`, `--protect <globs>` (files Claude may
 not edit), `--code-ttl <minutes>` (default 180), `--model <name>`, `--max-budget-usd <n>` (a cap per run on Claude Code's
-own cost estimate), `--cli <entry>` (the TypeTorch CLI used for deploys), `--no-clipboard`, `--no-tunnel` (no Cloudflare
-tunnel, for a local client only; what `serve --claude` uses). Terminal commands while it runs: `code`, `users`,
-`revoke <userId>`, `rotate`, `status`, `cancel <promptId>`, `quit`.
+own cost estimate), `--cli <entry>` (the TypeTorch CLI used for deploys), `--env-file <path>`, `--repo <dir>`,
+`--port <n>`, `--no-install` (no `bun install` in a fresh worktree), `--no-clipboard`, `--no-announce` (local testing),
+`--no-tunnel` (no Cloudflare tunnel, for a local client only; what `serve --claude` uses), and, in dev-server 0.4.0
+(not on npm yet), `--deploy-branch <b>` (where Deploy goes: a dev-channel branch; default the session's branch).
+Terminal commands while it runs: `code`, `users`, `revoke <userId>`, `rotate`, `status`, `cancel <promptId>`, `quit`.
 
 It also runs in Docker (locally or as a Coolify app): the dev-server repo's `Dockerfile` and `compose.yaml`, with the
 users in `TT_USERS` and `claude auth login` inside the container. See the
@@ -125,26 +128,49 @@ assets, from your PC). The chip clears after you send; without it Claude has no 
   Settings > Security; it applies to every server of the experience, prod included).
 - In **Code** mode it records the asset in `toolbox.lock.toml` instead.
 
-## From Studio (`serve --claude`)
+## From Studio
 
 The TypeTorch Studio plugin has a **Claude** button that opens the same chat in Studio. It needs
-[`typetorch serve`](studio-testing.md) with `--claude` (CLI 0.12+) on the machine with the game checkout:
+[`typetorch serve`](studio-testing.md) with `--claude` on the machine with the game checkout:
 
 ```sh
 bun run typetorch serve --claude
 ```
 
-- serve runs remote-claude on this machine without a tunnel (`remote-claude --no-tunnel`) and pairs with it on the
-  Studio user's behalf: nobody pastes a code. A remote-claude you start yourself in the repo works too (serve finds it
-  through `.typetorch/remote-claude.session.json`).
+**Versions.** serve from CLI 0.12.2+ starts remote-claude with `--deploy-branch`, which only `@typetorch/dev-server`
+0.4.0 knows. 0.4.0 is not on npm yet (npm has 0.3.3, which exits with `unexpected argument`): until it is, set
+`TYPETORCH_DEV_SERVER` in the environment to a checkout's entry, for example
+`TYPETORCH_DEV_SERVER=../dev-server/src/index.ts` (run with Bun; the path is relative to the game folder) for a
+[typetorch/dev-server](https://github.com/typetorch/dev-server) checkout next to the game, with `bun install` run in
+it. Apply, Deploy to dev and the per-dev worktrees below are dev-server 0.4.0.
+
+- serve runs remote-claude on this machine without a tunnel
+  (`remote-claude --no-tunnel --no-announce --no-clipboard --deploy-branch <serve's --dev-branch>`) and pairs with it
+  on the Studio user's behalf: nobody pastes a code. A remote-claude you start yourself in the repo works too (serve
+  finds it through `.typetorch/remote-claude.session.json`). serve doesn't restart it when it exits: read
+  `serve logs`, then `serve restart claude`.
 - `--claude-users <ids>`: the Roblox user ids allowed (remembered). Without it, the owners in `typetorch.json`. Studio
   prompts as the Roblox user it runs as.
-- **Code mode only.** Claude edits the branch in its worktree, then the tab shows the same deploy card as the game:
-  **Deploy** (runs `typetorch deploy` on that branch, so the branch must be dev-channel; with `"approval": "all"` it
-  waits for `typetorch approve` on your PC) or **Discard**. Live mode works only from the in-game tab: Studio's Live
-  pill says so.
-- The "+" menu has Dex path (the Studio selection), My logs, Server logs (in a playtest) and Toolbox; screenshots work
-  from the Play client. Recent chats are listed, and the chat follows you between Edit and Play.
+- **Code mode only.** Live mode works only from the in-game tab: Studio's Live pill says so. Claude edits a copy of
+  the branch, then the tab shows a card with the summary and the changed files:
+  - **Apply** puts the change into the checkout serve's Rojo syncs to Studio, uncommitted, so you review and commit it
+    there. A change to lines that changed there too is refused, and the checkout stays as it was.
+  - **Deploy to dev** runs `typetorch deploy` of that commit to serve's dev branch (`dev`, or `serve --dev-branch`).
+    With `"approval": "all"` it waits for `typetorch approve` on your PC.
+  - **Discard** drops the commit. With no answer in 15 minutes the change is discarded; only the dev who sent the
+    prompt decides.
+- **Each dev gets their own worktree**, `../<game>-remote-claude-<user id>` on `remote-claude/<branch>-<user id>`, so
+  several devs use Claude at once: each dev's prompts run one at a time, but never wait for another dev's. Apply
+  changes the checkout one change at a time. Each worktree is brought up to the branch before every run, so a change
+  another dev applied reaches your runs once it is committed.
+- **A prod-channel checkout works too** (a local session only): Claude never commits to that branch itself, and Deploy
+  goes to serve's dev branch.
+- **Claude reading the open place is planned.** dev-server 0.4.0 offers Studio prompts the game tools, and the plugin
+  (0.7.1+) answers `inspect`, `find`, `game_logs` and `game_status` on the place open in Edit, read-only. It never runs
+  code it receives: `run_luau` is answered "not available in Studio". serve on CLI main doesn't relay these requests to
+  the plugin yet, so today those tool calls time out and Claude works from the files.
+- The "+" menu has Dex path (the Studio selection), My logs, Server logs and Screenshot (in Play only) and Toolbox.
+  Recent chats are listed, and the chat follows you between Edit and Play.
 - Replies stream to the tab over a WebSocket (`/tt/claude/stream`), so they show as Claude writes them.
 - **A helper on another machine** pairs their Studio with `serve --remote` ([A Studio on another
   machine](studio-testing.md#a-studio-on-another-machine)); add their user id to `--claude-users`. Pair again after

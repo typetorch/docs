@@ -1,0 +1,37 @@
+/* TypeTorch brand colours (brand/README.md): tile #fb7a32 -> #d9480f, flame core #e8590c. */
+:root {
+	--vp-c-brand-1: #c2410c;
+	--vp-c-brand-2: #d9480f;
+	--vp-c-brand-3: #e8590c;
+	--vp-c-brand-soft: rgba(232, 89, 12, 0.14);
+
+	--vp-home-hero-name-color: transparent;
+	--vp-home-hero-name-background: linear-gradient(120deg, #fb7a32 20%, #d9480f);
+	--vp-home-hero-image-background-image: linear-gradient(-45deg, #fb7a32 50%, #d9480f 50%);
+	--vp-home-hero-image-filter: blur(56px);
+}
+
+.dark {
+	--vp-c-brand-1: #fb8c4a;
+	--vp-c-brand-2: #fb7a32;
+	--vp-c-brand-3: #e8590c;
+	--vp-c-brand-soft: rgba(251, 122, 50, 0.16);
+}
+
+.VPHero .image-src {
+	max-width: 200px;
+	max-height: 200px;
+}
+@media (min-width: 640px) {
+	.VPHero .image-src {
+		max-width: 256px;
+		max-height: 256px;
+	}
+}
+
+/* Mermaid diagrams: centred, never wider than the page. */
+.vp-doc .mermaid {
+	display: flex;
+	justify-content: center;
+	overflow-x: auto;
+}

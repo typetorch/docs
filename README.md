@@ -6,6 +6,8 @@ TypeTorch updates live Roblox games **without restarting their servers**. You wr
 [roblox-ts](https://roblox-ts.com). Each build becomes one artifact (an uploaded, private Model asset), and every live
 server hot-swaps to it in a few seconds while players stay in the game.
 
+These docs are also a website: **[www.typetorch.dev](https://www.typetorch.dev)**.
+
 > **Status: early.** The core loop runs on live Roblox servers today. APIs and commands still change. These docs
 > describe the code as it is now. Features that don't exist yet are marked **planned**.
 
@@ -25,6 +27,9 @@ Pick one path:
 | An AI coding agent | **[Agent playbook](agents/AGENTS.md)**: tell your agent "migrate this project to typetorch" | |
 
 TypeTorch is **roblox-ts only**. A plain Luau game has to move to roblox-ts first.
+
+The template's package versions are behind npm. After cloning it (or after `init`), take the newest `@typetorch/*`
+packages: [Take the newest versions](getting-started/fresh-setup.md#take-the-newest-versions).
 
 ## How it works
 
@@ -52,40 +57,65 @@ flowchart LR
   live servers and alerts, patches the kernel into the place, and runs the Studio loop (`typetorch serve`).
   `typetorch update` keeps it current.
 - **Studio plugin:** attaches Studio to `typetorch serve` by itself, reloads a running playtest on save, publishes hot
-  assets from a panel, and opens a Claude chat.
+  assets from a panel, and has a Claude tab for `typetorch serve --claude` (it needs `@typetorch/dev-server` 0.4.0,
+  which is not on npm yet; see [remote-claude](guides/remote-claude.md#from-studio)).
 - **Safe deploys:** a cloud test before every prod publish; on each server a health window that rolls a failing build
   back; `deploy --wait`, which rolls the branch back when a build fails on 20% of servers; a new server plays within
   15 s.
-- **Backend (optional, self-hosted):** live server status, deploy reports, alerts, error logs and debug bundles from
-  the kernel, your own analytics with experiments, funnels and player journeys, and a web explorer.
+- **Backend (optional, self-hosted):** live server status, deploy reports and history, alerts, error logs and debug
+  bundles from the kernel, read-only remote and live debug of one live server, your own analytics (experiments,
+  funnels, player journeys, first-session recordings on your maps), experience notifications, player feedback, live
+  events, and the web explorer that shows all of it. It runs from a checkout or its Docker image.
 
 ## Guides
 
+**Build your game**
+
 | Guide | What it covers |
 |---|---|
-| [Branches and channels](guides/branches-and-channels.md) | `prod` and `dev`, private servers on a branch, `/tt new`, owners switching any server in place, `branch rm` |
-| [Deploy and rollback](guides/deploy-and-rollback.md) | deploy, approval, safe deploys (cloud test, health window, `--wait` and automatic rollback, reports), promote, rollback, the backup build (automatic refresh, `--reupload`), the build cache, pins, kernel updates |
-| [Live servers and alerts](guides/fleet-and-alerts.md) | the fleet API, `typetorch servers`, `report`, `alerts`, server lost and stuck, webhooks, error logs, debug bundles, remote debug in the explorer, debugging endpoints |
-| [Settings](guides/settings.md) | the signed settings record: dev access, fleet, analytics and your own live values (`liveConfig`), `typetorch settings` |
-| [Cross-server messages](guides/messaging.md) | `TypeTorch.messaging` (one kernel-held topic, dev branches kept off prod, limits), `TypeTorch.servers()` |
-| [Loading screens](guides/loading-screen.md) | your own loading screen: `ClientReady`, `Holding`, `TypeTorchBootScreen`, `TypeTorchKernelScreen` |
-| [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, the join row and its raw join data (`jd`), DuckDB or Basin, experiments and live overrides (`typetorch experiment`), the web explorer, queries, node graphs, privacy, a local quick start |
-| [Notifications](guides/notifications.md) | native Roblox experience notifications: kinds in `typetorch.json`, `TypeTorch.notifications()` (`want`, `drop`, `setOff`, `onOpen`, `promptOptIn`), templates made by hand (`typetorch notify templates`), signed taps, the funnel, `typetorch notify` |
-| [Player feedback](guides/feedback.md) | `TypeTorch.feedback().submit(player, { rating, text, topic, ctx })`, rating scales (thumbs, stars, a labelled scale) in `game.feedback`, rate limits, the Feedback page, moving from a custom event |
-| [API keys](guides/api-keys.md) | named backend keys with roles (`game`, `lookup`, `support`, `analyst`, `admin`) and scopes, `typetorch keys create/list/revoke`, the per-player support endpoints (`/v1/players/by-uid/{uid}/events`, `summary`), the event allow-list, per-key rate limit and audit, built-in env tokens |
-| [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
-| [Player data](guides/player-data.md) | the swap-safe data pattern (library writes as DataHost jobs or `TypeTorch.runDetached`), ProfileStore and ProfileService examples, the cloud test and developer product receipts |
+| [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, playerState, `Dependency<T>()`, roles, logs, messaging, detached jobs, live settings and live events, live debug (`remoteDebug`, `fleet`), notifications and feedback |
 | [State with charm](guides/state.md) | charm atoms across swaps: server atoms from `persist`, charm-sync over `createNetwork`, the client's hydrate request |
-| [Go-live checklist](guides/go-live-checklist.md) | moving a game with live players: prepare, a copy, a dev-branch soak, live tests, cut-over, what to do if it goes wrong |
-| [Hot assets](guides/hot-assets.md) | models and UI templates from the place, updated live with `hotAsset()`; from the CLI or the Studio plugin |
-| [Testing in Studio](guides/studio-testing.md) | `typetorch serve` and the Studio plugin: your local code with the real kernel, live reload in a playtest, agents driving Studio, a Studio on another machine |
-| [The dev menu](guides/dev-menu.md) | every tab, owners and devs, the `/tt` commands |
-| [Runtime API](guides/runtime-api.md) | `TypeTorch.*`: identity, start info, swap events, persist, playerState, `Dependency<T>()`, roles, logs, messaging, live settings |
 | [Networking](guides/networking.md) | `createNetwork`, guards, limits, requests, timeouts, `emit` |
+| [Cross-server messages](guides/messaging.md) | `TypeTorch.messaging` (one kernel-held topic, dev branches kept off prod, limits), `TypeTorch.servers()` |
+| [Player data](guides/player-data.md) | the swap-safe data pattern (library writes as DataHost jobs or `TypeTorch.runDetached`), ProfileStore and ProfileService examples, the cloud test and developer product receipts |
+| [Loading screens](guides/loading-screen.md) | your own loading screen: `ClientReady`, `Holding`, `TypeTorchBootScreen`, `TypeTorchKernelScreen` |
+| [Hot assets](guides/hot-assets.md) | models and UI templates from the place, updated live with `hotAsset()`; from the CLI or the Studio plugin |
+| [The dev menu](guides/dev-menu.md) | every tab, owners and devs, the dev-only tools, the command palette, the `/tt` commands |
+| [Player feedback](guides/feedback.md) | `TypeTorch.feedback().submit(player, { rating, text, topic, ctx })`, rating scales (thumbs, stars, a labelled scale) in `game.feedback`, rate limits, the Feedback page, moving from a custom event |
 | [Coming from Flamework](guides/from-flamework.md) | `typetorch migrate --from flamework` (the codemod and its report), `createFlameworkCompat`, the mapping |
-| [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server or from Studio (`serve --claude`): Live and Code modes, screenshots, Toolbox |
-| [Security model](guides/security.md) | who can do what, dev access (`access push`), keys, signing, remote Studios, never publish secrets |
+
+**Deploy**
+
+| Guide | What it covers |
+|---|---|
+| [Deploy and rollback](guides/deploy-and-rollback.md) | deploy, the compiler (goblox or rbxtsc), the production pack (darklua), approval, safe deploys (cloud test, health window, `--wait` and automatic rollback, reports), promote, rollback, deploy marks on the backend, the backup build (automatic refresh, `--reupload`), the build cache, pins, kernel updates |
+| [Branches and channels](guides/branches-and-channels.md) | `prod` and `dev`, private servers on a branch, `/tt new`, owners switching any server in place, `branch rm` |
+| [Prod signing](guides/prod-signing.md) | the Root Key and Fallback Key, `typetorch keys`, kernel 0.3 verification, bootstrap heads, the boot fail-safe |
+| [Settings](guides/settings.md) | the signed settings record: dev access, backend, the analytics dials, your own live values (`liveConfig`), the reserved game keys (`tt.events`, `feedback`), `typetorch settings` |
+| [Go-live checklist](guides/go-live-checklist.md) | moving a game with live players: prepare, a copy, a dev-branch soak, live tests, cut-over, what to do if it goes wrong |
+
+**Operate** (the self-hosted backend)
+
+| Guide | What it covers |
+|---|---|
+| [Live servers and alerts](guides/fleet-and-alerts.md) | the fleet API, `typetorch servers`, `report`, `alerts`, server lost and stuck, backend alerts, the deploy history, webhooks, error logs, debug bundles, remote debug, debugging endpoints |
+| [Live debug](guides/live-debug.md) | game-declared read-only commands, streams and Fleet columns, the live map of one server or all of them, limits and safety rules |
+| [The explorer](guides/explorer.md) | the backend's web app: sign-in and roles, every page, the filter bar, the command palette, compare and explain, deploy markers, saved queries |
+| [Analytics](guides/analytics.md) | `AnalyticsEngine`, the event format, positions, the join row and its raw join data (`jd`), DuckDB or Basin, the analytics dials, experiments and live overrides (`typetorch experiment`), queries, node graphs, privacy, a local quick start |
+| [Recordings and maps](guides/recordings-and-maps.md) | first-session recordings and positioned events on each map's real geometry: map export, replay, quit autopsy, first actions |
+| [Live events](guides/live-events.md) | scheduled changes of live values ("double cash this weekend"), signed once with `typetorch settings set game.tt.events -`, and the lift report |
+| [Notifications](guides/notifications.md) | native Roblox experience notifications: kinds in `typetorch.json`, `TypeTorch.notifications()` (`want`, `drop`, `setOff`, `onOpen`, `promptOptIn`), templates made by hand (`typetorch notify templates`), signed taps, the funnel, `typetorch notify` |
+| [Running the backend](guides/backend-operations.md) | runtime settings, backend alerts, the audit log, backups and restore, disk space, backend stats, deploys on Coolify, API docs for agents, Open Cloud key scopes |
+| [API keys](guides/api-keys.md) | named backend keys with roles (`game`, `lookup`, `support`, `analyst`, `admin`) and scopes, `typetorch keys create/list/revoke` (the next CLI release), the per-player support endpoints, the event allow-list, per-key rate limit and audit, built-in env tokens |
+| [Security model](guides/security.md) | who can do what, dev access (`access push`), the backend, devtools for devs only, keys, signing, remote Studios, never publish secrets |
 | [Troubleshooting](guides/troubleshooting.md) | real errors and their fixes |
+
+**Tooling**
+
+| Guide | What it covers |
+|---|---|
+| [Testing in Studio](guides/studio-testing.md) | `typetorch serve` and the Studio plugin: your local code with the real kernel, live reload in a playtest, agents driving Studio, a Studio on another machine |
+| [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server or from Studio (`serve --claude`): Live and Code modes, screenshots, Toolbox |
 
 ## For agents
 
@@ -93,7 +123,7 @@ flowchart LR
   Cursor and others).
 - [agents/skills/typetorch-migrate/SKILL.md](agents/skills/typetorch-migrate/SKILL.md): the same playbook as a Claude
   Code skill.
-- Claude Code plugin (works once the `typetorch/claude-plugin` repo is on GitHub):
+- Claude Code plugin ([typetorch/claude-plugin](https://github.com/typetorch/claude-plugin)):
 
   ```text
   /plugin marketplace add typetorch/claude-plugin
@@ -114,8 +144,9 @@ flowchart LR
 | [template](https://github.com/typetorch/template) | the starter game (Target Rush), also the reference setup |
 | [transformer](https://github.com/typetorch/transformer) | `@typetorch/transformer`, the compiler plugin for guards and dependency injection |
 | [dev-server](https://github.com/typetorch/dev-server) | `@typetorch/dev-server`, `remote-claude`: Claude Code on your PC, prompted from inside a dev server or from Studio |
-| [backend](https://github.com/typetorch/backend) | the backend: analytics (DuckDB, or Basin), the fleet API (SQLite), error logs, debug bundles and the web explorer (run from a checkout or its Docker image; not on npm) |
-| [dash](https://github.com/typetorch/dash) | `dash.typetorch.dev`: one Roblox sign-in for every backend you own or view (optional) |
+| [backend](https://github.com/typetorch/backend) | the backend: analytics (DuckDB, or Basin), the fleet API (SQLite), error logs, debug bundles, remote and live debug, notifications, feedback, live events and the web explorer (run from a checkout or its Docker image; not on npm) |
+| [claude-plugin](https://github.com/typetorch/claude-plugin) | the Claude Code plugin marketplace with the `typetorch-migrate` skill |
+| dash (private) | [dash.typetorch.dev](https://dash.typetorch.dev): one Roblox sign-in for every backend you own or view (optional) |
 
 ## Conventions in these docs
 
@@ -139,6 +170,14 @@ The Studio plugin is released the same way, from a tag, as `TypeTorchSync.rbxm` 
 accept plugin uploads through Open Cloud yet (the release job warns and skips that step), so the Creator Store copy is
 published by hand in Studio with **Publish as Plugin**. Install from the GitHub release
 ([Testing in Studio](guides/studio-testing.md#set-up-once)).
+
+## The docs site
+
+These Markdown files are also the site at [www.typetorch.dev](https://www.typetorch.dev) (and `typetorch.dev`): VitePress,
+served by a Cloudflare Worker. `bun install`, then `bun run docs:dev` for a live preview, `bun run docs:build` to build
+(dead links fail it). New pages go into `.vitepress/sidebar.ts`. `bun run sync:reference` copies the public package
+READMEs into `reference/`. `bun run deploy` builds and deploys with the Cloudflare CLI (`cf deploy`, config in
+`cloudflare.config.ts`; needs `cf auth login` and Node 22.18+); `bun run deploy:check` is the dry run.
 
 ## Logo
 

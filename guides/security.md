@@ -7,7 +7,7 @@
 | **You at your terminal** (holding the Open Cloud key and the signing key files) | build, upload, approve, sign and deploy any branch; roll back; pin; publish the kernel; rotate keys |
 | **An agent, a script or the remote-claude dev-server** | build and upload, then only write a **proposal**; you approve it with `typetorch approve` (y/N). The dev-server never targets a prod-channel branch |
 | **Owner in game** | everything a dev can, plus the dev menu's Manage tab (kick, ban, bring, shut down and migrate servers, load a build on other dev servers), switching the server they are in to any branch or build (prod included), and rolling back prod-channel servers |
-| **Dev in game** | the dev menu and `/tt`: read everything; on dev-channel servers also edit in the Dex, cheats, pins, branch switches, remote-claude |
+| **Dev in game** | the dev menu and `/tt`: read everything; on dev-channel servers also cheats, pins and branch switches. The [dev-only tools](dev-menu.md#dev-only-tools) (Claude, Logs > Upload, Dex edits, Network blocking, Server > Experiments) work under dev rules for every dev, and on a public server an owner switched to a dev branch for owners only |
 | **Player** | nothing beyond your game's own network leaves, which are rate-limited, shape-limited and type-guarded |
 
 - **Owners** are the experience's creator (or the owning group's owner) and `members` with the role `"owner"`.
@@ -60,6 +60,51 @@ What stays open, by design or for now:
 - **Cross-server messages** (`TypeTorch.messaging`): the sender tags (JobId, branch, channel) are for routing, not
   proof. Anything that can publish to your universe's MessagingService can forge them; check what a message asks for.
 
+## The backend
+
+The [backend](https://github.com/typetorch/backend) is meant to sit on a public https address. Its full model is in the
+backend README's [Security](https://github.com/typetorch/backend#security) section, sign-in and the explorer's roles in
+[The explorer](explorer.md#sign-in-and-roles), and the Open Cloud key's scopes per backend feature in
+[Running the backend](backend-operations.md#open-cloud-key-scopes). The short version:
+
+| Who | How they get in | Can |
+|---|---|---|
+| Game servers | the game key (`TYPETORCH_API_KEY`) as a Bearer | write events, heartbeats, deploy reports, alerts, error logs, notification intents; read nothing |
+| Admin | the admin token (`TYPETORCH_ADMIN_TOKEN`; the CLI, or the explorer's token login), or an **owner** signing in with Roblox | read and manage everything |
+| Viewer (the `web` role) | Sign in with Roblox only, for the UserIds in `TYPETORCH_WEB_VIEWERS` (or the Settings page) | read the game's data; every write answers 403; never the server's configuration or game servers' IP addresses |
+| A named key | `ttk_...` as a Bearer, with a role (`game`, `lookup`, `support`, `analyst`, `admin`) | only its role's scopes ([API keys](api-keys.md)); an `admin` key can't replace the owner list or the trust-link keys |
+| The lookup token | `TYPETORCH_LOOKUP_TOKEN` as a Bearer | `GET /v1/identity/resolve` only |
+
+- **Owners** are the access list the CLI sends with every settings write (`PUT /v1/access`, admin token only). Removing an
+  owner or a viewer ends their sessions on their next request. Sign-in also works through
+  [typetorch.dev](https://github.com/typetorch/backend#sign-in-with-typetorchdev), which only confirms who someone is: the
+  role still comes from the backend's own lists.
+- **Sessions** are signed JWTs in an `HttpOnly`, `SameSite=Strict` cookie, valid 3 days from sign-in
+  (`TYPETORCH_SESSION_MAX_DAYS`; no idle timeout). They survive restarts and deploys; changing the admin token ends them
+  all. A cookie request that changes something also needs the `X-TypeTorch: 1` header and, when the browser sends an `Origin`,
+  this site's. There is
+  no CORS.
+- **Lockouts:** 5 failed logins or bad tokens in 15 minutes from one address get `429` until the oldest ages out
+  (`TYPETORCH_LOGIN_MAX_FAILURES`, `TYPETORCH_LOGIN_WINDOW_MINUTES`). Wrong game keys are counted on their own, so a real
+  game server behind a shared Roblox address is never blocked.
+- **Admin allow list:** `TYPETORCH_ADMIN_ALLOW_IPS` (addresses and CIDR ranges) makes the admin routes, the explorer and the
+  login answer `404` to everyone else. Game routes stay open. `TYPETORCH_TOKEN_LOGIN=off` hides the token login in the
+  browser (the CLI's Bearer still works). Both can be changed on the Settings page, behind guards that refuse to lock you
+  out.
+- **Proxies:** client addresses come from `X-Forwarded-For` only with `TYPETORCH_TRUST_PROXY` (`1` behind Coolify or
+  Caddy), and then the proxy must be the only way to the port (`TYPETORCH_TRUSTED_PROXIES` enforces it). Behind
+  Cloudflare's proxy use `TYPETORCH_CLOUDFLARE=on` or a DNS-only record, or the allow list and the lockout see Cloudflare's
+  address instead of yours.
+- **Audit log:** settings changes, key creates and revokes, per-player reads by API keys, remote debug commands and the
+  other admin actions are written to the [audit log](https://github.com/typetorch/backend#audit-log) (the Audit page),
+  never with a secret.
+
+## Devtools reach devs only
+
+With kernel and framework 0.5.6+, the dev menu's client code (devtools) is not in the client tree every player gets. The
+server copies it into each dev's own `PlayerGui` when they join or become a dev; other players never receive it. Older
+kernels or frameworks ship it to every client as before (still gated on the server).
+
 ## Keys and tokens
 
 | Secret | Where it lives | Never |
@@ -67,9 +112,10 @@ What stays open, by design or for now:
 | Open Cloud API key(s) | the game repo's `.env` (gitignored; CLI 0.9), or the real environment | in git, in chat, in an issue, in a screenshot, given to an agent |
 | Signing key files | `~/.config/typetorch/keys/<universeId>.key` and `.fallback.key` | inside any git work tree (the CLI refuses), copied to another machine you don't control |
 | Backend admin token (`TYPETORCH_ADMIN_TOKEN`) | the game repo's `.env` and the backend's environment | anywhere a game server or a client can read it |
+| Named API keys (`ttk_...`) and the lookup token (`TYPETORCH_LOOKUP_TOKEN`) | the one tool that uses it (its secret store or environment) | in a game server, a client, or a shared chat |
 | Backend game key (`TYPETORCH_API_KEY`, write-only) | the game repo's `.env` and the backend's environment; the signed settings record's `backend` section (server only) | in code, in a payload, sent to a client |
 | Basin R2 token (SQL reads) | your PC only | in the game's settings |
-| Erasure webhook secret (`ROBLOX_WEBHOOK_SECRET`), alert webhook URL, the backend's Open Cloud key (`OPENCLOUD_API_KEY`) | the backend's environment | in git |
+| Erasure webhook secret (`ROBLOX_WEBHOOK_SECRET`), alert webhook URL, the backend's Open Cloud keys (`OPENCLOUD_API_KEY`, `OPENCLOUD_NOTIFY_KEY`), the notification signing key (`TYPETORCH_NOTIFY_KEY` or `notify-keys.json`) | the backend's environment and data folder (the webhook URL in `runtime-settings.json` when saved on the Settings page) | in git; a downloaded backup leaves the webhook URL and `notify-keys.json` out |
 | remote-claude pairing codes | your terminal and clipboard | in a commit (they expire after one use or 3 hours) |
 | `typetorch serve --remote` pairing links | your terminal (`serve status`), then the person you send it to | in a public channel (one use, 15 minutes; paired devices are listed by `serve devices`) |
 
@@ -88,7 +134,8 @@ What stays open, by design or for now:
   leaks: rotate it. For the game key, put the new one in the backend's `TYPETORCH_API_KEY`, the old one in
   `TYPETORCH_API_KEY_PREVIOUS` (both accepted until you remove the old one), put the new one in the game repo's `.env`, and
   run `backend setup` again. For the admin token, change `TYPETORCH_ADMIN_TOKEN` on the backend (that ends every explorer
-  session) and in the game repo's `.env`.
+  session) and in the game repo's `.env`. For a named API key: revoke it (`DELETE /v1/admin/keys/<id>`, or
+  `typetorch keys revoke <id>` from the next CLI release) and create another ([API keys](api-keys.md)).
 
 ## `typetorch serve` and remote Studios
 

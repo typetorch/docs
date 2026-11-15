@@ -6,10 +6,11 @@ anticheat rows by UserId. It gets a `support` key, which can read that and nothi
 
 - A key looks like `ttk_<id>_<secret>`. The `id` (10 characters of `0-9 a-z`) is public: lists and the audit log show
   it. The secret is shown **once**, when the key is made; the backend keeps only a SHA-256 hash of the whole key.
-- A key is a bearer token: `Authorization: Bearer ttk_...`. It never opens an explorer session; browser sign-in (owner,
-  dev, viewer) is unchanged.
+- A key is a bearer token: `Authorization: Bearer ttk_...`. It never opens an explorer session; browser sign-in (owners
+  as admins, viewers read-only) is unchanged ([The explorer: sign in and roles](explorer.md#sign-in-and-roles)).
 - Each key has a name (`a-z 0-9 . _ -`, 1-48 characters, unique among active keys), a role, and an optional expiry (1 to
   3650 days). An expired or revoked key answers 401, like an unknown one.
+- A backend keeps at most 1,000 keys, revoked ones included (a create past that answers 409).
 
 ## Roles and scopes
 
@@ -27,7 +28,7 @@ What each scope opens:
 
 | Scope | Routes |
 |---|---|
-| `ingest:write` | `POST /v1/ingest`, the game side of `/v1/fleet/*`, `/v1/errors`, `/v1/notify/intents`, `opened`, `played` |
+| `ingest:write` | `POST /v1/ingest`, `/v1/identity`, `/v1/errors`, the game side of `/v1/fleet/*`, `/v1/notify/intents`, `opened`, `played` |
 | `identity:resolve` | `GET /v1/identity/resolve` |
 | `players:read` | `GET /v1/players/by-uid/{uid}/events` and `.../summary` ([below](#per-player-endpoints)) |
 | `analytics:query` | the [named queries](analytics.md#queries) |
@@ -38,6 +39,9 @@ What each scope opens:
 A request outside the key's scopes answers `403 { "error": "forbidden", "need": "<scope>" }`.
 
 ## The CLI
+
+The `keys create | list | revoke` commands ship in **the next CLI release** (they are on the CLI's main branch, after
+0.18.1). The [HTTP routes](#over-http) work today with any backend that has named keys.
 
 From the game folder, with `TYPETORCH_ADMIN_TOKEN` in its `.env` and `backend.url` in `typetorch.json`:
 
@@ -57,6 +61,8 @@ bun run typetorch keys revoke a1b2c3d4e5
 - `revoke` takes the id (from `list`), never the key itself. A revoked key fails at once.
 - These sit next to the [prod signing key](prod-signing.md) commands (`keys init`, `rotate`, `resign`); they share the
   `keys` command, nothing else.
+
+### Over HTTP
 
 The same over HTTP (admin scope):
 
@@ -78,7 +84,7 @@ The tokens in the backend's environment keep working unchanged, and `keys list` 
 | `env:lookup` | `TYPETORCH_LOOKUP_TOKEN` | `lookup` |
 
 They can't be revoked through the API or the CLI: to retire one, change the variable in the backend's environment and
-restart it.
+restart it ([Running the backend: environment](backend-operations.md#environment)).
 
 ## Per-player endpoints
 
@@ -118,16 +124,22 @@ Query: `since` (unix ms, default the last 30 days).
   "byName": { "ac_flag": 12, "ac_action": 3, "ac_honeypot": 0 },
   "byCategory": { "speed": 9, "fly": 3 },
   "sessions": 41,
-  "lastSeen": 1762876800123
+  "lastSeen": 1762876800123,
+  "playtimeSecs": 51840,
+  "robuxSpent": 1200,
+  "purchases": 4
 }
 ```
 
 - `byName`: a count for every allow-listed name (0 when none).
 - `byCategory`: the `ac_flag` rows grouped by their `props.cat`.
-- `sessions`: distinct sessions. `lastSeen`: the newest row of any kind for those pids, or `null`.
+- `sessions`: distinct sessions. `lastSeen`: the newest row of any kind but `fleet` for those pids, or `null`.
+- `playtimeSecs`: each session's first to last row (any kind but `fleet`), summed, in seconds.
+- `robuxSpent` and `purchases`: the Robux and the count of the `purchase` rows (the framework's native purchase rows)
+  in the range.
 
 For a UserId this backend has never seen, `events` answers `200 { "uid": …, "known": false, "pids": [], "rows": [],
-"more": false }`, and `summary` answers with `known: false` too. Both work on the DuckDB and the Basin backend, and answer 503 while analytics isn't open
+"more": false }`, and `summary` answers with `known: false` and every count 0. Both work on the DuckDB and the Basin backend, and answer 503 while analytics isn't open
 yet, like the other analytics reads.
 
 Example, from the bot's host:
@@ -139,21 +151,31 @@ curl --max-time 30 -H "Authorization: Bearer $TYPETORCH_SUPPORT_KEY" \
 
 ### The allow-list
 
-A support key reads only the event names in the runtime setting `players.supportEvents` (the backend's Settings page;
-default `ac_flag,ac_action,ac_honeypot,join,leave`, where `join` and `leave` are the `session` rows). Asking for any
-other name answers `403 { "error": "event_not_allowed", "name": "<name>" }`. An `admin` key isn't limited by it.
+A support key reads only the event names in the runtime setting `players.supportEvents` (the backend's Settings page,
+or `TYPETORCH_PLAYERS_SUPPORT_EVENTS`, comma separated; at most 64 names; default
+`ac_flag,ac_action,ac_honeypot,join,leave`). Some names are special:
+
+| Name | Reads |
+|---|---|
+| `join`, `leave`, `device` | the `session` rows of that name (`device` is the player's device row; add it to the list to allow it) |
+| `feedback` | the player's [feedback](feedback.md) rows (the `feedback` kind), reported with the name `feedback` |
+| any other name | rows of that name of any kind but `session`, `fleet` and `feedback` |
+
+Asking for any other name answers `403 { "error": "event_not_allowed", "name": "<name>" }`. An `admin` key (or an
+owner's session or the admin token) isn't limited by it.
 
 Name your game's support-relevant [analytics](analytics.md) events to match, or add them to the list.
 
 ## Rate limit
 
-Every key has its own token bucket: `keys.ratePerMinute` requests a minute (runtime setting, default 120). Over it the
-backend answers `429 { "error": "rate_limited" }` with `Retry-After` (seconds); wait that long. Built-in keys are
-limited per id too, except `env:api` (the game key), which keeps the ingest limits game servers have always had.
+Every named key (`ttk_...`) has its own token bucket: `keys.ratePerMinute` requests a minute (runtime setting or
+`TYPETORCH_KEYS_RATE_PER_MINUTE`, default 120). Over it the backend answers `429 { "error": "rate_limited" }` with
+`Retry-After` (seconds); wait that long. A key with the `game` role isn't limited by it: it keeps the ingest limits game
+servers have always had. The built-in env tokens keep their own checks.
 
 ## Audit
 
-Every `players:read` request writes an [audit](security.md) row: the key's id, name and role, the route template
+Every `players:read` request writes an [audit](security.md#the-backend) row (action `players.read`): the key's id, name and role, the route template
 (`/v1/players/by-uid/:uid/events`), the status, the time and the client's IP. It never holds the UserId (more people can
 read the audit log than the data), only a count of pids. Creating and revoking keys are audited too (`keys.create`,
 `keys.revoke`, never the secret). Other uses of a key only update its `last used` time (at most once a minute).
