@@ -456,7 +456,7 @@ Revoked and expired keys answer 401 like unknown ones; `last_used_at` is written
 - A key is a Bearer only; it never opens an explorer session. Admin keys act like the admin token, except the owner list
   (`PUT /v1/access`), the trust-link signing keys (`PUT /v1/access/keys`), the export API (`/v1/admin/export/*`) and
   starting or steering a migration (`POST /v1/admin/migrate`): those take the env admin token only (403 for a named key). Analyst keys read like the web role within their scopes.
-- The CLI's `typetorch keys create | list | revoke` ship in the next CLI release (after 0.18.1); the routes work today.
+- The CLI's `typetorch keys create | list | revoke` need CLI 0.19.0+; the routes work with any CLI.
 - Rate limit: runtime setting `keys.ratePerMinute` (`TYPETORCH_KEYS_RATE_PER_MINUTE`, default 120) per key, `429 { error: "rate_limited" }` + Retry-After;
   game keys keep the ingest limits; the env tokens keep theirs.
 - `GET /v1/players/by-uid/<uid>/events?names=&since=&before=&limit=` (1..100, default 50; `since` / `before` unix ms,

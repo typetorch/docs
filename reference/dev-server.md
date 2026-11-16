@@ -166,7 +166,7 @@ npm, set `TYPETORCH_DEV_SERVER` to a checkout's `src/index.ts`.
   **Apply** (0.4.0), **Deploy to dev** and **Discard** in the tab, which `serve` sends as
   `POST /v1/prompts/:id/deploy` with `decision` `apply`, `deploy` or `discard`. Apply puts the change into the
   checkout `serve`'s Rojo syncs to Studio, uncommitted; Deploy goes to `--deploy-branch`.
-- Besides prompts, cancel and these decisions, `serve` (CLI 0.18.1) passes through only
+- Besides prompts, cancel and these decisions, `serve` (through CLI 0.19.0) passes through only
   `GET /v1/conversations[/:id]`, `POST /v1/attachments[/capture|/asset]`, `GET /v1/images/:id` and `POST /v1/logs`,
   never `/v1/token` or `/v1/game/*`. So the Studio game tools below don't reach the plugin yet (**planned**).
 - `typetorch serve --remote` (CLI 0.12) opens a tunnel of its own for a Studio on another machine; that tunnel and its

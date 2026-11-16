@@ -48,7 +48,7 @@ other plugins.
 **`darklua not found: this payload isn't minified`.**
 A warning, not an error: the build still works, unminified. Add darklua with `rokit add seaofvoices/darklua` (or set
 `TYPETORCH_DARKLUA` to its path), or build with `--no-minify`. The warning also suggests `"minify": false` in
-`typetorch.json`, but the CLI (through 0.18.1) drops that key as unknown, so it doesn't silence anything yet
+`typetorch.json`, but the CLI (through 0.19.0) drops that key as unknown, so it doesn't silence anything yet
 ([Production pack](deploy-and-rollback.md#production-pack)).
 
 **`compiler goblox was requested (...) but goblox is not installed`.**

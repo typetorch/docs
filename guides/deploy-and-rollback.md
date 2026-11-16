@@ -84,7 +84,7 @@ both channels):
   error fails the build.
 - Each module's result is cached by content hash in `.typetorch/build-cache/pack/`, so an unchanged rebuild only hashes.
 - `--no-minify` on `build`, `upload` or `deploy` turns it off. The darklua warning also suggests `"minify": false` in
-  `typetorch.json`, but the CLI (0.17.0 through 0.18.1) drops that key as unknown (`unknown key "minify" (ignored)`),
+  `typetorch.json`, but the CLI (0.17.0 through 0.19.0) drops that key as unknown (`unknown key "minify" (ignored)`),
   so it has no effect yet: use `--no-minify`.
 - `typetorch serve` never packs: Studio syncs the compiler's output.
 

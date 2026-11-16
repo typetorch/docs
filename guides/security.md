@@ -135,7 +135,7 @@ kernels or frameworks ship it to every client as before (still gated on the serv
   `TYPETORCH_API_KEY_PREVIOUS` (both accepted until you remove the old one), put the new one in the game repo's `.env`, and
   run `backend setup` again. For the admin token, change `TYPETORCH_ADMIN_TOKEN` on the backend (that ends every explorer
   session) and in the game repo's `.env`. For a named API key: revoke it (`DELETE /v1/admin/keys/<id>`, or
-  `typetorch keys revoke <id>` from the next CLI release) and create another ([API keys](api-keys.md)).
+  `typetorch keys revoke <id>` with CLI 0.19.0+) and create another ([API keys](api-keys.md)).
 
 ## `typetorch serve` and remote Studios
 

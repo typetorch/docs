@@ -47,8 +47,7 @@ A request outside the key's scopes answers `403 { "error": "forbidden", "need": 
 
 ## The CLI
 
-The `keys create | list | revoke` commands ship in **the next CLI release** (they are on the CLI's main branch, after
-0.18.1). The [HTTP routes](#over-http) work today with any backend that has named keys.
+The `keys create | list | revoke` commands need **CLI 0.19.0+**. The [HTTP routes](#over-http) work today with any backend that has named keys.
 
 From the game folder, with `TYPETORCH_ADMIN_TOKEN` in its `.env` and `backend.url` in `typetorch.json`:
 
