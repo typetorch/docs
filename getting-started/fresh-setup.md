@@ -133,11 +133,11 @@ bun run typetorch build
 
 The template's versions are behind. Its `bun.lock` installs these, not the newest on npm:
 
-| Package | The template installs | npm (2026-11-15) |
+| Package | The template installs | npm (2026-11-16) |
 |---|---|---|
-| `@typetorch/framework` | 0.5.0 | 0.7.1 |
+| `@typetorch/framework` | 0.5.0 | 0.7.2 |
 | `@typetorch/kernel` | 0.5.1 | 0.5.7 |
-| `@typetorch/cli` | 0.9.1 | 0.18.1 |
+| `@typetorch/cli` | 0.9.1 | 0.19.0 |
 | `@typetorch/transformer` | 0.2.1 | 0.3.2 |
 | `@typetorch/dev-server` | 0.2.3 | 0.3.3 |
 
@@ -282,7 +282,7 @@ Remove the template's `signingPublicKeys`, `keyAssetId` and `fallbackPublicKey`:
 | `notifications` | optional: the experience notification kinds and caps that `typetorch notify push` sends to the backend ([Notifications](../guides/notifications.md)) |
 
 Unknown keys are ignored with a warning (`unknown key "..." (ignored)`). That includes `minify`, which the darklua
-warning suggests: CLI 0.18.1 doesn't read it yet, so use `--no-minify` on `build`, `upload` or `deploy` to skip the
+warning suggests: CLI 0.19.0 doesn't read it yet, so use `--no-minify` on `build`, `upload` or `deploy` to skip the
 production pack.
 
 Commit it:

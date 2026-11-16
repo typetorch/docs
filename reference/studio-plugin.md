@@ -113,7 +113,7 @@ their own worktree on the serve machine (dev-server 0.4.0), so several devs can 
   the game through files (Code mode, above), never by running code in Studio: the plugin doesn't execute code it
   receives (Creator Store rules ban runtime code loading), so `run_luau` is answered "not available in Studio" (0.7.1
   removed it). **Planned:** the requests come from remote-claude (dev-server 0.4.0) through serve's `/tt/claude/v1`,
-  which doesn't pass `/v1/game/*` through yet (CLI 0.18.1), so until it does Claude works from the files only.
+  which doesn't pass `/v1/game/*` through yet (through CLI 0.19.0), so until it does Claude works from the files only.
 - **"+" menu** for the next message: **Dex path** (the Studio selection), **My logs** (this DataModel's Output),
   **Server logs** and **Screenshot** (in Play only), **Toolbox** (Creator Store tools for that message only).
 - **New chat**; tap the status line for recent chats; the copy icon on a reply selects its Markdown for Ctrl+C. Images
