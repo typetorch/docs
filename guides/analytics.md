@@ -94,8 +94,16 @@ the player's state (`zone:Lobby|screen:Shop|activity:round`).
 **From your code (game-specific):** funnels such as onboarding (`step`), purchases (`purchase`), currency in and out
 (`currency`), activities (`state`), and anything custom (`track`).
 
-**Never collected:** chat or anything typed, usernames and display names (error texts have them replaced with
-`<player>`), UserIds.
+**Player data collected.** The analytics are about identifiable players, not anonymous ones. Every row carries the
+pid, and the pid maps to the player's UserId (your DataStore link and your server's identity rows, under
+[Privacy](#privacy-and-right-to-erasure)), so every row, recording and feedback text can be traced to a Roblox account.
+The join row has the player's country, locale, account age, membership, policy flags, friends in the server and join
+data; the device row their device and screen size. The extended recording (framework 0.7.2, plans/36) stores the
+game's on-screen UI as drawn: usernames and display names (the player's and other players') wherever your UI shows
+them, and the text typed into TextBoxes (no privacy filters). Feedback rows keep the text the player wrote.
+
+**Not collected:** Roblox chat messages (CoreGui, which the recorders don't see). The first-ever session recording
+logs no keys while a TextBox or the chat has focus, and error texts have player names replaced with `<player>`.
 
 ### The first-ever session, recorded in detail
 
@@ -266,7 +274,7 @@ sink writes (`basin` or `duckdb`), and the read side's store renders each query 
 | Ingest | gzip batches, appended to raw files first | JSON arrays to two stream endpoints |
 | Delay | seconds | one roll interval (60 s minimum; expect 1-2 minutes) |
 | Queries | `bun run report`, the HTTP API, `createStore` | `createStore` (Basin SQL, read-only) |
-| Deleting a player's rows | yes | no (rows become anonymous) |
+| Deleting a player's rows | yes | no (rows lose their UserId link but stay) |
 | Live server status | the fleet API runs in the same process | run the fleet API alone (`TYPETORCH_PARTS=fleet`) |
 
 ### The DuckDB server
@@ -598,10 +606,13 @@ tokens.
 
 ## Privacy and Right to Erasure
 
-- **Events carry a random player id** (`pid`, 32 hex characters), never the UserId. The link lives in your game's
+- **Events carry a random player id** (`pid`, 32 hex characters) in place of the UserId; the pid is linked to the
+  UserId, so the rows are personal data. The link lives in your game's
   DataStore `TypeTorchAnalytics`, key `p/<UserId>` = `{ pid, first, last }` (one read per join, a write on the first
   join and at leave). `first` marks the first-ever session.
-- **Deleting that key makes the player's analytics anonymous**, on both backends.
+- **Deleting that key unlinks the player's analytics from their UserId**, on both backends. Unlinked is not
+  anonymous: rows that stay (Basin) keep what they hold, and an extended recording still shows any names that were on
+  screen.
 - **Your own server also keeps pid -> UserId.** Once a player's pid is known, the game server sends one identity row
   `{ pid, uid, t }` (the UserId and nothing else) per session to your analytics server: DuckDB games in the upload
   batch, Basin games to the backend's `/v1/identity` (Basin rows can't be deleted, so they never go there). It lands in
@@ -619,7 +630,7 @@ tokens.
   Then the UserId's identity rows are deleted (and refused afterwards). Its log keeps the notification id and outcome,
   never the UserId. The admin token can also erase by pid: `POST /v1/erasure` `{ "pid": "..." }`.
 - **Basin can't delete rows** (its SQL is read-only). Delete the `p/<UserId>` link with the rest of the player's data:
-  their rows stay, anonymous.
+  their rows stay, unlinked (not anonymous: see above).
 
 ## Quick start: a local test
 

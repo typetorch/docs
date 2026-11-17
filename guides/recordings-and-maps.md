@@ -158,5 +158,7 @@ Options (`mapKey`, `grid`, `cell`, `windowSeconds`, `downEvents`, `roundEvents`,
   samples them in a fixed order (the same range gives the same sample) and says so.
 - Positioned events are counted in SQL per 4-stud cell (the real-map view asks for finer cells).
 - Basin caps each statement at 10,000 rows; sessions are read in batches, and the answer says when the list hit the cap.
-- Recordings hold pids, never UserIds or names. Positioned events are ordinary event rows: erasure deletes them with the
+- Recordings are keyed by the pid (linked to the UserId, like every row). The first-ever session recording holds no
+  names; the extended recording (framework 0.7.2) stores the on-screen UI as drawn, so usernames, display names and
+  TextBox text the game's UI shows are in it. Positioned events are ordinary event rows: erasure deletes them with the
   player's other rows ([Privacy](analytics.md#privacy-and-right-to-erasure)).
