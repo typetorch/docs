@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Analytics (mockup)</title>
+<!--
+  A mockup of an experience's Analytics tab in the TypeTorch app (mobile/src/app/project/[universeId]/index.tsx,
+  features/project/AnalyticsTab.tsx, analytics/MetricCard.tsx, charts/LineChart.tsx), dark theme, made-up sample data.
+  Rendered to docs/public/screenshots/mobile/analytics.png at 390×844 CSS px. Icons: Ionicons.ttf next to this file.
+-->
+<style>
+:root { --bg: #0a0a0a; --fg: #fafafa; --card: #171717; --muted: #262626; --mfg: #a1a1a1; --border: rgba(255,255,255,0.10); --input: rgba(255,255,255,0.15); --brand: #3987e5; --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; }
+@font-face { font-family: Ionicons; src: url("Ionicons.ttf"); }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { width: 390px; height: 844px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 14px/1.3 Roboto, "Segoe UI", system-ui, sans-serif; }
+.ic { font-family: Ionicons; font-style: normal; font-weight: normal; line-height: 1; display: inline-block; }
+.sb { height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 24px; font-size: 13px; font-weight: 500; }
+.sb .r { display: flex; gap: 5px; font-size: 14px; }
+.hdr { height: 56px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 16px; }
+.hdr .pick { flex: 1; min-width: 0; margin-left: 10px; }
+.hdr .pick b { font-size: 16px; font-weight: 700; }
+.content { flex: 1; min-height: 0; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.small { font-size: 12px; color: var(--mfg); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.chips { display: flex; gap: 6px; white-space: nowrap; overflow: hidden; flex: none; }
+.chip { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); font-size: 12px; font-weight: 500; }
+.chip.on { background: var(--brand); border-color: var(--brand); }
+.seg { display: flex; background: var(--muted); border-radius: 8px; padding: 3px; gap: 3px; flex: none; }
+.seg > div { flex: 1; text-align: center; padding: 6px 0; border-radius: 6px; font-size: 12px; color: var(--mfg); font-weight: 500; }
+.seg > .on { background: var(--bg); color: var(--fg); font-weight: 700; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; flex: none; }
+.b-muted { background: #a1a1a122; border: 1px solid #a1a1a166; color: var(--mfg); }
+.b-good { background: #0ca30c22; border: 1px solid #0ca30c66; color: var(--good); }
+.b-brand { background: #3987e522; border: 1px solid #3987e566; color: var(--brand); }
+.ghost { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; font-weight: 600; }
+.nav { height: 20px; flex: none; display: flex; justify-content: center; align-items: center; }
+.nav::after { content: ""; width: 108px; height: 4px; border-radius: 2px; background: var(--fg); opacity: 0.5; }
+svg text { font-family: Roboto, "Segoe UI", system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div class="sb"><span>12:04</span><span class="r"><i class="ic" data-i="wifi"></i><i class="ic" data-i="cellular"></i><i class="ic" data-i="battery-full" style="font-size:17px"></i></span></div>
+<div class="hdr">
+	<i class="ic" data-i="menu" style="font-size:22px"></i>
+	<i class="ic" data-i="home-outline" style="font-size:22px"></i>
+	<div class="pick">
+		<div style="display:flex;align-items:center;gap:4px"><b>Zomvival</b><i class="ic" data-i="chevron-down" style="font-size:14px;color:var(--mfg)"></i></div>
+		<div class="small">Analytics</div>
+	</div>
+	<i class="ic" data-i="download-outline" style="font-size:20px;margin-right:-2px"></i>
+	<i class="ic" data-i="star" style="font-size:22px;color:var(--warning)"></i>
+</div>
+
+<div class="content">
+	<div style="display:flex;gap:12px;align-items:center;flex:none">
+		<img src="../icon-9908072796.png" alt="" style="width:56px;height:56px;border-radius:8px;object-fit:cover">
+		<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+			<div style="font-size:20px;font-weight:700;letter-spacing:-0.2px">Zomvival</div>
+			<div style="display:flex;gap:6px;align-items:center"><span class="small">Sample Studio</span><span class="badge b-good">1,248 playing</span><span class="badge b-brand"><i class="ic" data-i="flame" style="font-size:11px"></i>TypeTorch</span></div>
+		</div>
+	</div>
+
+	<div class="seg"><div>Overview</div><div class="on">Analytics</div><div>Tools</div><div>TypeTorch</div></div>
+
+	<div class="seg"><div>24 h</div><div>7 d</div><div class="on">28 d</div><div>90 d</div><div>1 y</div><div>Custom</div></div>
+	<div class="chips"><span class="chip on">Auto</span><span class="chip">Minute</span><span class="chip">30 min</span><span class="chip">Hourly</span><span class="chip">Daily</span><span class="chip">Weekly</span><span class="chip">Monthly</span><span class="chip">Total</span></div>
+	<div class="chips"><span class="chip on">Engagement</span><span class="chip">Retention</span><span class="chip">Monetization</span><span class="chip">Acquisition</span><span class="chip">Home recs</span></div>
+
+	<div class="card" style="flex:none">
+		<div style="display:flex;align-items:flex-start;gap:8px">
+			<div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Daily active users</span><span class="small">Unique users per day.</span></div>
+			<div style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:16px;font-weight:700">19.4K</span><span class="small">average</span></div>
+		</div>
+		<div class="chips"><span class="chip on">Total</span><span class="chip">New / returning</span><span class="chip">Source</span><span class="chip">Platform</span><span class="chip">Operating system</span></div>
+		<div style="display:flex;gap:6px;align-items:center"><span class="badge b-muted">daily</span><span class="ghost"><i class="ic" data-i="options-outline" style="font-size:14px"></i>Options</span></div>
+		<svg id="dau" width="332" height="150"></svg>
+	</div>
+
+	<div class="card" style="flex:none">
+		<div style="display:flex;align-items:flex-start;gap:8px">
+			<div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Monthly active users</span><span class="small">Unique users in the 30 days up to each day.</span></div>
+			<div style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:16px;font-weight:700">212.6K</span><span class="small">latest</span></div>
+		</div>
+		<div class="chips"><span class="chip on">Total</span><span class="chip">New / returning</span><span class="chip">Platform</span><span class="chip">Operating system</span></div>
+		<div style="display:flex;gap:6px;align-items:center"><span class="badge b-muted">daily</span><span class="ghost"><i class="ic" data-i="options-outline" style="font-size:14px"></i>Options</span></div>
+		<svg id="mau" width="332" height="150"></svg>
+	</div>
+</div>
+<div class="nav"></div>
+
+<script>
+// Ionicons glyphs (@expo/vector-icons glyphmaps/Ionicons.json).
+const G = {"menu":62545,"home-outline":62339,"chevron-down":62002,"download-outline":62138,"star":62869,"flame":62227,"options-outline":62603,"wifi":63025,"cellular":61960,"battery-full":61831};
+for (const e of document.querySelectorAll("[data-i]")) e.textContent = String.fromCodePoint(G[e.dataset.i]);
+
+// LineChart (charts/LineChart.tsx): PAD 10/8/20/40, y ticks at 0, half and a "nice" max, first and last date, area 12%.
+let seed = 7;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+function series(n, base, trend, wobble, weekend) {
+	const out = [];
+	for (let i = 0; i < n; i++) {
+		const day = (i + 3) % 7;
+		out.push(base + trend * i + (rnd() - 0.5) * wobble + (day === 5 || day === 6 ? weekend : 0));
+	}
+	return out;
+}
+function niceMax(max) {
+	const exp = Math.pow(10, Math.floor(Math.log10(max)));
+	const f = max / exp;
+	return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * exp;
+}
+const short = (n) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${+(n / 1e3).toFixed(1)}K` : `${+n.toFixed(1)}`);
+function chart(id, values) {
+	const svg = document.getElementById(id);
+	const W = 332, H = 150, P = { t: 10, r: 8, b: 20, l: 40 };
+	const pw = W - P.l - P.r, ph = H - P.t - P.b;
+	const max = niceMax(Math.max(...values));
+	const x = (i) => P.l + (i / (values.length - 1)) * pw;
+	const y = (v) => P.t + ph - (v / max) * ph;
+	let s = "";
+	for (const f of [0, 0.5, 1]) {
+		const v = max * f;
+		s += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>`;
+		s += `<text x="${P.l - 6}" y="${y(v) + 3}" font-size="10" fill="#a1a1a1" text-anchor="end">${short(v)}</text>`;
+	}
+	s += `<text x="${P.l}" y="${H - 4}" font-size="10" fill="#a1a1a1">10/21</text><text x="${W - P.r}" y="${H - 4}" font-size="10" fill="#a1a1a1" text-anchor="end">11/17</text>`;
+	const line = values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+	s += `<path d="${line} L${x(values.length - 1)},${y(0)} L${x(0)},${y(0)} Z" fill="#3987e5" opacity="0.12"/>`;
+	s += `<path d="${line}" stroke="#3987e5" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`;
+	svg.innerHTML = s;
+}
+chart("dau", series(28, 15800, 190, 2200, 3600));
+chart("mau", series(28, 186000, 980, 1500, 0));
+</script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Fleet (mockup)</title>
+<!--
+  A mockup of the TypeTorch tab's Fleet page in the TypeTorch app (mobile/src/app/tt/[backendId]/fleet.tsx,
+  features/typetorch/screen.tsx, table/DataTable.tsx), dark theme, made-up sample data (no real servers or jobs).
+  Rendered to docs/public/screenshots/mobile/fleet.png at 390×844 CSS px. Icons: Ionicons.ttf next to this file.
+-->
+<style>
+:root { --bg: #0a0a0a; --fg: #fafafa; --card: #171717; --muted: #262626; --mfg: #a1a1a1; --border: rgba(255,255,255,0.10); --input: rgba(255,255,255,0.15); --brand: #3987e5; --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; }
+@font-face { font-family: Ionicons; src: url("Ionicons.ttf"); }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { width: 390px; height: 844px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 14px/1.3 Roboto, "Segoe UI", system-ui, sans-serif; }
+.ic { font-family: Ionicons; font-style: normal; font-weight: normal; line-height: 1; display: inline-block; }
+.sb { height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 24px; font-size: 13px; font-weight: 500; }
+.sb .r { display: flex; gap: 5px; font-size: 14px; }
+.hdr { height: 56px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 16px; }
+.hdr .pick { flex: 1; min-width: 0; margin-left: 10px; }
+.hdr .pick b { font-size: 16px; font-weight: 700; }
+.hdr .right { display: flex; align-items: center; gap: 10px; }
+.content { flex: 1; min-height: 0; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.label { font-size: 11px; font-weight: 600; color: var(--mfg); text-transform: uppercase; letter-spacing: 0.6px; }
+.small { font-size: 12px; color: var(--mfg); }
+.mono { font-family: "DejaVu Sans Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: -0.4px; }
+.section { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.field { flex: 1; border: 1px solid var(--input); border-radius: 8px; padding: 9px 12px; color: var(--mfg); }
+.grid { display: flex; flex-wrap: wrap; gap: 8px; flex: none; }
+.stat { flex: 1 1 45%; display: flex; flex-direction: column; gap: 4px; }
+.stat .v { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; white-space: nowrap; }
+.bar { height: 4px; border-radius: 2px; background: var(--muted); }
+.bar > div { height: 4px; border-radius: 2px; }
+.search { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--mfg); }
+.tool { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); font-size: 12px; }
+.table { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.tr { display: flex; white-space: nowrap; }
+.tr + .tr { border-top: 1px solid var(--border); }
+.td { flex: none; padding: 7px; font-size: 12px; overflow: hidden; display: flex; align-items: center; gap: 2px; }
+.th { color: var(--mfg); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+.w-job { width: 96px; } .w-enum { width: 110px; } .w-art { width: 140px; } .w-seq { width: 60px; } .w-num { width: 92px; }
+.nav { height: 20px; flex: none; display: flex; justify-content: center; align-items: center; }
+.nav::after { content: ""; width: 108px; height: 4px; border-radius: 2px; background: var(--fg); opacity: 0.5; }
+</style>
+</head>
+<body>
+<div class="sb"><span>12:04</span><span class="r"><i class="ic" data-i="wifi"></i><i class="ic" data-i="cellular"></i><i class="ic" data-i="battery-full" style="font-size:17px"></i></span></div>
+<div class="hdr">
+	<i class="ic" data-i="menu" style="font-size:22px"></i>
+	<i class="ic" data-i="home-outline" style="font-size:22px"></i>
+	<div class="pick">
+		<div style="display:flex;align-items:center;gap:4px"><b>Zomvival</b><i class="ic" data-i="chevron-down" style="font-size:14px;color:var(--mfg)"></i></div>
+		<div class="small">Fleet</div>
+	</div>
+	<div class="right">
+		<span style="padding:0 4px"><span class="dot" style="width:9px;height:9px;background:var(--good)"></span></span>
+		<i class="ic" data-i="search" style="font-size:19px"></i>
+		<i class="ic" data-i="download-outline" style="font-size:20px"></i>
+		<i class="ic" data-i="link-outline" style="font-size:20px"></i>
+	</div>
+</div>
+
+<div class="content">
+	<div class="small" style="flex:none">Live game servers, the latest deploy and alerts, from the fleet API (updates over its event stream).</div>
+	<div style="display:flex;align-items:center;gap:8px;flex:none">
+		<div class="field">any branch</div>
+		<div style="display:flex;align-items:center;gap:5px"><span class="dot" style="background:var(--good)"></span><span class="small">live</span></div>
+	</div>
+
+	<div class="grid">
+		<div class="card stat"><span class="label">Live servers</span><span class="v">30</span></div>
+		<div class="card stat"><span class="label">Players</span><span class="v">1,248</span></div>
+		<div class="card stat"><span class="label">Artifacts running</span><span class="v">2</span><span class="small">7c41e09a (24), 3b9d2f61 (6)</span></div>
+		<div class="card stat"><span class="label">Health</span><span class="v" style="font-size:17px;line-height:23px">29 ok, 1 degraded</span></div>
+		<div class="card stat"><span class="label">Countries</span><span class="v">8</span><span class="small">US (11), DE (5), BR (4), GB (3), FR (3), PH (2), ...</span></div>
+	</div>
+
+	<div class="section">
+		<div class="label" style="padding:0 2px">Players per version</div>
+		<div class="card" style="display:flex;flex-direction:column;gap:8px">
+			<div style="display:flex;flex-direction:column;gap:3px"><div style="display:flex;justify-content:space-between"><span class="small">7c41e09a · 24 servers</span><span style="font-size:12px">1,031</span></div><div class="bar"><div style="width:100%;background:#3987e5"></div></div></div>
+			<div style="display:flex;flex-direction:column;gap:3px"><div style="display:flex;justify-content:space-between"><span class="small">3b9d2f61 · 6 servers</span><span style="font-size:12px">217</span></div><div class="bar"><div style="width:21%;background:#d95926"></div></div></div>
+		</div>
+	</div>
+
+	<div class="section">
+		<div class="label" style="padding:0 2px">Servers</div>
+		<div class="search"><i class="ic" data-i="search" style="font-size:16px"></i>Search live servers</div>
+		<div style="display:flex;align-items:center;gap:8px">
+			<span class="small" style="flex:1">30 rows</span>
+			<span class="tool"><i class="ic" data-i="grid-outline" style="font-size:14px"></i>Columns</span>
+			<span class="tool"><i class="ic" data-i="download-outline" style="font-size:14px"></i>Export</span>
+		</div>
+		<div class="table" id="servers"></div>
+	</div>
+</div>
+<div class="nav"></div>
+
+<script>
+// Ionicons glyphs (@expo/vector-icons glyphmaps/Ionicons.json).
+const G = {"menu":62545,"home-outline":62339,"chevron-down":62002,"download-outline":62138,"search":62815,"link-outline":62393,"grid-outline":62294,"swap-vertical":62899,"arrow-down":61741,"filter":62209,"wifi":63025,"cellular":61960,"battery-full":61831};
+
+// The live servers table (fleet.tsx SERVER_COLUMNS), sorted by players, highest first. Made-up job ids.
+const head = (name, w, sort) =>
+	`<div class="td th ${w}">${name}<i class="ic" data-i="${sort ? "arrow-down" : "swap-vertical"}" style="font-size:11px;color:${sort ? "var(--fg)" : "rgba(255,255,255,0.10)"}"></i><i class="ic" data-i="filter" style="font-size:11px;color:var(--mfg);margin-left:2px"></i></div>`;
+const rows = [
+	["5e0c7a", "d41b93", "public", "prod", "7c41e09a", 57, 50, "ok"],
+	["a93f12", "0c77e4", "public", "prod", "7c41e09a", 57, 50, "ok"],
+	["1b84d0", "9fa230", "public", "prod", "7c41e09a", 57, 49, "ok"],
+	["c27e55", "41d6b8", "public", "prod", "3b9d2f61", 56, 48, "degraded"],
+	["70d9ab", "e3150f", "public", "prod", "7c41e09a", 57, 47, "ok"],
+	["e8a461", "5b02cd", "public", "prod", "7c41e09a", 57, 46, "ok"],
+	["39fc08", "a6e71d", "public", "prod", "3b9d2f61", 56, 45, "ok"],
+	["f1265e", "88b4a2", "reserved", "prod", "7c41e09a", 57, 44, "ok"],
+];
+let t = `<div class="tr">${head("Job", "w-job")}${head("Type", "w-enum")}${head("Branch", "w-enum")}${head("Artifact", "w-art")}${head("Seq", "w-seq")}${head("Players", "w-num", true)}${head("Health", "w-enum")}</div>`;
+for (const [a, b, type, branch, art, seq, players, health] of rows)
+	t += `<div class="tr"><div class="td w-job mono">${a}…${b}</div><div class="td w-enum">${type}</div><div class="td w-enum">${branch}</div><div class="td w-art mono">${art}</div><div class="td w-seq">${seq}</div><div class="td w-num">${players} / 50</div><div class="td w-enum">${health}</div></div>`;
+document.getElementById("servers").innerHTML = t;
+for (const e of document.querySelectorAll("[data-i]")) e.textContent = String.fromCodePoint(G[e.dataset.i]);
+</script>
+</body>
+</html>

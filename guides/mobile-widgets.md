@@ -126,11 +126,13 @@ These are HTML mockups with sample data, made to check the layouts. They are not
 | [Release garden 4×1](/mobile/mockups/garden-final.html) | the one-game release garden in a wide strip |
 | [Health 4×1](/mobile/mockups/health4x1-final.html) | the 4×1 Stats widget with health |
 
-> **TODO screenshot:** a home screen with a 4×2 Stats widget and a 4×2 All games widget, taken on the phone. Save as
-> `docs/public/screenshots/mobile/widgets-home.png`.
+![A home screen with a 4×2 Stats widget and a 4×2 All games widget](/screenshots/mobile/widgets-home.png)
 
-> **TODO screenshot:** the widget picker in the app (Settings, Widgets). Save as
-> `docs/public/screenshots/mobile/widgets-settings.png`.
+*A mockup with sample data (the widgets drawn by the app's widget preview), not a phone capture.*
+
+![Settings, Widgets: each widget's game, style and four stats](/screenshots/mobile/widgets-settings.png)
+
+*A mockup with sample data (made in HTML from the app's screens), not a phone capture.*
 
 ## See also
 

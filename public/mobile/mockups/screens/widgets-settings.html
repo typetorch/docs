@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Settings, Widgets (mockup)</title>
+<!--
+  A mockup of Settings → Widgets in the TypeTorch app (mobile/src/features/live/WidgetSettings.tsx,
+  features/live/widget-metrics.ts), dark theme, made-up sample data: the same two widgets as widgets-home.html (a
+  Stats widget for The Prison and an All games widget). Rendered to docs/public/screenshots/mobile/widgets-settings.png
+  at 390×844 CSS px. Icons: Ionicons.ttf next to this file.
+-->
+<style>
+:root { --bg: #0a0a0a; --fg: #fafafa; --card: #171717; --muted: #262626; --mfg: #a1a1a1; --border: rgba(255,255,255,0.10); --input: rgba(255,255,255,0.15); --brand: #3987e5; --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; }
+@font-face { font-family: Ionicons; src: url("Ionicons.ttf"); }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { width: 390px; height: 844px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 14px/1.3 Roboto, "Segoe UI", system-ui, sans-serif; }
+.ic { font-family: Ionicons; font-style: normal; font-weight: normal; line-height: 1; display: inline-block; }
+.sb { height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 24px; font-size: 13px; font-weight: 500; }
+.sb .r { display: flex; gap: 5px; font-size: 14px; }
+.hdr { height: 56px; flex: none; display: flex; align-items: center; gap: 28px; padding: 0 16px; font-size: 17px; font-weight: 600; }
+.content { flex: 1; min-height: 0; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.label { font-size: 11px; font-weight: 600; color: var(--mfg); text-transform: uppercase; letter-spacing: 0.6px; }
+.small { font-size: 12px; color: var(--mfg); }
+.section { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.wcard { display: flex; flex-direction: column; gap: 6px; }
+.chips { display: flex; gap: 6px; white-space: nowrap; overflow: hidden; flex: none; }
+.chip { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); font-size: 12px; font-weight: 500; }
+.chip.on { background: var(--brand); border-color: var(--brand); }
+.seg { display: flex; background: var(--muted); border-radius: 8px; padding: 3px; gap: 3px; flex: none; }
+.seg > div { flex: 1; text-align: center; padding: 6px 0; border-radius: 6px; font-size: 12px; color: var(--mfg); font-weight: 500; }
+.seg > .on { background: var(--bg); color: var(--fg); font-weight: 700; }
+.list { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.list > div { position: relative; }
+.list > div + div::before { content: ""; position: absolute; top: 0; left: 12px; right: 0; height: 1px; background: var(--border); }
+.row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+.row .body { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.num { width: 22px; height: 22px; border-radius: 11px; background: var(--muted); display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--mfg); flex: none; }
+.editor { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; }
+.nav { height: 20px; flex: none; display: flex; justify-content: center; align-items: center; }
+.nav::after { content: ""; width: 108px; height: 4px; border-radius: 2px; background: var(--fg); opacity: 0.5; }
+</style>
+</head>
+<body>
+<div class="sb"><span>12:04</span><span class="r"><i class="ic" data-i="wifi"></i><i class="ic" data-i="cellular"></i><i class="ic" data-i="battery-full" style="font-size:17px"></i></span></div>
+<div class="hdr"><i class="ic" data-i="arrow-back" style="font-size:24px"></i>Widgets</div>
+
+<div class="content">
+	<div class="section">
+		<div class="label" style="padding:0 2px">On the home screen</div>
+		<div style="display:flex;flex-direction:column;gap:16px">
+			<div class="wcard">
+				<div style="display:flex;align-items:center;gap:8px;padding:0 2px"><i class="ic" data-i="apps-outline" style="font-size:16px;color:var(--brand)"></i><span style="font-weight:600">The Prison</span></div>
+				<div class="chips"><span class="chip">All games</span><span class="chip">Zomvival</span><span class="chip on">The Prison</span><span class="chip">Cart Ride</span></div>
+				<div class="seg"><div class="on">Stats</div><div>Releases</div></div>
+				<div class="list">
+					<div>
+						<div class="row"><span class="num">1</span><div class="body"><span style="font-weight:500">Session length · last hour</span></div><i class="ic" data-i="chevron-up" style="font-size:16px;color:var(--mfg)"></i></div>
+						<div class="editor">
+							<div class="chips"><span class="chip">DAU</span><span class="chip">WAU</span><span class="chip">MAU</span><span class="chip">New players</span><span class="chip">D1</span><span class="chip">D7</span><span class="chip on">Session length</span><span class="chip">Playtime</span></div>
+							<span class="small">Mean length of the sessions that ended in the window</span>
+							<span class="label">Window</span>
+							<div class="chips"><span class="chip on">1 h</span><span class="chip">24 h</span><span class="chip">72 h</span><span class="chip">7 d</span><span class="chip">30 d</span><span class="chip">Custom…</span></div>
+						</div>
+					</div>
+					<div><div class="row"><span class="num">2</span><div class="body"><span style="font-weight:500">Playtime · last hour</span></div><i class="ic" data-i="chevron-down" style="font-size:16px;color:var(--mfg)"></i></div></div>
+					<div><div class="row"><span class="num">3</span><div class="body"><span style="font-weight:500">D1</span></div><i class="ic" data-i="chevron-down" style="font-size:16px;color:var(--mfg)"></i></div></div>
+					<div><div class="row"><span class="num">4</span><div class="body"><span style="font-weight:500">Revenue · last 72 hours</span><span class="small">Not on the 2×1 size</span></div><i class="ic" data-i="chevron-down" style="font-size:16px;color:var(--mfg)"></i></div></div>
+				</div>
+			</div>
+
+			<div class="wcard">
+				<div style="display:flex;align-items:center;gap:8px;padding:0 2px"><i class="ic" data-i="apps-outline" style="font-size:16px;color:var(--brand)"></i><span style="font-weight:600">All games</span></div>
+				<div class="chips"><span class="chip on">All games</span><span class="chip">Zomvival</span><span class="chip">The Prison</span><span class="chip">Cart Ride</span></div>
+				<span class="small">The releases of every signed-in game of the last weeks, added up; tap a game's icon on the widget to see only that game, tap it again for all.</span>
+			</div>
+		</div>
+	</div>
+
+	<div class="section">
+		<div class="label" style="padding:0 2px">Default for new widgets</div>
+		<div class="list">
+			<div><div class="row"><span class="num">1</span><div class="body"><span style="font-weight:500">DAU</span></div><i class="ic" data-i="chevron-down" style="font-size:16px;color:var(--mfg)"></i></div></div>
+			<div><div class="row"><span class="num">2</span><div class="body"><span style="font-weight:500">New players · last 24 hours</span></div><i class="ic" data-i="chevron-down" style="font-size:16px;color:var(--mfg)"></i></div></div>
+			<div><div class="row"><span class="num">3</span><div class="body"><span style="font-weight:500">D1</span></div><i class="ic" data-i="chevron-down" style="font-size:16px;color:var(--mfg)"></i></div></div>
+		</div>
+	</div>
+</div>
+<div class="nav"></div>
+
+<script>
+// Ionicons glyphs (@expo/vector-icons glyphmaps/Ionicons.json).
+const G = {"arrow-back":61735,"apps-outline":61730,"chevron-down":62002,"chevron-up":62017,"wifi":63025,"cellular":61960,"battery-full":61831};
+for (const e of document.querySelectorAll("[data-i]")) e.textContent = String.fromCodePoint(G[e.dataset.i]);
+</script>
+</body>
+</html>

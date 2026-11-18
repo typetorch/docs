@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Projects (mockup)</title>
+<!--
+  A mockup of the TypeTorch app's Projects home (mobile/src/app/(tabs)/index.tsx, components/ProjectRow.tsx), dark
+  theme (mobile/src/theme.tsx), with made-up sample data. Rendered to docs/public/screenshots/mobile/projects.png at
+  390×844 CSS px. Icons: Ionicons.ttf (MIT, from @expo/vector-icons) next to this file.
+-->
+<style>
+:root { --bg: #0a0a0a; --fg: #fafafa; --card: #171717; --muted: #262626; --mfg: #a1a1a1; --border: rgba(255,255,255,0.10); --input: rgba(255,255,255,0.15); --brand: #3987e5; --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; }
+@font-face { font-family: Ionicons; src: url("Ionicons.ttf"); }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { width: 390px; height: 844px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 14px/1.3 Roboto, "Segoe UI", system-ui, sans-serif; }
+.ic { font-family: Ionicons; font-style: normal; font-weight: normal; line-height: 1; display: inline-block; }
+.sb { height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 24px; font-size: 13px; font-weight: 500; }
+.sb .r { display: flex; gap: 5px; font-size: 14px; }
+.hdr { height: 56px; flex: none; display: flex; align-items: center; padding: 0 16px; font-size: 20px; font-weight: 700; }
+.content { flex: 1; min-height: 0; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.label { font-size: 11px; font-weight: 600; color: var(--mfg); text-transform: uppercase; letter-spacing: 0.6px; padding: 0 2px; }
+.small { font-size: 12px; color: var(--mfg); }
+.section { display: flex; flex-direction: column; gap: 8px; }
+.list { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; position: relative; }
+.list .row + .row::before { content: ""; position: absolute; top: 0; left: 12px; right: 0; height: 1px; background: var(--border); }
+.row .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.title { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.title span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; color: var(--mfg); }
+.stats .p { display: flex; align-items: center; gap: 4px; }
+.gi { width: 40px; height: 40px; border-radius: 8px; background: var(--muted); flex: none; object-fit: cover; display: grid; place-items: center; color: var(--mfg); }
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex: none; }
+.chips { display: flex; gap: 6px; white-space: nowrap; overflow: hidden; }
+.chip { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); font-size: 12px; font-weight: 500; }
+.chip.on { background: var(--brand); border-color: var(--brand); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; flex: none; }
+.b-brand { background: #3987e522; border: 1px solid #3987e566; color: var(--brand); }
+.b-warning { background: #fab21922; border: 1px solid #fab21966; color: var(--warning); }
+.fab { position: absolute; right: 16px; bottom: 96px; display: flex; align-items: center; gap: 6px; padding: 12px 18px; border-radius: 999px; background: var(--brand); color: #fff; font-weight: 600; box-shadow: 0 3px 6px rgba(0,0,0,0.35); }
+.tabs { height: 60px; flex: none; display: flex; border-top: 1px solid var(--border); background: var(--bg); }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--mfg); }
+.tab.on { color: var(--fg); }
+.nav { height: 20px; flex: none; display: flex; justify-content: center; align-items: center; }
+.nav::after { content: ""; width: 108px; height: 4px; border-radius: 2px; background: var(--fg); opacity: 0.5; }
+</style>
+</head>
+<body>
+<div class="sb"><span>12:04</span><span class="r"><i class="ic" data-i="wifi"></i><i class="ic" data-i="cellular"></i><i class="ic" data-i="battery-full" style="font-size:17px"></i></span></div>
+<div class="hdr">Projects</div>
+
+<div class="content">
+	<div class="chips"><span class="chip on">Latest updated</span><span class="chip">Playing</span><span class="chip">Visits</span><span class="chip">Name</span></div>
+	<div class="small">5 projects · 1,962 playing now</div>
+
+	<div class="section">
+		<div class="label">Pinned</div>
+		<div class="list">
+			<div class="row">
+				<img class="gi" src="../icon-9908072796.png" alt="">
+				<div class="body">
+					<div class="title"><span>Zomvival</span><span class="badge b-brand"><i class="ic" data-i="flame" style="font-size:11px"></i>TypeTorch</span></div>
+					<div class="stats"><span class="p"><span class="dot" style="background:var(--good)"></span>1,248 playing <i class="ic" data-i="flame" style="font-size:11px;color:var(--brand)"></i></span><span>3.4M visits</span><span>updated 2h ago</span><span>91% likes</span><i class="ic" data-i="key-outline" style="font-size:12px"></i></div>
+				</div>
+				<i class="ic" data-i="star" style="font-size:20px;color:var(--warning)"></i>
+			</div>
+			<div class="row">
+				<img class="gi" src="../icon-8795395994.png" alt="">
+				<div class="body">
+					<div class="title"><span>The Prison</span><span class="badge b-brand"><i class="ic" data-i="flame" style="font-size:11px"></i>TypeTorch</span></div>
+					<div class="stats"><span class="p"><span class="dot" style="background:var(--good)"></span>214 playing <i class="ic" data-i="flame" style="font-size:11px;color:var(--brand)"></i></span><span>812.4K visits</span><span>updated 1d ago</span><span>88% likes</span><i class="ic" data-i="key-outline" style="font-size:12px"></i></div>
+				</div>
+				<i class="ic" data-i="star" style="font-size:20px;color:var(--warning)"></i>
+			</div>
+		</div>
+	</div>
+
+	<div class="section">
+		<div class="label">Projects</div>
+		<div class="list">
+			<div class="row">
+				<div class="gi"><i class="ic" data-i="cube-outline" style="font-size:20px"></i></div>
+				<div class="body">
+					<div class="title"><span>Cart Ride</span></div>
+					<div class="stats"><span class="p"><span class="dot" style="background:var(--good)"></span>486 playing</span><span>1.2M visits</span><span>updated 5h ago</span><span>84% likes</span></div>
+				</div>
+				<i class="ic" data-i="star-outline" style="font-size:20px;color:var(--mfg)"></i>
+			</div>
+			<div class="row">
+				<div class="gi" style="background:linear-gradient(135deg,#7a6ad8,#2c2266);color:#fff;font-weight:700">S</div>
+				<div class="body">
+					<div class="title"><span>Slime Tycoon</span></div>
+					<div class="stats"><span class="p"><span class="dot" style="background:var(--good)"></span>14 playing</span><span>96.3K visits</span><span>updated 3d ago</span><span>79% likes</span><i class="ic" data-i="key-outline" style="font-size:12px"></i></div>
+				</div>
+				<i class="ic" data-i="star-outline" style="font-size:20px;color:var(--mfg)"></i>
+			</div>
+			<div class="row">
+				<div class="gi"><i class="ic" data-i="cube-outline" style="font-size:20px"></i></div>
+				<div class="body">
+					<div class="title"><span>Test Place</span></div>
+					<div class="stats"><span class="p"><span class="dot" style="background:var(--mfg)"></span>0 playing</span><span>1,204 visits</span><span>updated 12d ago</span><i class="ic" data-i="key-outline" style="font-size:12px"></i></div>
+					<div style="display:flex;gap:6px;margin-top:4px"><span class="badge b-warning"><i class="ic" data-i="lock-closed" style="font-size:11px"></i>Private</span></div>
+				</div>
+				<i class="ic" data-i="star-outline" style="font-size:20px;color:var(--mfg)"></i>
+			</div>
+		</div>
+	</div>
+
+	<div class="small" style="text-align:center">Tap the star to pin · long-press to remove</div>
+</div>
+
+<div class="fab"><i class="ic" data-i="add" style="font-size:20px"></i>Add projects</div>
+
+<div class="tabs">
+	<div class="tab on"><i class="ic" data-i="grid" style="font-size:22px"></i>Projects</div>
+	<div class="tab"><i class="ic" data-i="flame-outline" style="font-size:22px"></i>Backends</div>
+	<div class="tab"><i class="ic" data-i="settings-outline" style="font-size:22px"></i>Settings</div>
+</div>
+<div class="nav"></div>
+
+<script>
+// Ionicons glyphs (@expo/vector-icons glyphmaps/Ionicons.json).
+const G = {"grid":62293,"flame":62227,"flame-outline":62228,"settings-outline":62828,"star":62869,"star-outline":62873,"key-outline":62372,"add":61699,"lock-closed":62407,"cube-outline":62105,"wifi":63025,"cellular":61960,"battery-full":61831};
+for (const e of document.querySelectorAll("[data-i]")) e.textContent = String.fromCodePoint(G[e.dataset.i]);
+</script>
+</body>
+</html>

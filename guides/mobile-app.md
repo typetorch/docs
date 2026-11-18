@@ -176,12 +176,17 @@ and no telemetry.
 
 ## Screenshots
 
-> **TODO screenshot:** the Projects home (My experiences and a group section). Save as
-> `docs/public/screenshots/mobile/projects.png`.
+![The Projects home: pinned experiences, then the rest of your projects](/screenshots/mobile/projects.png)
 
-> **TODO screenshot:** an experience's Analytics tab. Save as `docs/public/screenshots/mobile/analytics.png`.
+*A mockup with sample data (made in HTML from the app's screens), not a phone capture.*
 
-> **TODO screenshot:** the TypeTorch tab's Fleet page. Save as `docs/public/screenshots/mobile/fleet.png`.
+![An experience's Analytics tab: the range, the granularity, the Engagement group and its metric cards](/screenshots/mobile/analytics.png)
+
+*A mockup with sample data (made in HTML from the app's screens), not a phone capture.*
+
+![The TypeTorch tab's Fleet page: live servers, players, versions and the servers table](/screenshots/mobile/fleet.png)
+
+*A mockup with sample data (made in HTML from the app's screens), not a phone capture.*
 
 ## See also
 
