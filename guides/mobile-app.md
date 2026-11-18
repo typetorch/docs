@@ -4,9 +4,9 @@ The TypeTorch app is a phone app for your Roblox experiences. It lists the exper
 shows their analytics and tools, and shows your self-hosted backend's pages (live servers, deploys, errors, analytics)
 natively on the phone. It also has home-screen widgets for live numbers, milestone alerts and exports.
 
-> **Status: early, Android only.** The app ships as an APK for now. It is not on Google Play yet. Most backend pieces it
-> uses for sign-in, live numbers and milestone pushes are on backend branches that are not merged to main yet. See
-> [Backend status](#backend-status) before you rely on the backend features.
+> **Status: early, Android only.** The app ships as an APK for now. It is not on Google Play yet. The backend side
+> (sign-in, live numbers, widgets and milestone pushes) is on the backend's main branch. See
+> [Backend requirements](#backend-requirements).
 
 ## What you need
 
@@ -28,20 +28,18 @@ A store build (Google Play) comes later. It is built as an app bundle from the `
 Developers build a development client from the `development` profile. Expo Go is not enough for the widgets and the
 live watch, because they use the app's own native module.
 
-## Backend status
+## Backend requirements
 
-The app's backend calls are served by these backend routes. Only the dashboard routes are on main today.
+The app uses these backend routes. They are on the backend's main branch.
 
-| Feature | Backend routes | Where it is |
-|---|---|---|
-| Browser sign-in, admin-token sign-in, token refresh and revoke | `/auth/mobile/*`, `/v1/auth/mobile/*` | backend branch `feat/mobile-tokens`, not on main |
-| Live numbers, live watch, widgets | `GET /v1/mobile/live` | backend branches `feat/mobile-live-push` and `feat/mobile-releases`, not on main |
-| Milestone pushes | `POST` and `DELETE /v1/mobile/push`, the `ccuMilestone` alert rule | backend branch `feat/mobile-live-push`, not on main |
-| Release garden | `GET /v1/mobile/live?metrics=releases` | backend branch `feat/mobile-releases`, not on main |
-| TypeTorch pages | the explorer's `/v1/...` routes | main, but the app reaches them with a mobile token, so it needs the sign-in branch too |
+| Feature | Backend routes |
+|---|---|
+| Browser sign-in, admin-token sign-in, refresh, sign-out, revoke | `/auth/mobile/*`, `/v1/auth/mobile/*` |
+| Live numbers, live watch and widgets | `GET /v1/mobile/live`, with `metrics=` for widget stats and the release garden |
+| Milestone pushes | `POST` and `DELETE /v1/mobile/push`, `POST /v1/mobile/push/test`, and the `ccuMilestone` alert rule |
+| TypeTorch pages | the explorer's `/v1/...` routes, called with the mobile token |
 
-Until those branches are merged and deployed, a backend from main does not accept the app's sign-in. The app's
-Projects, analytics and tools use Roblox's own APIs and do not need a backend.
+The Projects, analytics and tools use Roblox's own APIs and do not need a backend.
 
 ## Sign in to a backend
 
@@ -56,10 +54,15 @@ Projects, analytics and tools use Roblox's own APIs and do not need a backend.
 3. The sign-in gives a role. **admin** can use everything the admin token can. **web** is read-only, like the explorer's
    viewers.
 
-The phone keeps a mobile token (`ttm_...`) for each backend, in the phone's secure storage. It lasts 60 days by default
-(the backend can set 30 to 90). The app renews it when fewer than 15 days remain; the old token is revoked at once.
-Sign out in the app, or revoke a session in the backend's Settings page under **Mobile app sessions**. A backend that
-rejects the token marks that backend as signed out.
+The phone keeps a mobile token (`ttm_...`) for each backend, in the phone's secure storage. The token lasts 60 days by
+default, and the backend can set 30 to 90. The app renews it when fewer than 15 days remain, and the old token is revoked
+at once. A renewed token keeps its sign-in's time: after 180 days from the sign-in (the backend's
+`TYPETORCH_MOBILE_TOKEN_MAX_DAYS`), the app must sign in again.
+
+To sign a phone out, use the app's sign-out. On the backend's Settings page, the **Mobile app sessions** card lists the
+sessions and revokes one, or every phone at once (**Revoke all**). A backend that rejects the token marks that backend as
+signed out. Changing the backend's admin token ends the tokens made with the admin token, but not the Roblox users'
+tokens: use **Revoke all** for those.
 
 ## Open Cloud key
 

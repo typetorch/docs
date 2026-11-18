@@ -4,9 +4,9 @@ Home-screen widgets show your game's live numbers without opening the app. There
 numbers you pick) and **Releases** (a grid of your deploys, a release garden). A widget shows one game, or **All games**
 across every signed-in backend.
 
-> **Status: early.** The widgets read `GET /v1/mobile/live`, which is on backend branches that are not merged to main yet
-> (see [Backend status](mobile-app.md#backend-status)). The widget look and the data logic ship over the air, so they can
-> change without a new APK.
+> **Status: early.** The widgets read `GET /v1/mobile/live` on the backend (see
+> [Backend requirements](mobile-app.md#backend-requirements)). The widget look and the data logic ship over the air, so
+> they can change without a new APK.
 
 ## Add a widget
 
@@ -38,12 +38,12 @@ Each Stats widget shows up to four **slots**. A slot is a number and a small arr
 |---|---|---|
 | CCU, servers, peak today | players online now, live servers, the highest CCU since 00:00 UTC | now |
 | DAU, WAU, MAU | unique players in the last 24 hours, 7 days, 30 days | fixed |
-| New players | players who joined in the window | 1 to 72 hours, or 1 to 90 days |
+| New players | players whose first-ever session is in the window | 1 to 72 hours, or 1 to 90 days |
 | D1, D7 | retention of the latest complete cohort | fixed |
 | Session length | mean length of sessions that ended in the window | 1 to 72 hours, or 1 to 90 days |
 | Playtime | total time played in the window, including running sessions | 1 to 72 hours, or 1 to 90 days |
 | Sessions | sessions that ended in the window | 1 to 72 hours, or 1 to 90 days |
-| Revenue | Robux spent in the window | 1 to 72 hours, or 1 to 90 days |
+| Revenue | Robux players paid in the window | 1 to 72 hours, or 1 to 90 days |
 | Payers | unique paying players in the window | 1 to 72 hours, or 1 to 90 days |
 
 - **Colours:** time units are orange, `%` is blue, `R$` is green. Values are white (dark on the day theme).
@@ -52,7 +52,8 @@ Each Stats widget shows up to four **slots**. A slot is a number and a small arr
 
 ## Release garden
 
-The garden draws one cell per UTC day, in columns of seven days. The newest day is in the bottom right and outlined.
+The garden draws one cell per UTC day, in columns of seven days. The newest day is in the bottom right and outlined. A
+release counts on the day it started. It is prod when its channel is `prod`; any other channel counts as dev.
 
 | Cell | Meaning |
 |---|---|
@@ -81,15 +82,15 @@ app and the refresh corner refreshes it.
 
 ## Health
 
-Health shows how the game is doing right now next to the numbers. It appears on Stats widgets, on the All games 4×2 and
-on the release garden's today cell.
+Health shows how the game is doing right now, next to the numbers. It appears on Stats widgets, on the All games 4×2 and
+on the release garden's today cell. It comes from the backend's health card, which is cached for a minute.
 
 | Part | Rule | Colour |
 |---|---|---|
-| Errors (last hour) | compared with the hour before. ▲4× when errors are at least 1 and at least twice the hour before. ▲38% when they rose by more than 10%. ▼61% when they fell by more than 10%. Nothing within ±10%, or when there is no data. ▲ alone when the hour before had no errors | red when rising, green when falling |
-| Servers | healthy servers against all servers. A game with no servers counts as all healthy | amber when not all are healthy |
-| Alerts | open backend alerts. All games lists the newest three across games | amber when any is open |
-| Today's cell (garden) | red when errors are high (at least twice the hour before) or a critical alert fired in the last hour. Amber when any alert is open. Otherwise no ring | red or amber ring |
+| Errors | the last 60 minutes against the 60 minutes before. ▲4× when errors are at least 1 and at least twice the earlier hour. ▲38% when they rose by more than 10%. ▼61% when they fell by more than 10%. Nothing within ±10%, or when there is no data. ▲ alone when the earlier hour had no errors | red when rising, green when falling |
+| Servers | a server is healthy when its Health badge on the Fleet page has no reasons: kernel ok, a heartbeat within 75 seconds, 50 or more TPS, memory 3,000 MB or less. A game with no servers counts as all healthy | amber when not all are healthy |
+| Alerts | fleet alerts from the last 24 hours that nobody has acknowledged. The All games list shows the newest three across games | amber when any is open |
+| Today's cell (garden) | red when errors are high (at least twice the earlier hour), or when a critical alert from the last hour is among the listed alerts. Amber when any alert is open. Otherwise no ring | red or amber ring |
 
 On the smallest sizes the errors part shows only the arrow.
 

@@ -125,7 +125,7 @@ flowchart LR
 
 | Guide | What it covers |
 |---|---|
-| [The mobile app](guides/mobile-app.md) | install, sign-in to a backend, the Open Cloud key and its scopes, Projects, analytics and tools, the TypeTorch pages, exports, backend status |
+| [The mobile app](guides/mobile-app.md) | install, sign-in to a backend, the Open Cloud key and its scopes, Projects, analytics and tools, the TypeTorch pages, exports, backend requirements |
 | [Mobile widgets](guides/mobile-widgets.md) | home-screen widgets: sizes, Stats and Releases, the release garden, All games with a tap filter, health |
 | [Mobile notifications](guides/mobile-notifications.md) | CCU milestone pushes, the live watch, Xiaomi and HyperOS battery settings |
 | [For maintainers](guides/mobile-maintainers.md) | editing the widget HTML and widget program over the air: build, check, preview, `eas update` |

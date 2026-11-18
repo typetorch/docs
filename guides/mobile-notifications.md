@@ -8,23 +8,27 @@ The app has two kinds of phone notification for a game, and widgets keep the num
 | Live watch | one ongoing notification per game, with live numbers updated every 30 seconds | a signed-in backend |
 | Widgets | the same live numbers on the home screen ([Widgets](mobile-widgets.md)) | a signed-in backend |
 
-> **Status: early.** The milestone rule and the live numbers route are on backend branches that are not merged to main
-> yet (see [Backend status](mobile-app.md#backend-status)). The app side is built.
+> **Status: early.** The backend side is on the backend's main branch. The app side is built. Milestone pushes also need
+> Firebase in the phone's build.
 
 These are not the same as Roblox experience notifications, which go to your players. See
 [Notifications](notifications.md) for those.
 
 ## CCU milestone pushes
 
-A milestone fires when the game's live player count (CCU) first reaches it. The milestones are 10, 20, 40, 80, and so on,
-doubling each time.
+A milestone fires when the game's live player count (CCU) first reaches it. The milestones start at 10 and double each
+time: 10, 20, 40, 80, and so on.
 
-- **Re-arm:** a milestone can fire again only after the CCU has dropped below 70% of it.
-- **Cooldown:** at most one push per milestone every 30 minutes.
-- **Where the rule is set:** the backend's Settings page, as an alert rule (`ccuMilestone`). Its start value, re-arm
-  percentage and cooldown can be changed there. The defaults are the ones above.
+- **Re-arm:** a milestone fires again only after the CCU has dropped below 70% of it.
+- **Cooldown:** at most one alert per milestone every 30 minutes.
+- **One step at a time:** a jump past several milestones fires only the highest. The first reading after the backend
+  starts only learns the level, so a restart never announces one.
+- **Where it goes:** the backend's alert webhook (for example Discord), and a push to each phone that turned milestones on.
+- **The rule:** the backend's **Settings** page, **Backend alerts** section, rule `ccuMilestone` (level info). Its start
+  (10), re-arm (70%) and cooldown (30 minutes) can be changed there. The backend's rule must be on for any milestone to
+  fire. Environment: `TYPETORCH_ALERT_CCU_MILESTONE`.
 
-To turn pushes on:
+To turn pushes on in the app:
 
 1. Open **Settings**, then **Notifications**.
 2. Turn on **CCU milestones** for the game. The app asks for notification permission.
@@ -35,8 +39,8 @@ A tapped milestone opens that backend's Fleet page in the app.
 If the phone's build has no Firebase setup, the switch stays off and the app says why. The live watch and the widgets
 still work.
 
-A push stops when the phone's registration is removed: you sign out, the token is revoked or expires, or the push service
-reports that the device is no longer registered.
+A push stops when the phone's registration is removed: you sign out, you revoke the session (or **Revoke all**), the token
+expires, or the push service reports that the device is no longer registered.
 
 ## Live watch
 

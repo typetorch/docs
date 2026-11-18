@@ -168,10 +168,12 @@ Two more come from the optional ingest queue, on the main server only (`TYPETORC
 `queue_bucket_down` (critical) when the queue bucket can't be reached for a minute, and `queue_file_bad` (warning) when a queued
 file can't be loaded (that file is skipped for 10 minutes). They are not in the rules table above.
 
-**Planned: `ccuMilestone`** (the mobile app's milestone pushes; [Mobile app notifications](mobile-notifications.md)). It fires
-when the players online first reach 10, then 20, 40, 80 and so on, re-arms once they drop below 70% of that milestone, and
-fires at most once every 30 minutes per milestone. Its settings are `start`, `rearmPercent` and `cooldownMinutes`. It is on
-the backend branch `feat/mobile-live-push`, not on main yet, so it does not exist on main.
+**Players online milestone** (`ccuMilestone`, level info; `TYPETORCH_ALERT_CCU_MILESTONE`, and the Settings page's
+Backend alerts). Milestones start at `start` (10) and double each step (10, 20, 40, 80, ...). A milestone fires when the
+fleet's players online first reach it, re-arms once they drop below `rearmPercent` (70%) of it, and fires at most once per
+`cooldownMinutes` (30) per milestone. A jump past several fires only the highest, and the first sample after a start only
+learns the level. Besides the alert webhook, it is a push to every [mobile app](mobile-notifications.md) registration with
+milestones on.
 
 Rules that compare with "before" wait for enough volume, so a small test place stays quiet. Details:
 [Running the backend](backend-operations.md#backend-alerts) and the

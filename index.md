@@ -54,7 +54,7 @@ features:
     link: /guides/fleet-and-alerts
     linkText: Live servers and alerts
   - title: Mobile app
-    details: "An Android app for your games (APK for now): Roblox analytics and tools, your backend's pages, home-screen widgets with live numbers and health, milestone pushes and exports. Early: some backend parts are not merged yet."
+    details: "An Android app for your games (APK for now): Roblox analytics and tools, your backend's pages, home-screen widgets with live numbers and health, milestone pushes and exports. Early: Android APK only."
     link: /guides/mobile-app
     linkText: The mobile app
 ---

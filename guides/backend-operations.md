@@ -60,7 +60,7 @@ Every key and bound: the backend README's
 ## Backend alerts
 
 Next to the kernel's alerts, the backend watches its own data once a minute: error spikes, a new error after a deploy,
-a drop in players online, a silent fleet, stopped ingest, slow requests, memory, event loop lag, 5xx answers, low disk
+a drop in players online, a players-online milestone (`ccuMilestone`, info), a silent fleet, stopped ingest, slow requests, memory, event loop lag, 5xx answers, low disk
 and a disk filling up. They go to the Fleet page's alerts and the same webhook. The rules, their defaults and the
 `TYPETORCH_ALERT_*` variables: [Live servers and alerts](fleet-and-alerts.md#backend-alerts).
 
