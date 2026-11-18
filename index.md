@@ -53,6 +53,10 @@ features:
     details: Live server status, deploy reports, alerts, error logs and debug bundles from the kernel, live debug of one server, your own analytics with experiments, funnels and first-session recordings, notifications, feedback, live events, and a web explorer.
     link: /guides/fleet-and-alerts
     linkText: Live servers and alerts
+  - title: Mobile app
+    details: "An Android app for your games (APK for now): Roblox analytics and tools, your backend's pages, home-screen widgets with live numbers and health, milestone pushes and exports. Early: Android APK only."
+    link: /guides/mobile-app
+    linkText: The mobile app
 ---
 
 <div class="home-demo">

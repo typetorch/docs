@@ -4,6 +4,8 @@ The explorer is the web app the [backend](https://github.com/typetorch/backend) 
 [analytics](analytics.md), live servers, deploys, errors and the backend itself in one place. It reads the same routes
 as the CLI and your scripts, and it changes nothing on a game server.
 
+The [mobile app](mobile-app.md) shows most of these pages natively on an Android phone.
+
 - The Docker image builds it. From a checkout: `bun run web:install` and `bun run web:build` (into `web/dist`).
 - `TYPETORCH_EXPLORER=off` serves the API only.
 - Everything below is on the backend's main branch (the backend is unversioned: it runs from a checkout or its image).

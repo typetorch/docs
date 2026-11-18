@@ -112,6 +112,7 @@ kernels or frameworks ship it to every client as before (still gated on the serv
 | Open Cloud API key(s) | the game repo's `.env` (gitignored; CLI 0.9), or the real environment | in git, in chat, in an issue, in a screenshot, given to an agent |
 | Signing key files | `~/.config/typetorch/keys/<universeId>.key` and `.fallback.key` | inside any git work tree (the CLI refuses), copied to another machine you don't control |
 | Backend admin token (`TYPETORCH_ADMIN_TOKEN`) | the game repo's `.env` and the backend's environment | anywhere a game server or a client can read it |
+| Mobile app tokens (`ttm_...`) and the mobile app's Open Cloud key | the phone's secure storage. The backend keeps only a SHA-256 of each mobile token | in git, in logs, in a game, or on a backend (the app's key goes only to `apis.roblox.com`) |
 | Named API keys (`ttk_...`) and the lookup token (`TYPETORCH_LOOKUP_TOKEN`) | the one tool that uses it (its secret store or environment) | in a game server, a client, or a shared chat |
 | Backend game key (`TYPETORCH_API_KEY`, write-only) | the game repo's `.env` and the backend's environment; the signed settings record's `backend` section (server only) | in code, in a payload, sent to a client |
 | Basin R2 token (SQL reads) | your PC only | in the game's settings |

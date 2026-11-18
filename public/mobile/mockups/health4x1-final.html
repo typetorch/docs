@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;font-family:var(--font-sans)}
+.lbl{font-size:12px;font-weight:700;color:var(--foreground);margin:12px 2px 2px}.sub{font-size:11px;color:var(--muted-foreground);margin:0 2px 6px}
+.home{border-radius:var(--radius);padding:10px;background:linear-gradient(160deg,#1d2433,#0d1017)}
+.w{width:380px;height:115px;border-radius:24px;background:#1c1c20;color:#f2f0f5;font-family:Roboto,var(--font-sans);box-sizing:border-box;padding:10px 14px 10px 12px;display:flex;gap:12px;overflow:hidden}
+.g{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:2px;height:100%;flex:none}
+.c{border-radius:2.5px;background:#2b2b31}.c.none{background:transparent}
+.m{color:#a7a3ad}.ok{color:#4cc27a}.warn{color:#f0a03a}.bad{color:#ef6b6b}.gr{color:#4cc27a}.bl{color:#5aa9ff}
+.side{flex:1;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.chips{display:flex;align-items:center;gap:6px}.chips img{width:22px;height:22px;border-radius:99px}
+.ref{margin-left:auto;color:#a7a3ad;font-size:15px}
+.dot{width:7px;height:7px;border-radius:99px;display:inline-block;flex:none}
+.line{display:flex;align-items:center;gap:6px;font-size:10.5px;white-space:nowrap}.line .t{flex:1;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:99px;background:#2b2b31;font-size:10.5px;white-space:nowrap}
+.cap{font-size:12px;color:var(--muted-foreground);margin:12px 2px 0;line-height:1.45}
+</style></head><body>
+
+<p class="lbl">Bad hour: errors up 4× on the hour before, a server needs a look, 3 open alerts</p>
+<div class="home"><div class="w"><div class="g" id="g1"></div><div class="side">
+ <div class="chips"><img src="icon-9908072796.png"><img src="icon-8795395994.png"><span class="m" style="font-size:10.5px;margin-left:4px;white-space:nowrap"><b class="bad">159</b><b class="bad" style="font-size:9.5px">▲4×</b> err · <b class="warn">3</b> al</span><span class="ref">↻</span></div>
+ <div class="line"><span class="dot" style="background:#ef6b6b"></span><span class="t">Zomvival · error spike after #142</span><span class="m">4m</span></div>
+ <div class="line"><span class="dot" style="background:#f0a03a"></span><span class="t">Zomvival · CCU −38%</span><span class="m">12m</span></div>
+ <div class="line" style="font-size:11px"><b class="gr">119</b><span class="m">prod</span> <b class="bl">903</b><span class="m">dev</span><span class="warn" style="margin-left:auto">44/45 srv</span></div>
+</div></div></div>
+<p class="lbl">Calm hour: errors down, every server healthy, no alerts</p>
+<div class="home"><div class="w"><div class="g" id="g2"></div><div class="side">
+ <div class="chips"><img src="icon-9908072796.png"><img src="icon-8795395994.png"><span class="m" style="font-size:10.5px;margin-left:4px;white-space:nowrap"><b class="">12</b><b class="ok" style="font-size:9.5px">▼61%</b> err · <b class="m">0</b> al</span><span class="ref">↻</span></div>
+ <div class="line"><span class="t m">No alerts in 24 h</span></div>
+ <div class="line" style="visibility:hidden">.</div>
+ <div class="line" style="font-size:11px"><b class="gr">119</b><span class="m">prod</span> <b class="bl">903</b><span class="m">dev</span><span class="m" style="margin-left:auto">45/45 srv</span></div>
+</div></div></div>
+<p class="cap"><b style="color:var(--foreground)">Errors</b> compare the last hour with the hour before. ▲ (red) shows how many times higher, like ▲4×, when they at least doubled, or ▲38% for a smaller rise. ▼ (green) shows how much lower, like ▼61%. A change of 10% or less shows no arrow. <b style="color:var(--foreground)">Servers</b> turn amber when any server needs a look and stay plain grey at 45/45. Alerts are amber when any are open. The 2 newest alerts show as lines, each with its game. Today's square is ringed red on an error spike or a critical alert in the last hour, amber when alerts are open.</p><script>
+let seed=4; const rnd=()=>{seed=(seed*16807)%2147483647; return seed/2147483647};
+const G=['#2b2b31','#1f6f45','#2fa463','#4cc27a'], B=['#2b2b31','#24508a','#3a7fd0','#5aa9ff'];const lvl=n=>n===0?0:n===1?1:n<=3?2:3;
+const days=[];for(let i=0;i<39;i++)days.push({p:rnd()<0.35?1+Math.floor(rnd()*3):0,d:rnd()<0.6?1+Math.floor(rnd()*5):0});
+for(const id of ['g1','g2']){const g=document.getElementById(id);const weeks=10,n=70;g.style.gridTemplateColumns='repeat('+weeks+',11.9px)';
+ for(let i=0;i<n;i++){const c=document.createElement('div');c.className='c';const k=i-(n-39);if(k<0)c.classList.add('none');else{const x=days[k];
+  if(x.p&&x.d)c.style.background='linear-gradient(135deg,'+G[lvl(x.p)]+' 50%,'+B[lvl(x.d)]+' 50%)';else if(x.p)c.style.background=G[lvl(x.p)];else if(x.d)c.style.background=B[lvl(x.d)];}
+  if(i===n-1&&id==='g1')c.style.boxShadow='0 0 0 2px #ef6b6b';g.appendChild(c)}}
+</script></body></html>

@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;font-family:var(--font-sans)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:12px}
+.lbl{font-size:12px;font-weight:700;color:var(--foreground);margin:0 2px 2px}
+.sub{font-size:11px;color:var(--muted-foreground);margin:0 2px 6px}
+.home{border-radius:var(--radius);padding:10px;background:linear-gradient(160deg,#1d2433,#0d1017)}
+.w{width:380px;height:115px;justify-content:flex-end;border-radius:24px;background:#1c1c20;color:#f2f0f5;font-family:Roboto,var(--font-sans);box-sizing:border-box;padding:10px 14px 10px 12px;display:flex;gap:14px}
+.g{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:2px;height:100%;flex:none}
+.c{border-radius:2.5px;background:#2b2b31}.c.none{background:transparent}
+.c.today{outline:1.5px solid #f2f0f5cc;outline-offset:-1px}
+.side{flex:none;width:168px;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.chips{display:flex;align-items:center;gap:6px}.chips img{width:22px;height:22px;border-radius:999px}
+.ref{margin-left:auto;color:#a7a3ad;font-size:15px}
+.m{color:#a7a3ad}.gr{color:#4cc27a}.bl{color:#5aa9ff}
+.num{font-size:12px;white-space:nowrap}.num b{font-size:16px;font-weight:700}
+.games{display:flex;flex-direction:column;gap:2px;font-size:10.5px}
+.games div{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.games img{width:13px;height:13px;border-radius:999px}
+.games span.n{flex:1;overflow:hidden;text-overflow:ellipsis;color:#a7a3ad}
+.cap{font-size:12px;color:var(--muted-foreground);margin:10px 2px 0;line-height:1.45}
+</style></head><body>
+<div style="display:flex;flex-direction:column;gap:12px">
+ <div><p class="lbl">Now · your 39 days</p><p class="sub">the grid sits next to the numbers; earlier weeks are left blank</p><div class="home"><div class="w" id="a"></div></div></div>
+ <div><p class="lbl">Later · 16+ weeks of history</p><p class="sub">the grid has grown left and fills the widget</p><div class="home"><div class="w" id="b"></div></div></div>
+</div>
+<p class="cap">Each game's line shows prod (green), dev (blue) and its last prod. The totals sit below. Tap an icon to show one game; tap again to clear.</p>
+<script>
+let seed=5; const rnd=()=>{seed=(seed*16807)%2147483647; return seed/2147483647};
+const G=['#2b2b31','#1f6f45','#2fa463','#4cc27a'], B=['#2b2b31','#24508a','#3a7fd0','#5aa9ff'];
+const lvl=n=>n===0?0:n===1?1:n<=3?2:3;
+const days=[];for(let i=0;i<42;i++){days.push({p:rnd()<0.35?1+Math.floor(rnd()*3):0,d:rnd()<0.6?1+Math.floor(rnd()*5):0})}
+const games=[{n:'Zomvival',i:'icon-9908072796.png',p:78,d:610,l:'1 d ago'},{n:'The Prison',i:'icon-8795395994.png',p:41,d:293,l:'today'}];
+function widget(id,weeks,showGames,HIST){const w=document.getElementById(id);
+ const g=document.createElement('div');g.className='g';g.style.gridTemplateColumns='repeat('+weeks+',11.9px)';const n=weeks*7, hist=HIST;
+ for(let i=0;i<n;i++){const c=document.createElement('div');c.className='c';const k=i-(n-42);
+  if(i<n-hist){c.classList.add('none')}else{const x=days[((k%42)+42)%42]||{p:0,d:0};
+   if(x.p&&x.d)c.style.background='linear-gradient(135deg,'+G[lvl(x.p)]+' 50%,'+B[lvl(x.d)]+' 50%)';else if(x.p)c.style.background=G[lvl(x.p)];else if(x.d)c.style.background=B[lvl(x.d)];}
+  if(i===n-1)c.classList.add('today');g.appendChild(c)}
+ w.appendChild(g);
+ const s=document.createElement('div');s.className='side';
+ s.innerHTML='<div class="chips">'+games.map(x=>'<img src="'+x.i+'" title="'+x.n+'">').join('')+'<span class="ref">↻</span></div>'+
+  (showGames?'<div class="games">'+games.map(x=>'<div><img src="'+x.i+'"><span class="n">'+x.n+'</span><b class="gr">'+x.p+'</b><b class="bl">'+x.d+'</b>'+'<span class="m" style="width:42px;text-align:right">'+x.l+'</span>'+'</div>').join('')+'</div>':'')+
+  '<div class="num"><b class="gr">119</b> <span class="m">prod</span>&nbsp; <b class="bl">903</b> <span class="m">dev</span>'+(showGames?'':'<div class="m" style="font-size:11px;margin-top:2px">last prod 1 d ago</div>')+'</div>';
+ w.appendChild(s);}
+widget("a",12,true,39); widget("b",12,true,105);
+</script></body></html>

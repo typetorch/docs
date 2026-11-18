@@ -10,6 +10,9 @@ no signer and no funnel.
 - The [backend](https://github.com/typetorch/backend) plans each user's next send (**at most `dailyCap` a day per user**,
   1 by default), sends it through Open Cloud with a **signed launch data token**, and retries.
 - When a player taps it, the framework verifies the token on the game server and calls your `onOpen`.
+
+These go to your players. The TypeTorch mobile app is different: it sends milestone pushes to you, the owner, about your
+game's live player count. See [Mobile app notifications](mobile-notifications.md).
 - Every step is an analytics row (`kind = "notify"`), so the funnel (wanted, sent, opened, played) is on the explorer's
   **Notifications** page with no extra code.
 

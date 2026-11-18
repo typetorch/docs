@@ -121,6 +121,15 @@ flowchart LR
 | [Testing in Studio](guides/studio-testing.md) | `typetorch serve` and the Studio plugin: your local code with the real kernel, live reload in a playtest, agents driving Studio, a Studio on another machine |
 | [remote-claude](guides/remote-claude.md) | prompt Claude Code from inside a dev server or from Studio (`serve --claude`): Live and Code modes, screenshots, Toolbox |
 
+**Mobile app** (Android, early; the APK is not on Play yet)
+
+| Guide | What it covers |
+|---|---|
+| [The mobile app](guides/mobile-app.md) | install, sign-in to a backend, the Open Cloud key and its scopes, Projects, analytics and tools, the TypeTorch pages, exports, backend requirements |
+| [Mobile widgets](guides/mobile-widgets.md) | home-screen widgets: sizes, Stats and Releases, the release garden, All games with a tap filter, health |
+| [Mobile notifications](guides/mobile-notifications.md) | CCU milestone pushes, the live watch, Xiaomi and HyperOS battery settings |
+| [For maintainers](guides/mobile-maintainers.md) | editing the widget HTML and widget program over the air: build, check, preview, `eas update` |
+
 ## For agents
 
 - [agents/AGENTS.md](agents/AGENTS.md): the migration and setup playbook for any coding agent (Claude Code, Codex,
