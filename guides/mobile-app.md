@@ -111,12 +111,12 @@ are asked for only by the screens that use them.
 
 ## Projects
 
-The home screen lists the experiences you can reach, in sections:
+The home screen lists only the experiences you added: **Pinned** first (tap the star), then **Projects**, in the order
+picked with the sort chips. Search filters by name, ID or creator.
 
-- **My experiences:** the universes your Open Cloud key names, and your own public experiences.
-- **One section per group:** the experiences of groups where your rank is high enough. Settings picks which groups:
-  groups you own, rank 200 and up, or all.
-- **Added by you:** experiences you add by place link or ID.
+**Add projects** opens everything you can reach, in sections: the universes your Open Cloud key names and your own
+experiences, then one section per group where your rank is high enough (Settings picks which groups: owned, rank 200 and
+up, or all). You can also add an experience by place link or ID there.
 
 A connected backend's universe is always listed, even when it is private or unlisted. Pull to refresh, or search.
 
