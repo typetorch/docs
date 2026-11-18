@@ -94,7 +94,8 @@ trend across scales use `norm` (the rating as 0..1).
 | `play_s` | seconds played in this session so far |
 
 Device (`dev`), state (zone / screen / activity), session and the player's id come from the engine, as on every row.
-No UserId or username is stored: the explorer finds the player from the pid (the identity store). The full contract is
+The row has no UserId or username field, but it is not anonymous: the pid links it to the player's UserId, and the
+explorer finds the player from it (the identity store). The text is what the player wrote. The full contract is
 in the framework's `src/analytics/SCHEMA.md`.
 
 ## The Feedback page

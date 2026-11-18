@@ -642,14 +642,22 @@ const variant = analytics.experiment("onboarding", ["short", "long"]); // same a
   through the server: about 13 KB a minute for an active player (18 KB as stored base64), under 1 KB for an idle one;
   the per-recording caps (256 KB, 80 chunks) still apply, and 10 minutes of an active player fit inside them. Set
   `recordSeconds` to the length of your first round (e.g. 300) to record it whole.
-- **Never collected:** chat or anything typed, usernames and display names (error texts have them replaced). No event
-  row carries a UserId.
+- **Player data collected:** the analytics are about identifiable players. Rows carry the pid, and the pid maps to the
+  UserId (the DataStore record below, and the identity rows the dev's server keeps), so every row, recording and
+  feedback text can be traced to a Roblox account. The join row has the player's country, locale, account age,
+  membership, policy flags, friends in the server and join data; the device row their device and screen. The extended
+  recording (framework 0.7.2, plans/36) stores the game's on-screen UI as drawn: usernames and display names (the
+  player's and other players') wherever the game's UI shows them, and the text typed into TextBoxes (no privacy
+  filters). Feedback rows keep the text the player wrote. Not collected: Roblox chat messages (CoreGui, not visible
+  to the recorders); the first-session recording logs no keys while a TextBox or the chat has focus, and `tech` error
+  texts have player names replaced by `<player>`.
 - **Identities** (option `identity`, default on): once the pid is known, one row `{ pid, uid, t }` (the UserId, nothing
   else) per session goes to the dev's own server only, never into the events: duckdb games in the batch body, Basin
   games to the backend (the record's `backend` url + `/v1/identity`, or the `identity` / `identityToken` settings). The
   analytics server keeps pid -> UserId in a deletable table (support lookups, Right to Erasure).
 - **Player ids:** DataStore `TypeTorchAnalytics`, key `p/<UserId>` -> `{ pid, first, last }`: one read per join, a
-  write on the first join and at leave. Deleting the key (Right to Erasure) leaves that player's rows anonymous.
+  write on the first join and at leave. Deleting the key (Right to Erasure) removes the pid <->
+  UserId link; rows left behind are unlinked, not anonymous (an extended recording still shows on-screen names).
 - **Sending:** one queue on the server (10,000 events; over that the oldest are dropped and counted), a flush every
   `flushSeconds` (15) or at 500 rows, at most ~10 HttpService requests a minute, retries with backoff, and a last
   flush on shutdown (kernel 0.3.2). Delivery is at least once (a swap mid-request sends that batch again).
