@@ -122,6 +122,38 @@ that window.
   down first when volume spikes.
 - The explorer's **Recordings** page draws them on a map and replays them: [Recordings and maps](recordings-and-maps.md).
 
+### Extended recording
+
+Framework 0.7.2+ (plans/36) can also record poses, other characters and tracked models, animations and the UI tree
+(codec tt-ext-1) for some recorded sessions. Who gets it is the built-in experiment `tt_extended_recording` (variants
+`off`, `on`), only in sessions recorded in detail (`recordShare`) of players under `maxPlaytime` seconds of playtime: with
+no override nobody does. Its dials are `extended` in the settings, changed live with the CLI (0.20.0+), no deploy:
+
+```sh
+bun run typetorch experiment weights tt_extended_recording 1,1    # half of the recorded sessions (settle ... on: all)
+bun run typetorch analytics extended show                         # each dial: the record's value or the default
+bun run typetorch analytics extended set seconds 600 --dry-run    # before and after, nothing written
+bun run typetorch analytics extended set seconds 600              # 10 minutes after the first input, the most
+bun run typetorch analytics extended unset seconds                # back to the default
+```
+
+| Dial | Range | Default | What |
+|---|---|---|---|
+| `seconds` | 10-600 | 300 | seconds an extended session records after the first input (its tt-rec-1 stream runs as long) |
+| `maxPlaytime` | 0-86400 | 60 | eligible while total playtime at the join is under this many seconds |
+| `afkSeconds` | 5-600 | 30 | no input and no movement this long = AFK |
+| `hz` | 1-10 | 3.33 | pose / move / UI polls a second |
+| `entMax` | 0-255 | 24 | the most entities recorded at once, nearest first |
+| `entRadius` | 10-2000 | 150 | entities farther from the camera (studs) aren't recorded |
+| `uiBudgetMs` | 0.05-4 | 0.25 | UI poll time per frame, ms (phones and tablets: 0.6 of it) |
+| `uiKeyframeSeconds` | 10-600 | 60 | seconds between UI keyframes |
+| `dryRun` | true / false | false | build everything, send nothing, report the counts |
+| `streams.pose`, `streams.ent`, `streams.ui`, `streams.view` | true / false | true | which streams run |
+
+The CLI refuses a value out of range (servers would clamp it), signs the record with both prod keys and writes the dials
+to `backend.analytics.extended` and the `analytics` field (a Basin sink reads that one); nothing else in the record
+changes. Don't set them from game code (`new AnalyticsEngine({ settings })`): that replaces the whole analytics config.
+
 ### Positions
 
 Framework 0.7.1+. Game-code events (`custom`, `funnel`, `purchase`, `currency`) can carry the player's character
@@ -364,6 +396,7 @@ with no deploy or place publish.
 | `positions` | event names (1-64 characters, at most 64) whose game-code events always carry `px`, `py`, `pz`, added to the engine option ([Positions](#positions); framework 0.7.1+) |
 | `techEvery` | seconds between tech samples, 15-3600 (default 60) |
 | `experiments` | live dials per [experiment](#experiments) |
+| `extended` | the [extended recording](#extended-recording)'s dials (framework 0.7.2+) |
 
 **How to write it:** `backend setup` writes it from the game folder, after it checks the backend's address and both keys
 ([settings](settings.md#checked-before-it-is-signed)):
@@ -376,7 +409,8 @@ It derives this section from `backend` and keeps the other fields (`techEvery`, 
 `--analytics basin --events <url> --recordings <url>` it writes a Basin sink instead (`backend` = `basin`, the two stream
 URLs, and the send token from `BASIN_SEND_TOKEN`; the record's `backend` keeps pointing at the server for the fleet).
 `--analytics duckdb` writes the server sink back. `typetorch experiment`
-writes the experiment overrides ([below](#experiments)). No command sets `techEvery`, `recordSeconds`, `positions` or
+writes the experiment overrides ([below](#experiments)) and `typetorch analytics extended` the extended recording's dials
+([below](#extended-recording)). No command sets `techEvery`, `recordSeconds`, `positions` or
 the join data dials yet (`backend setup` keeps whatever is already in `backend.analytics`), and `settings set analytics`
 only points to `backend setup`. Read it back with `bun run typetorch settings get
 analytics` (the token hidden), and stop sending with `bun run typetorch settings unset backend` (it drops `fleet` and
