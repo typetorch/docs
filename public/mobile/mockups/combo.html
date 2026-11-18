@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;font-family:var(--font-sans)}
+.lbl{font-size:12px;font-weight:700;color:var(--foreground);margin:14px 2px 2px}.sub{font-size:11px;color:var(--muted-foreground);margin:0 2px 6px}
+.home{border-radius:var(--radius);padding:12px;background:linear-gradient(160deg,#1d2433,#0d1017)}
+.w{width:380px;height:240px;border-radius:24px;background:#1c1c20;color:#f2f0f5;font-family:Roboto,var(--font-sans);box-sizing:border-box;padding:12px 14px;display:flex;gap:12px;overflow:hidden}
+.g{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:2px;flex:none}
+.c{border-radius:2.5px;background:#2b2b31}.c.none{background:transparent}.c.today{outline:1.5px solid #f2f0f5cc;outline-offset:-1px}
+.m{color:#a7a3ad}.ok{color:#4cc27a}.warn{color:#f0a03a}.bad{color:#ef6b6b}.gr{color:#4cc27a}.bl{color:#5aa9ff}
+.chips{display:flex;align-items:center;gap:6px}.chips img{width:22px;height:22px;border-radius:99px}
+.ref{margin-left:auto;color:#a7a3ad;font-size:15px}
+.dot{width:8px;height:8px;border-radius:99px;display:inline-block;flex:none}
+.gl{display:flex;align-items:center;gap:6px;font-size:10.5px;white-space:nowrap}
+.gl img{width:14px;height:14px;border-radius:99px}.gl .n{flex:1;overflow:hidden;text-overflow:ellipsis}
+.k{font-size:9px;color:#a7a3ad;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.cap{font-size:12px;color:var(--muted-foreground);margin:12px 2px 0;line-height:1.45}
+table{border-collapse:collapse;font-size:10.5px;width:100%}td{padding:2px 3px;white-space:nowrap}th{font-size:8.5px;color:#a7a3ad;font-weight:600;text-align:right;padding:0 3px 3px;text-transform:uppercase}td.r{text-align:right}
+</style></head><body>
+
+<p class="lbl" style="margin-top:0">A · Garden left, a health table right</p><p class="sub">a row per game: status, errors, servers, alerts, prod and dev</p>
+<div class="home"><div class="w" style="align-items:center"><div class="g" id="ga"></div><div style="flex:1;align-self:stretch;display:flex;flex-direction:column;gap:8px;min-width:0">
+ <div class="chips"><span class="dot" style="background:#f0a03a;width:10px;height:10px"></span><span style="font-size:13px;font-weight:700">2 need a look</span><span class="ref">↻</span></div>
+ <table><tr><th style="text-align:left">Game</th><th>Err 1h</th><th>Srv</th><th>Alerts</th></tr>
+ <tr><td><img src="icon-9908072796.png" style="width:13px;height:13px;border-radius:99px;vertical-align:-2px"> Zomvival</td><td class="r bad">143 ▲</td><td class="r">5/6</td><td class="r warn">2</td></tr>
+ <tr><td><img src="icon-8795395994.png" style="width:13px;height:13px;border-radius:99px;vertical-align:-2px"> The Prison</td><td class="r">12</td><td class="r ok">31/31</td><td class="r m">0</td></tr>
+ <tr><td><span style="display:inline-block;width:13px;height:13px;border-radius:99px;background:#4a4a52;vertical-align:-2px"></span> Cart Ride</td><td class="r">4</td><td class="r ok">8/8</td><td class="r warn">1</td></tr></table>
+ <div style="margin-top:auto;border-top:1px solid #33333a;padding-top:6px;font-size:11px"><span class="m">releases</span> <b class="gr">119</b> <span class="m">prod</span> <b class="bl">903</b> <span class="m">dev · last prod 1 d ago</span></div>
+</div></div></div>
+
+<p class="lbl">B · Garden on top, health cards below</p><p class="sub">the release grid across the top; one card per game with its health</p>
+<div class="home"><div class="w" style="flex-direction:column;gap:8px">
+ <div style="display:flex;align-items:center;gap:8px"><div class="g" id="gb"></div><div style="flex:1;display:flex;flex-direction:column;gap:3px;font-size:11px"><span class="ref" style="margin-left:auto">↻</span><span><b class="gr">119</b> <span class="m">prod</span></span><span><b class="bl">903</b> <span class="m">dev</span></span><span class="m">last prod 1 d</span></div></div>
+ <div style="display:flex;gap:6px;flex:1">
+  <div style="flex:1;background:#25252b;border-radius:12px;padding:7px 8px;display:flex;flex-direction:column;gap:3px;border-left:3px solid #ef6b6b"><div class="gl"><img src="icon-9908072796.png"><span class="n" style="font-weight:600">Zomvival</span></div><span style="font-size:10.5px"><b class="bad">143</b> <span class="m">err 1h</span></span><span style="font-size:10.5px">5/6 <span class="m">srv</span> · <b class="warn">2</b> <span class="m">alerts</span></span></div>
+  <div style="flex:1;background:#25252b;border-radius:12px;padding:7px 8px;display:flex;flex-direction:column;gap:3px;border-left:3px solid #2fa463"><div class="gl"><img src="icon-8795395994.png"><span class="n" style="font-weight:600">The Prison</span></div><span style="font-size:10.5px"><b>12</b> <span class="m">err 1h</span></span><span style="font-size:10.5px">31/31 <span class="m">srv</span> · <span class="m">0 alerts</span></span></div>
+  <div style="flex:1;background:#25252b;border-radius:12px;padding:7px 8px;display:flex;flex-direction:column;gap:3px;border-left:3px solid #f0a03a"><div class="gl"><span class="dot" style="background:#4a4a52;width:14px;height:14px"></span><span class="n" style="font-weight:600">Cart Ride</span></div><span style="font-size:10.5px"><b>4</b> <span class="m">err 1h</span></span><span style="font-size:10.5px">8/8 <span class="m">srv</span> · <b class="warn">1</b> <span class="m">alert</span></span></div>
+ </div>
+</div></div>
+
+<p class="lbl">C · Garden with health overlaid on the timeline</p><p class="sub">today's column shows red when there are errors and amber when there are alerts; the latest alerts listed beside</p>
+<div class="home"><div class="w" style="align-items:center"><div class="g" id="gc"></div><div style="flex:1;align-self:stretch;display:flex;flex-direction:column;gap:7px;min-width:0">
+ <div class="chips"><img src="icon-9908072796.png"><img src="icon-8795395994.png"><span class="ref">↻</span></div>
+ <div style="display:flex;gap:10px;font-size:11px;white-space:nowrap"><span><b class="bad">159</b> <span class="m">err 1h</span></span><span><b class="ok">44</b><span class="m">/45 srv</span></span><span><b class="warn">3</b> <span class="m">alerts</span></span></div>
+ <div style="display:flex;flex-direction:column;gap:5px;font-size:10.5px">
+  <div class="gl"><span class="dot" style="background:#ef6b6b"></span><span class="n">Zomvival · error spike after #142</span><span class="m">4m</span></div>
+  <div class="gl"><span class="dot" style="background:#f0a03a"></span><span class="n">Zomvival · CCU −38%</span><span class="m">12m</span></div>
+  <div class="gl"><span class="dot" style="background:#f0a03a"></span><span class="n">Cart Ride · memory 92%</span><span class="m">31m</span></div>
+ </div>
+ <div style="margin-top:auto;font-size:11px"><b class="gr">119</b> <span class="m">prod</span> <b class="bl">903</b> <span class="m">dev</span></div>
+</div></div></div>
+<p class="cap">All three are one all-games widget: tap a game (icon, row or card) to show only that game, tap again for all. Health numbers refresh with the widget (every 30 min, on ↻, and on each live-watch poll). Pre-history weeks are blank, as in the garden. They use the widget program, so they ship over OTA.</p>
+<script>
+let seed=9; const rnd=()=>{seed=(seed*16807)%2147483647; return seed/2147483647};
+const G=['#2b2b31','#1f6f45','#2fa463','#4cc27a'], B=['#2b2b31','#24508a','#3a7fd0','#5aa9ff'];const lvl=n=>n===0?0:n===1?1:n<=3?2:3;
+function grid(id,weeks,cell,hist,health){const g=document.getElementById(id);g.style.gridTemplateColumns='repeat('+weeks+','+cell+'px)';g.style.gridTemplateRows='repeat(7,'+cell+'px)';const n=weeks*7;
+ for(let i=0;i<n;i++){const c=document.createElement('div');c.className='c';if(i<n-hist)c.classList.add('none');else{const p=rnd()<0.35?1+Math.floor(rnd()*3):0,d=rnd()<0.6?1+Math.floor(rnd()*5):0;
+  if(p&&d)c.style.background='linear-gradient(135deg,'+G[lvl(p)]+' 50%,'+B[lvl(d)]+' 50%)';else if(p)c.style.background=G[lvl(p)];else if(d)c.style.background=B[lvl(d)];}
+  if(i===n-1){c.classList.add('today');if(health)c.style.boxShadow='0 0 0 2px #ef6b6b'}g.appendChild(c)}}
+grid('ga',8,14,39);grid('gb',18,10.5,39);grid('gc',8,14,39,true);
+</script></body></html>

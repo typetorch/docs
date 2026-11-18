@@ -205,3 +205,6 @@ route or page says which scope is missing.
 
 The key is sent only in the `x-api-key` header to Roblox and never logged. The game repo's own Open Cloud key (deploys,
 the settings record) is separate: [Security model](security.md#keys-and-tokens).
+
+The TypeTorch mobile app has its own Open Cloud key, kept only on the phone. The backend never receives it, and the app
+never sends its key to a backend: [The mobile app](mobile-app.md#open-cloud-key).

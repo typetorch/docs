@@ -204,6 +204,16 @@ export const OPERATE: DefaultTheme.SidebarItem = {
 	],
 };
 
+export const MOBILE: DefaultTheme.SidebarItem = {
+	text: "Mobile app",
+	items: [
+		{ text: "The mobile app", link: "/guides/mobile-app" },
+		{ text: "Widgets", link: "/guides/mobile-widgets" },
+		{ text: "Notifications", link: "/guides/mobile-notifications" },
+		{ text: "For maintainers", link: "/guides/mobile-maintainers" },
+	],
+};
+
 export const TOOLING: DefaultTheme.SidebarItem = {
 	text: "Tooling",
 	items: [
@@ -228,4 +238,4 @@ export const REFERENCE: DefaultTheme.SidebarItem = {
 };
 
 /** Every group, in order. One sidebar for the whole site. */
-export const SIDEBAR: DefaultTheme.SidebarItem[] = [GETTING_STARTED, BUILD, DEPLOY, OPERATE, TOOLING, REFERENCE].map(withToc);
+export const SIDEBAR: DefaultTheme.SidebarItem[] = [GETTING_STARTED, BUILD, DEPLOY, OPERATE, MOBILE, TOOLING, REFERENCE].map(withToc);

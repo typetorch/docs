@@ -78,6 +78,13 @@ Key facts for agents:
 - [Security model](https://www.typetorch.dev/guides/security): who can do what, what protects prod, the backend, devtools for devs only, keys and tokens, serve's control API and remote Studios, no CI for games, never publish secrets, agents
 - [Troubleshooting](https://www.typetorch.dev/guides/troubleshooting): real errors and fixes (cloud test, --wait, swaps, fleet, quick tunnels, analytics, settings and signing keys, dependency cycles)
 
+## Mobile app
+
+- [The mobile app](https://www.typetorch.dev/guides/mobile-app): Android app (APK for now, no Play yet): install, sign-in to a backend (browser or admin token, mobile tokens), the Open Cloud key and its read and write scopes, Projects, experience analytics and tools, the TypeTorch pages, exports (PDF, PNG, CSV), backend status (mobile routes on branches not merged to main)
+- [Mobile widgets](https://www.typetorch.dev/guides/mobile-widgets): home-screen widgets: sizes, Stats and Releases styles, the stat catalogue and windows, the release garden, All games with a tap filter, health colours and arrows, when widgets update
+- [Mobile notifications](https://www.typetorch.dev/guides/mobile-notifications): CCU milestone pushes (ccuMilestone rule, Firebase in the build), the live watch, Xiaomi and HyperOS battery settings
+- [Mobile maintainers](https://www.typetorch.dev/guides/mobile-maintainers): editing the widget HTML and widget program over the air: build and check scripts, the preview, eas update channels
+
 ## Tooling
 
 - [Testing in Studio](https://www.typetorch.dev/guides/studio-testing): studio.project.json, the Studio plugin (TypeTorchSync.rbxm from its GitHub release), typetorch serve, live reload in a playtest (kernel 0.5.4+), the hot assets panel, agents and Studio, a Studio on another machine (serve --remote), Claude in Studio (serve --claude), a session you must not publish
