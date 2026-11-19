@@ -39,7 +39,8 @@ Each Stats widget shows up to four **slots**. A slot is a number and a small arr
 | CCU, servers, peak today | players online now, live servers, the highest CCU since 00:00 UTC | now |
 | DAU, WAU, MAU | unique players in the last 24 hours, 7 days, 30 days | fixed |
 | New players | players whose first-ever session is in the window | 1 to 72 hours, or 1 to 90 days |
-| D1, D7 | retention of the latest complete cohort | fixed |
+| D1 | retention so far today: yesterday's new players back today (grows through the day; the arrow compares with the last complete D1) | fixed |
+| D7 | retention of the latest complete cohort | fixed |
 | Session length | mean length of sessions that ended in the window | 1 to 72 hours, or 1 to 90 days |
 | Playtime | total time played in the window, including running sessions | 1 to 72 hours, or 1 to 90 days |
 | Sessions | sessions that ended in the window | 1 to 72 hours, or 1 to 90 days |
