@@ -8,6 +8,9 @@ natively on the phone. It also has home-screen widgets for live numbers, milesto
 > (sign-in, live numbers, widgets and milestone pushes) is on the backend's main branch. See
 > [Backend requirements](#backend-requirements).
 
+The app is open source (MIT) at [github.com/typetorch/mobile](https://github.com/typetorch/mobile), like the other
+TypeTorch repos.
+
 ## What you need
 
 | For | You need |
@@ -24,6 +27,12 @@ natively on the phone. It also has home-screen widgets for live numbers, milesto
    one now.
 
 A store build (Google Play) comes later. It is built as an app bundle from the `production` profile and is not published.
+
+To build it yourself, clone [typetorch/mobile](https://github.com/typetorch/mobile) and build an APK with EAS from the
+`preview` profile (`eas build --profile preview --platform android`). Point it at your own Expo account first: set
+`owner` in `app.json` and run `eas init` for a new project id. Milestone pushes
+need your own Firebase project's `google-services.json` (see the repo's `docs/FIREBASE_SETUP.md`); without it the app
+works and only the pushes are off.
 
 Developers build a development client from the `development` profile. Expo Go is not enough for the widgets and the
 live watch, because they use the app's own native module.
