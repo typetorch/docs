@@ -251,7 +251,9 @@ Live map, Deploys, Errors, Performance, Query and Settings ([The explorer](explo
   - **`/live`** is the live map of every server at once: while it is open, servers post only positions, one frame
     every 3 s. Admin role only (`POST /v1/fleet/live-map/watch`, `GET /v1/fleet/live-map`).
   - The Fleet page's **Columns** button shows the game's custom columns (`fleet.column`), hidden by default
-    (`GET /v1/fleet/columns`; the values come as `cv` on each server row).
+    (`GET /v1/fleet/columns`; the values come as `cv` on each server row). Framework 0.7.4+: the built-in
+    **Framework** column (`tt_framework`, each server's TypeTorch framework version) shows by default, and a deploy's
+    page lists its live servers by framework version.
   - Positions and stream frames hold player names, UserIds and positions: the backend keeps the last 120 s per server
     in memory only (never on disk or in a log) and drops them when the server closes or is lost.
   - Routes (admin): `POST /v1/fleet/servers/<JobId>/commands` takes `game.<name>` ops only when that server declared

@@ -61,7 +61,7 @@ accepted and checked, and nothing reaches the backend.
 | Names (commands, streams, columns) | `^[a-z][a-z0-9_]{0,31}$` |
 | Commands per server | 32 (label at most 40 characters, description at most 200) |
 | Streams per server | 8, at 0.2 to 4 Hz; `kind` `"points"` or `"json"` (default) |
-| Columns per server | 16; a value is a string (at most 64 characters), a number, a boolean or nothing; `type` `"string"`, `"number"` or `"bool"` is a display hint |
+| Columns per server | 15 of your own (framework 0.7.4+: the built-in `tt_framework` takes the kernel's 16th; `tt_` names are reserved); a value is a string (at most 64 characters), a number, a boolean or nothing; `type` `"string"`, `"number"` or `"bool"` is a display hint |
 | Command args | an optional JSON object of at most 2 KB |
 | Command answer | at most 200 KB, scrubbed of the settings' keys and tokens |
 | Command calls | owners only; the backend takes 30 a minute per explorer user and 60 per server, the kernel runs 30 a minute, each with a 10 s deadline |
@@ -77,7 +77,7 @@ A bad name or option, a duplicate, or one past a limit throws at once.
 | A server's **Game** tab (`/servers/<JobId>`) | a button per declared command, labelled **game-defined**, with optional JSON args. `{ kind: "table", columns, rows }` draws as a table, `{ kind: "kv", items }` as key-value pairs, anything else as JSON. Below, each stream's latest value |
 | A server's **Live map** tab | the server's players on the [exported map](recordings-and-maps.md#maps): positions at 2 Hz, a map switcher, 2D / 3D and the height band, the name on hover, a 20 s trail, your `points` streams as markers (each point in its `color`, else the stream's; a point's `label` isn't drawn). Click a dot or **Follow** to follow a player |
 | **Live map** (`/live`, next to Fleet) | every live server's players at once, coloured per server. While it is open, servers post only positions, one frame every 3 s |
-| **Fleet** page, **Columns** button | your custom columns (hidden until turned on), as the union of what the live servers declared |
+| **Fleet** page, **Columns** button | your custom columns (hidden until turned on), as the union of what the live servers declared. The **Framework** column (framework 0.7.4+, each server's TypeTorch framework version) shows by default |
 
 The server page's tabs only connect while it is open: the backend tells that server it is watched, and the server
 polls and posts. Nothing extra is sent while nobody watches. With the instant wake (an Open Cloud messaging key on the
