@@ -98,6 +98,7 @@ apply a change within seconds. More in [Analytics](analytics.md#settings-the-ana
 | `flushSeconds` | seconds between sends, 5-300 (default 15) | `backend setup --flush-seconds <s>` |
 | `recordShare` | share (0-1) of new players whose first session is recorded (default 1) | `backend setup --record-share <0-1>` |
 | `experiments` | the live experiment overrides | `typetorch experiment` |
+| `extended` | the extended recording's dials (`seconds` 10-600, default 300; `hz`, `entMax`, `streams`, ...; framework 0.7.2+) | `typetorch analytics extended set <dial> <value>` (CLI 0.20.0+; [Analytics: extended recording](analytics.md#extended-recording)) |
 | `techEvery` | seconds between tech health samples, 15-3600 (default 60) | no command |
 | `recordSeconds` | seconds a first-session recording runs after the first input, 10-600 (default 60; framework 0.7.1+) | no command |
 | `positions` | up to 64 event names whose game-code events always carry the player's position (framework 0.7.1+) | no command |
